@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Creador de Rutas - IAVE-WEB</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50, #3498db);
+            color: white;
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 15px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #c0392b;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 350px 1fr 400px;
+            gap: 0;
+            height: calc(100vh - 140px);
+        }
+
+        .sidebar {
+            background: #f8f9fa;
+            padding: 25px;
+            border-right: 1px solid #e9ecef;
+            overflow-y: auto;
+        }
+
+        .form-section {
+            margin-bottom: 25px;
+        }
+
+        .form-section h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 16px;
+            font-weight: 600;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 5px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: 500;
+            font-size: 13px;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        .route-points {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .route-point {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            margin-bottom: 8px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #3498db;
+        }
+
+        .route-point.origin {
+            border-left-color: #27ae60;
+        }
+
+        .route-point.destination {
+            border-left-color: #e74c3c;
+        }
+
+        .route-icon {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            border-radius: 50%;
+        }
+
+        .route-icon.origin {
+            background: #27ae60;
+        }
+
+        .route-icon.destination {
+            background: #e74c3c;
+        }
+
+        .route-icon.waypoint {
+            background: #f39c12;
+        }
+
+        .map-container {
+            background: #fff;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .map-placeholder {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(45deg, #ecf0f1, #bdc3c7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #7f8c8d;
+            font-size: 18px;
+            font-weight: 500;
+        }
+
+        .map-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .map-btn {
+            width: 40px;
+            height: 40px;
+            background: white;
+            border: none;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .map-btn:hover {
+            background: #f8f9fa;
+            transform: scale(1.05);
+        }
+
+        .details-panel {
+            background: #f8f9fa;
+            padding: 25px;
+            border-left: 1px solid #e9ecef;
+            overflow-y: auto;
+        }
+
+        .route-summary {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .summary-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #f1f2f6;
+        }
+
+        .summary-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+
+        .summary-label {
+            font-weight: 500;
+            color: #555;
+        }
+
+        .summary-value {
+            color: #2c3e50;
+            font-weight: 600;
+        }
+
+        .route-table {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .table-header {
+            background: #3498db;
+            color: white;
+            padding: 15px;
+            font-weight: 600;
+        }
+
+        .table-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            padding: 12px 15px;
+            border-bottom: 1px solid #f1f2f6;
+            transition: background-color 0.3s ease;
+        }
+
+        .table-row:hover {
+            background: #f8f9fa;
+        }
+
+        .table-row:last-child {
+            border-bottom: none;
+        }
+
+        .add-point-btn {
+            width: 100%;
+            padding: 12px;
+            background: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            margin-top: 15px;
+            transition: all 0.3s ease;
+        }
+
+        .add-point-btn:hover {
+            background: #229954;
+            transform: translateY(-2px);
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-active {
+            background: #27ae60;
+        }
+
+        .status-pending {
+            background: #f39c12;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚛 Creador de Rutas - Propuesta IAVE-WEB</h1>
+            <div class="header-actions">
+                <button class="btn btn-secondary">📋 Plantillas</button>
+                <button class="btn btn-primary">💾 Guardar Ruta</button>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <!-- Panel de Configuración -->
+            <div class="sidebar">
+                <div class="form-section">
+                    <h3>📍 Información General</h3>
+                    <div class="form-group">
+                        <label>Nombre de la Ruta</label>
+                        <input type="text" class="form-control" placeholder="Ej: Ruta Norte-01">
+                    </div>
+                    <div class="form-group">
+                        <label>Tipo de Vehículo</label>
+                        <select class="form-control">
+                            <option>Camión dos ejes</option>
+                            <option>Camión tres ejes</option>
+                            <option>Tráiler</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Conductor</label>
+                        <select class="form-control">
+                            <option>Seleccionar conductor...</option>
+                            <option>2045 Ariel Ines</option>
+                            <option>2240 Marcos Hernández</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>🎯 Puntos de Ruta</h3>
+                    <div class="form-group">
+                        <label>Origen</label>
+                        <input type="text" class="form-control" placeholder="Huachinetla, Huehuetoca, Mex.">
+                    </div>
+                    <div class="form-group">
+                        <label>Destino</label>
+                        <input type="text" class="form-control" placeholder="Hermosillo, Hermosillo, Son.">
+                    </div>
+                    <button class="add-point-btn">+ Agregar Punto Intermedio</button>
+                </div>
+
+                <div class="route-points">
+                    <div class="route-point origin">
+                        <div class="route-icon origin"></div>
+                        <div>
+                            <strong>Origen</strong><br>
+                            <small>Huachinetla, Huehuetoca</small>
+                        </div>
+                    </div>
+                    <div class="route-point">
+                        <div class="route-icon waypoint"></div>
+                        <div>
+                            <strong>Punto Intermedio</strong><br>
+                            <small>Guadalajara, Jalisco</small>
+                        </div>
+                    </div>
+                    <div class="route-point destination">
+                        <div class="route-icon destination"></div>
+                        <div>
+                            <strong>Destino</strong><br>
+                            <small>Hermosillo, Sonora</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mapa -->
+            <div class="map-container">
+                <div class="map-placeholder">
+                    🗺️ Mapa Interactivo<br>
+                    <small>(Aquí se integrará Google Maps o Leaflet)</small>
+                </div>
+                <div class="map-controls">
+                    <button class="map-btn" title="Zoom In">+</button>
+                    <button class="map-btn" title="Zoom Out">−</button>
+                    <button class="map-btn" title="Mi ubicación">📍</button>
+                    <button class="map-btn" title="Capas">🗂️</button>
+                </div>
+            </div>
+
+            <!-- Panel de Detalles -->
+            <div class="details-panel">
+                <div class="route-summary">
+                    <h3 style="margin-bottom: 15px; color: #2c3e50;">📊 Resumen de Ruta</h3>
+                    <div class="summary-item">
+                        <span class="summary-label">Distancia Total:</span>
+                        <span class="summary-value">1,843.44 km</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Tiempo Estimado:</span>
+                        <span class="summary-value">19h 51min</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Costo Estimado:</span>
+                        <span class="summary-value">$6,825.00</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Combustible:</span>
+                        <span class="summary-value">245.8 L</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Estado:</span>
+                        <span class="summary-value">
+                            <span class="status-indicator status-pending"></span>
+                            En planificación
+                        </span>
+                    </div>
+                </div>
+
+                <div class="route-table">
+                    <div class="table-header">
+                        🚩 Puntos de Control
+                    </div>
+                    <div class="table-row">
+                        <strong>Ubicación</strong>
+                        <strong>Código</strong>
+                    </div>
+                    <div class="table-row">
+                        <span>Jocotitlán</span>
+                        <span>128</span>
+                    </div>
+                    <div class="table-row">
+                        <span>Atlacomulco</span>
+                        <span>222</span>
+                    </div>
+                    <div class="table-row">
+                        <span>Contepec</span>
+                        <span>141</span>
+                    </div>
+                    <div class="table-row">
+                        <span>Zinapécuaro</span>
+                        <span>351</span>
+                    </div>
+                    <div class="table-row">
+                        <span>Panindícuaro</span>
+                        <span>463</span>
+                    </div>
+                </div>
+
+                <div style="margin-top: 20px;">
+                    <button class="btn btn-primary" style="width: 100%; margin-bottom: 10px;">
+                        🚀 Iniciar Ruta
+                    </button>
+                    <button class="btn btn-secondary" style="width: 100%; background: #95a5a6; color: white;">
+                        📄 Exportar PDF
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Simulación de interactividad
+        document.querySelectorAll('.form-control').forEach(input => {
+            input.addEventListener('focus', function() {
+                this.style.transform = 'scale(1.02)';
+            });
+            
+            input.addEventListener('blur', function() {
+                this.style.transform = 'scale(1)';
+            });
+        });
+
+        document.querySelectorAll('.btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                this.style.transform = 'scale(0.95)';
+                setTimeout(() => {
+                    this.style.transform = 'scale(1)';
+                }, 150);
+            });
+        });
+
+        // Simulación de agregar puntos
+        document.querySelector('.add-point-btn').addEventListener('click', function() {
+            alert('Funcionalidad para agregar puntos intermedios\n(Se implementará con React)');
+        });
+    </script>
+</body>
+</html>
