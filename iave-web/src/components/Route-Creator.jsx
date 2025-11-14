@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { parsearMinutos, formatearDinero, RouteOption } from '../components/shared/utils';
-import axios from 'axios';
+import Buscador from '../components/nuevocomponente.jsx';
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -10,7 +10,6 @@ import markerCaseta from 'leaflet/dist/images/MapPinGreen.png';
 import markerB from 'leaflet/dist/images/B.png';
 import markerPin from 'leaflet/dist/images/pin_intermedio.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
-import { set } from 'lodash';
 
 const API_KEY = 'Jq92BpFD-tYae-BBj2-rEMc-MnuytuOB30ST';
 const API_URL = process.env.REACT_APP_API_URL;
@@ -62,8 +61,6 @@ const RutasModule = () => {
     const [puntosIntermedios, setPuntosIntermedios] = useState([]);
 
 
-
-
     const [puntoIntermedio, setPuntoIntermedio] = useState(null);
     const [origen, setOrigen] = useState([]);
     const [destino, setDestino] = useState([]);
@@ -79,7 +76,7 @@ const RutasModule = () => {
     // Estados adicionales
     const [rutas_OyL, setRutas_OyL] = useState(null); //Rutas Optima y Libre
     const [rutaSeleccionada, setRutaSeleccionada] = useState([]); //Ruta Seleccionada, después de presentar las opciones.
-    const [boolExiste, setBoolExiste] = useState('Creando ruta');
+    const [boolExiste, setBoolExiste] = useState('Consultando ruta');
 
     // Refs para debouncing
     const origenTimeoutRef = useRef(null);
@@ -271,6 +268,11 @@ const RutasModule = () => {
             const selectedIntermedio = puntosIntermedios.find(item => item.nombre === value);
             setPuntoIntermedio(selectedIntermedio); // Usar el nuevo estado
         }
+
+
+        if (name === 'selectTipoTraslado') {
+            // Aquí puedes manejar el cambio del tipo de traslado si es necesario
+        }
     };
 
 
@@ -388,217 +390,224 @@ const RutasModule = () => {
     }
 
 
-async function calcularRutaHandler(e) {
-    // Validación de inputs
-    if (!origen?.id_dest || !destino?.id_dest) {
-        alert('Por favor selecciona un origen y destino válidos');
-        return;
-    }
+    async function calcularRutaHandler(e) {
+        // Validación de inputs
+        if (!origen?.id_dest || !destino?.id_dest) {
+            alert('Por favor selecciona un origen y destino válidos');
+            return;
+        }
 
-    // Inicializar estados
-    setLoadingRutas(true);
-    setRutaSeleccionada([]);
-    setRutas_OyL([]);
+        // Inicializar estados
+        setLoadingRutas(true);
+        setRutaSeleccionada([]);
+        setRutas_OyL([]);
 
-    try {
-        // Helper: normalizar nombres de lugares
-        const normalizarNombre = (lugar) => {
-            const partes = lugar?.nombre.split(',');
-            return partes?.[1]?.trim() || lugar?.nombre.trim();
-        };
-
-        // Helper: crear FormData para INEGI
-        const crearFormDataINEGI = (idOrigen, idDestino) => {
-            return new URLSearchParams({
-                dest_i: idOrigen,
-                dest_f: idDestino,
-                v: tipoVehiculo,
-                e: '0',
-                type: 'json',
-                key: API_KEY
-            });
-        };
-
-        // Helper: procesar datos de ruta
-        const procesarRuta = (data) => ({
-            distancia: data?.data?.long_km || 0,
-            tiempo: data?.data?.tiempo_min || 0,
-            costoCasetas: data?.data?.costo_caseta || 0,
-            tienePeaje: data?.data?.peaje === 't',
-            advertencias: data?.data?.advertencia || [],
-            geometria: data?.data?.geometria || null,
-            geojson: data?.data?.geojson || null
-        });
-
-        // Helper: combinar GeoJSON
-        const combinarGeoJSON = (geo1, geo2) => {
-            if (!geo1) return geo2;
-            if (!geo2) return geo1;
-
-            const geoJSON1 = typeof geo1 === 'string' ? JSON.parse(geo1) : geo1;
-            const geoJSON2 = typeof geo2 === 'string' ? JSON.parse(geo2) : geo2;
-
-            return {
-                ...geoJSON1,
-                coordinates: [...geoJSON1.coordinates, ...geoJSON2.coordinates]
+        try {
+            // Helper: normalizar nombres de lugares
+            const normalizarNombre = (lugar) => {
+                const partes = lugar?.nombre.split(',');
+                return partes?.[1]?.trim() || lugar?.nombre.trim();
             };
-        };
 
-        // Helper: combinar dos rutas
-        const combinarRutas = (ruta1, ruta2) => ({
-            distancia: ruta1.distancia + ruta2.distancia,
-            tiempo: ruta1.tiempo + ruta2.tiempo,
-            costoCasetas: ruta1.costoCasetas + ruta2.costoCasetas,
-            tienePeaje: ruta1.tienePeaje || ruta2.tienePeaje,
-            advertencias: [...ruta1.advertencias, ...ruta2.advertencias],
-            geometria: ruta1.geometria && ruta2.geometria
-                ? ruta1.geometria + ruta2.geometria
-                : (ruta1.geometria || ruta2.geometria),
-            geojson: combinarGeoJSON(ruta1.geojson, ruta2.geojson)
-        });
+            // Helper: crear FormData para INEGI
+            const crearFormDataINEGI = (idOrigen, idDestino) => {
+                return new URLSearchParams({
+                    dest_i: idOrigen,
+                    dest_f: idDestino,
+                    v: tipoVehiculo,
+                    e: '0',
+                    type: 'json',
+                    key: API_KEY
+                });
+            };
 
-        // Fetch: Ruta TUSA
-        const fetchRutaTUSA = async () => {
-            const formData = new URLSearchParams({
-                origen: normalizarNombre(origen),
-                destino: normalizarNombre(destino)
+            // Helper: procesar datos de ruta
+            const procesarRuta = (data) => ({
+                distancia: data?.data?.long_km || 0,
+                tiempo: data?.data?.tiempo_min || 0,
+                costoCasetas: data?.data?.costo_caseta || 0,
+                tienePeaje: data?.data?.peaje === 't',
+                advertencias: data?.data?.advertencia || [],
+                geometria: data?.data?.geometria || null,
+                geojson: data?.data?.geojson || null
             });
 
-            const response = await fetch(
-                `${API_URL}/api/casetas/rutas/BuscarRutaPorOrigen_Destino`,
-                {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: formData
+            // Helper: combinar GeoJSON
+            const combinarGeoJSON = (geo1, geo2) => {
+                if (!geo1) return geo2;
+                if (!geo2) return geo1;
+
+                const geoJSON1 = typeof geo1 === 'string' ? JSON.parse(geo1) : geo1;
+                const geoJSON2 = typeof geo2 === 'string' ? JSON.parse(geo2) : geo2;
+
+                return {
+                    ...geoJSON1,
+                    coordinates: [...geoJSON1.coordinates, ...geoJSON2.coordinates]
+                };
+            };
+
+            // Helper: combinar dos rutas
+            const combinarRutas = (ruta1, ruta2) => ({
+                distancia: ruta1.distancia + ruta2.distancia,
+                tiempo: ruta1.tiempo + ruta2.tiempo,
+                costoCasetas: ruta1.costoCasetas + ruta2.costoCasetas,
+                tienePeaje: ruta1.tienePeaje || ruta2.tienePeaje,
+                advertencias: [...ruta1.advertencias, ...ruta2.advertencias],
+                geometria: ruta1.geometria && ruta2.geometria
+                    ? ruta1.geometria + ruta2.geometria
+                    : (ruta1.geometria || ruta2.geometria),
+                geojson: combinarGeoJSON(ruta1.geojson, ruta2.geojson)
+            });
+
+            // Fetch: Ruta TUSA
+            const fetchRutaTUSA = async () => {
+                const formData = new URLSearchParams({
+                    origen: normalizarNombre(origen),
+                    destino: normalizarNombre(destino)
+                });
+
+                const response = await fetch(
+                    `${API_URL}/api/casetas/rutas/BuscarRutaPorOrigen_Destino`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: formData
+                    }
+                );
+
+                if (!response.ok) {
+                    console.error('Error TUSA:', response);
+                    throw new Error(`Error en servidor TUSA: ${response.status}`);
                 }
-            );
 
-            if (!response.ok) {
-                console.error('Error TUSA:', response);
-                throw new Error(`Error en servidor TUSA: ${response.status}`);
-            }
-
-            const text = await response.text();
-            try {
-                const json = JSON.parse(text);
-                return json?.data || json;
-            } catch {
-                return text;
-            }
-        };
-
-        // Fetch: Ruta INEGI
-        const fetchRutaINEGI = async (formData, tipoRuta) => {
-            const response = await fetch(
-                `https://gaia.inegi.org.mx/sakbe_v3.1/${tipoRuta}`,
-                {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: formData
+                const text = await response.text();
+                try {
+                    const json = JSON.parse(text);
+                    return json?.data || json;
+                } catch {
+                    return text;
                 }
-            );
+            };
 
-            if (!response.ok) {
-                throw new Error(`Error INEGI (${tipoRuta}): ${response.status}`);
+            // Fetch: Ruta INEGI
+            const fetchRutaINEGI = async (formData, tipoRuta) => {
+                const response = await fetch(
+                    `https://gaia.inegi.org.mx/sakbe_v3.1/${tipoRuta}`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: formData
+                    }
+                );
+
+                if (!response.ok) {
+                    throw new Error(`Error INEGI (${tipoRuta}): ${response.status}`);
+                }
+
+                const text = await response.text();
+                return JSON.parse(text);
+            };
+
+            // Determinar si hay punto intermedio
+            const hayIntermedio = puntoIntermedio && e !== 'SinIntermedio';
+            const idDestFinal = hayIntermedio ? puntoIntermedio.id_dest : destino.id_dest;
+
+            // Crear FormData para primer segmento
+            const formData1 = crearFormDataINEGI(origen.id_dest, idDestFinal);
+
+            // Ejecutar todas las peticiones en paralelo
+            const promesas = [
+                fetchRutaINEGI(formData1, 'optima'),
+                fetchRutaINEGI(formData1, 'libre'),
+                fetchRutaTUSA()
+            ];
+
+            // Si hay punto intermedio, agregar peticiones del segundo segmento
+            if (hayIntermedio) {
+                const formData2 = crearFormDataINEGI(puntoIntermedio.id_dest, destino.id_dest);
+                promesas.push(
+                    fetchRutaINEGI(formData2, 'optima'),
+                    fetchRutaINEGI(formData2, 'libre')
+                );
             }
 
-            const text = await response.text();
-            return JSON.parse(text);
-        };
+            // Esperar todas las respuestas
+            const resultados = await Promise.all(promesas);
+            const [rutaOptima1, rutaLibre1, dataTusa, rutaOptima2, rutaLibre2] = resultados;
 
-        // Determinar si hay punto intermedio
-        const hayIntermedio = puntoIntermedio && e !== 'SinIntermedio';
-        const idDestFinal = hayIntermedio ? puntoIntermedio.id_dest : destino.id_dest;
+            // Actualizar ruta TUSA y verificar si existe
+            const rutaTUSAData = dataTusa?.data || dataTusa || [];
+            const existeEnTUSA = Array.isArray(rutaTUSAData)
+                ? rutaTUSAData.length > 0
+                : dataTusa?.enTUSA;
 
-        // Crear FormData para primer segmento
-        const formData1 = crearFormDataINEGI(origen.id_dest, idDestFinal);
+            setRutaTusa(rutaTUSAData);
+            console.log('rutaTusa:', rutaTUSAData);
 
-        // Ejecutar todas las peticiones en paralelo
-        const promesas = [
-            fetchRutaINEGI(formData1, 'optima'),
-            fetchRutaINEGI(formData1, 'libre'),
-            fetchRutaTUSA()
-        ];
+            // Mostrar alerta si la ruta no está en TUSA
+            if (!existeEnTUSA) {
+                console.warn('⚠️ Ruta no encontrada en TUSA');
 
-        // Si hay punto intermedio, agregar peticiones del segundo segmento
-        if (hayIntermedio) {
-            const formData2 = crearFormDataINEGI(puntoIntermedio.id_dest, destino.id_dest);
-            promesas.push(
-                fetchRutaINEGI(formData2, 'optima'),
-                fetchRutaINEGI(formData2, 'libre')
-            );
+                //alert('⚠️ La ruta no existe en TUSA. Se está creando una nueva ruta.');
+                //Aqui se va a cargar el "nuevocomponente que se está desarrollando para que muestre al usuario la opción de seleccionar el cliente al que se le asignará la ruta nueva."
+
+
+
+            }
+
+            // Procesar rutas según si hay punto intermedio
+            let rutaOptimaFinal, rutaLibreFinal;
+
+            if (hayIntermedio) {
+                const optima1 = procesarRuta(rutaOptima1);
+                const optima2 = procesarRuta(rutaOptima2);
+                const libre1 = procesarRuta(rutaLibre1);
+                const libre2 = procesarRuta(rutaLibre2);
+
+                rutaOptimaFinal = combinarRutas(optima1, optima2);
+                rutaLibreFinal = combinarRutas(libre1, libre2);
+            } else {
+                rutaOptimaFinal = procesarRuta(rutaOptima1);
+                rutaLibreFinal = procesarRuta(rutaLibre1);
+            }
+
+            // Helper: convertir GeoJSON a string si es necesario
+            const stringifyGeoJSON = (geojson) => {
+                return typeof geojson === 'string' ? geojson : JSON.stringify(geojson);
+            };
+
+            // Actualizar estado con rutas procesadas
+            setRutas_OyL({
+                optima: rutaOptimaFinal,
+                libre: rutaLibreFinal,
+                polilineaOptima: convertirCoordenadasGeoJSON(
+                    stringifyGeoJSON(rutaOptimaFinal.geojson)
+                ),
+                polilineaLibre: convertirCoordenadasGeoJSON(
+                    stringifyGeoJSON(rutaLibreFinal.geojson)
+                )
+            });
+
+            // Actualizar estado de existencia
+            const mensaje = dataTusa?.[0]?.Categoria
+                ? 'Ruta existente'
+                : 'Creando ruta';
+            setBoolExiste(`${mensaje}, <selecciona una ruta>`);
+
+        } catch (error) {
+            console.error('Error al calcular la ruta:', error);
+            setBoolExiste('Error al calcular la ruta');
+            alert(`Error: ${error.message}`);
+        } finally {
+            setLoadingRutas(false);
         }
-
-        // Esperar todas las respuestas
-        const resultados = await Promise.all(promesas);
-        const [rutaOptima1, rutaLibre1, dataTusa, rutaOptima2, rutaLibre2] = resultados;
-
-        // Actualizar ruta TUSA y verificar si existe
-        const rutaTUSAData = dataTusa?.data || dataTusa || [];
-        const existeEnTUSA = Array.isArray(rutaTUSAData) 
-            ? rutaTUSAData.length > 0 
-            : dataTusa?.enTUSA;
-        
-        setRutaTusa(rutaTUSAData);
-        console.log('rutaTusa:', rutaTUSAData);
-
-        // Mostrar alerta si la ruta no está en TUSA
-        if (!existeEnTUSA) {
-            console.warn('⚠️ Ruta no encontrada en TUSA');
-            // Opcional: mostrar notificación no intrusiva
-            // toast.warning('Esta ruta no está registrada en TUSA');
-        }
-
-        // Procesar rutas según si hay punto intermedio
-        let rutaOptimaFinal, rutaLibreFinal;
-
-        if (hayIntermedio) {
-            const optima1 = procesarRuta(rutaOptima1);
-            const optima2 = procesarRuta(rutaOptima2);
-            const libre1 = procesarRuta(rutaLibre1);
-            const libre2 = procesarRuta(rutaLibre2);
-
-            rutaOptimaFinal = combinarRutas(optima1, optima2);
-            rutaLibreFinal = combinarRutas(libre1, libre2);
-        } else {
-            rutaOptimaFinal = procesarRuta(rutaOptima1);
-            rutaLibreFinal = procesarRuta(rutaLibre1);
-        }
-
-        // Helper: convertir GeoJSON a string si es necesario
-        const stringifyGeoJSON = (geojson) => {
-            return typeof geojson === 'string' ? geojson : JSON.stringify(geojson);
-        };
-
-        // Actualizar estado con rutas procesadas
-        setRutas_OyL({
-            optima: rutaOptimaFinal,
-            libre: rutaLibreFinal,
-            polilineaOptima: convertirCoordenadasGeoJSON(
-                stringifyGeoJSON(rutaOptimaFinal.geojson)
-            ),
-            polilineaLibre: convertirCoordenadasGeoJSON(
-                stringifyGeoJSON(rutaLibreFinal.geojson)
-            )
-        });
-
-        // Actualizar estado de existencia
-        const mensaje = dataTusa?.[0]?.Categoria 
-            ? 'Ruta existente' 
-            : 'Creando ruta';
-        setBoolExiste(`${mensaje}, <selecciona una ruta>`);
-
-    } catch (error) {
-        console.error('Error al calcular la ruta:', error);
-        setBoolExiste('Error al calcular la ruta');
-        alert(`Error: ${error.message}`);
-    } finally {
-        setLoadingRutas(false);
     }
-}
 
     return (
         <div className="container-fluid py-0">
+
+
+
 
             <div className="container-fluid py-0 rounded-top">
                 <div className="header-RC py-2 rounded-top">
@@ -607,7 +616,45 @@ async function calcularRutaHandler(e) {
                         <button className="btn btn-success">💾 Guardar Ruta</button>
                     </div>
                 </div>
-
+                <div className="container-fluid py-1 rounded-top border ">
+                    <div className="alert alert-info border-left-info my-2" role="alert" close="true" >
+                        <i className="fas fa-info-circle mr-2"></i>
+                        <strong>Estado:</strong> {loadingRutas || loadingRutaSeleccionada ? 'Cargando rutas...' : boolExiste}
+                    </div>
+                    <table className='table table-bordered table-scroll table-sm table-hover align-middle mt-2'>
+                        <thead>
+                            <tr>
+                                <th>Tipo de Ruta</th>
+                                <th>Distancia</th>
+                                <th>Tiempo</th>
+                                <th>Costo Casetas</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {loadingRutas && (
+                                <tr>
+                                    <td>Cargando rutas...</td>
+                                </tr>
+                            )}
+                            {!loadingRutas && rutas_OyL && (
+                                <>
+                                    <tr>
+                                        <td>Ruta Óptima: </td>
+                                        <td> Distancia: {rutas_OyL.optima.distancia.toFixed(2)} km  </td>
+                                        <td> Tiempo: {parsearMinutos(rutas_OyL.optima.tiempo)}  </td>
+                                        <td> Costo Casetas: {formatearDinero(rutas_OyL.optima.costoCasetas)} </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Ruta Libre: </td>
+                                        <td> Distancia: {rutas_OyL.libre.distancia.toFixed(2)} km  </td>
+                                        <td> Tiempo: {parsearMinutos(rutas_OyL.libre.tiempo)}  </td>
+                                        <td> Costo Casetas: {formatearDinero(rutas_OyL.libre.costoCasetas)} </td>
+                                    </tr>
+                                </>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
                 <div className="main-content-RC">
                     {/* Sidebar donde se selecciona origen, destino y punto intermedio. */}
                     <div className="sidebar-RC px-3">
@@ -698,7 +745,17 @@ async function calcularRutaHandler(e) {
                             </div>
                             <div className="form-group py-0" style={{ justifySelf: 'center' }}>
                                 <label className='py-0 my-0 mr-2'>Tipo de unidad: </label>
-                                <select className='form-select form-select-sm custom-select' name="selectTipoVehiculo" onChange={handleChange} value={tipoVehiculo} id='selectTipoVehiculo' style={{ width: 'auto', height: '2.5rem' }}>
+                                <select
+                                    className='form-select form-select-sm custom-select'
+                                    name="selectTipoVehiculo"
+                                    onChange={handleChange}
+                                    value={tipoVehiculo}
+                                    id='selectTipoVehiculo'
+                                    style={{ width: 'auto', height: '2.5rem' }}
+                                >
+
+
+
                                     <option value="1">Automovil</option>
                                     <option value="2">Bus 2 Ejes</option>
 
@@ -710,6 +767,8 @@ async function calcularRutaHandler(e) {
                                     <option value="10">Camion 7 Ejes</option>
                                     <option value="11">Camion 8 Ejes</option>
                                     <option value="12">Camion 9 Ejes</option>
+
+
                                 </select>
                             </div>
 
@@ -983,10 +1042,10 @@ async function calcularRutaHandler(e) {
 
                         <div className="route-summary-RC pt-2">
                             <h3 className='pb-0 mb-0' style={{ marginBottom: '15px', color: '#2c3e50' }}>📊 Resumen de Ruta </h3>
-                            <center className='pb-3 text-primary'><small><strong>{(rutaTusa[0]?.Categoria) ? 'Esta ruta YA existe en TUSA' : ''}</strong></small></center>
+                            <center className='pb-3 text-primary'><small><strong>{(rutaTusa[0]?.Categoria) ? 'Esta ruta YA existe en TUSA ' + rutaTusa[0]?.Categoria : ''}</strong></small></center>
                             <div className="form-group py-0" style={{ justifySelf: 'center', }}>
                                 <label className='py-0 my-0 mr-2'>Tipo de traslado: </label>
-                                <select className='form-select form-select-sm custom-select' name="selectTipoTraslado" id='selectTipoTraslado' style={{ width: 'auto', height: '2.5rem' }} disabled={(rutaTusa[0]?.Categoria)} defaultValue={rutaTusa[0]?.Categoria || ''}>
+                                <select className='form-select form-select-sm custom-select' name="selectTipoTraslado" id='selectTipoTraslado' style={{ width: 'auto', height: '2.5rem' }} disabled={(rutaTusa[0]?.Categoria)} value={rutaTusa[0]?.Categoria || ''} onChange={handleChange}>
                                     <option value=""  > Selecciona </option>
                                     <option value="Latinos"> Latinos </option>
                                     <option value="Nacionales"> Nacionales </option>
@@ -1069,6 +1128,9 @@ async function calcularRutaHandler(e) {
                         </div>
                     </div>
                 </div>
+            </div>
+            <div>
+                <Buscador></Buscador>
             </div>
         </div >
     );
