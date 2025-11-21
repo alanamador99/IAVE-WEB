@@ -1,254 +1,239 @@
 import React, { useState } from 'react';
+import { Calendar, CheckCircle, AlertCircle, Info } from 'lucide-react';
 
-// Componente Modal con clases de Bootstrap/SB Admin
-const ModalSelectorCliente = ({ isOpen, onClose, onSelect, valorCampo, valoresSugeridos,titulo='', campo='' }) => {
-  const [clienteSeleccionado, setClienteSeleccionado] = useState('');
+const GanttChart = () => {
+  const [selectedPhase, setSelectedPhase] = useState(null);
 
-  if (!isOpen) return null;
-
-  const handleConfirmar = () => {
-    if (clienteSeleccionado) {
-      onSelect(clienteSeleccionado);
-      setClienteSeleccionado('');
-      onClose();
+  const phases = [
+    {
+      id: 1,
+      name: "ETAPA 1: ANÁLISIS Y DISEÑO",
+      duration: "3 semanas",
+      start: 1,
+      length: 3,
+      color: "bg-blue-500",
+      deliverables: [
+        "Documento de Arquitectura Técnica",
+        "Especificación de Requerimientos",
+        "Modelo de Datos documentado"
+      ],
+      tips: [
+        "Usa herramientas como Lucidchart o Draw.io para diagramas",
+        "Considera patrones de arquitectura: MVC, Microservicios, Capas",
+        "Documenta decisiones arquitectónicas (ADRs)"
+      ]
+    },
+    {
+      id: 2,
+      name: "ETAPA 2: DESARROLLO Y CÓDIGO",
+      duration: "6 semanas",
+      start: 4,
+      length: 6,
+      color: "bg-green-500",
+      deliverables: [
+        "Código Fuente documentado",
+        "Documentación técnica",
+        "Evidencias de seguridad"
+      ],
+      tips: [
+        "Implementa estándares de código (ESLint, Prettier)",
+        "Usa Git con commits descriptivos",
+        "Aplica principios SOLID y Clean Code",
+        "Documenta con JSDoc o similar"
+      ]
+    },
+    {
+      id: 3,
+      name: "ETAPA 3: TESTING Y CALIDAD",
+      duration: "3 semanas",
+      start: 10,
+      length: 3,
+      color: "bg-yellow-500",
+      deliverables: [
+        "Plan de Pruebas ejecutado",
+        "Reporte de Cobertura",
+        "Certificado de Seguridad (SAST/DAST)",
+        "Métricas de performance"
+      ],
+      tips: [
+        "Herramientas: Jest, Selenium, JMeter",
+        "Busca cobertura mínima del 80%",
+        "Usa SonarQube para SAST",
+        "OWASP ZAP para DAST"
+      ]
+    },
+    {
+      id: 4,
+      name: "ETAPA 4: DEPLOYMENT",
+      duration: "2 semanas",
+      start: 13,
+      length: 2,
+      color: "bg-purple-500",
+      deliverables: [
+        "Procedimientos de Deployment",
+        "Plan de Disaster Recovery"
+      ],
+      tips: [
+        "Automatiza con CI/CD (Jenkins, GitLab CI)",
+        "Usa scripts de rollback",
+        "Documenta cada paso del despliegue",
+        "Realiza backups antes de deployment"
+      ]
+    },
+    {
+      id: 5,
+      name: "ETAPA 5: OPERACIÓN Y SOPORTE",
+      duration: "2 semanas",
+      start: 15,
+      length: 2,
+      color: "bg-red-500",
+      deliverables: [
+        "Manual de Operaciones",
+        "Documentación de APIs"
+      ],
+      tips: [
+        "Usa Swagger/OpenAPI para APIs",
+        "Crea guías paso a paso con capturas",
+        "Incluye FAQs y troubleshooting",
+        "Documenta logs y monitoreo"
+      ]
     }
-  };
+  ];
 
-  const handleCancelar = () => {
-    setClienteSeleccionado('');
-    onClose();
-  };
+  const weeks = Array.from({ length: 17 }, (_, i) => i + 1);
 
   return (
-    <>
-      {/* Backdrop */}
-      <div
-        className="modal-backdrop fade show"
-        onClick={handleCancelar}
-        style={{ zIndex: 1040 }}
-      ></div>
+    <div className="w-full max-w-7xl mx-auto p-6 bg-white">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-800 mb-2 flex items-center gap-2">
+          <Calendar className="text-blue-600" />
+          Diagrama de Gantt - Proyecto de Desarrollo
+        </h1>
+        <p className="text-gray-600">Duración total estimada: 16 semanas (4 meses)</p>
+      </div>
 
-      {/* Modal */}
-      <div
-        className="modal fade show"
-        style={{ display: 'block', zIndex: 1050 }}
-        tabIndex="-1"
-        role="dialog"
-      >
-        <div className="modal-dialog modal-dialog-centered" role="document">
-          <div className="modal-content shadow-lg">
-            {/* Header */}
-            <div className="modal-header bg-gradient-primary">
-              <h5 className="modal-title text-white">
-                <i className="fas fa-user-tie mr-2"></i>
-                {titulo || 'Seleccionar Cliente para la Población'}
-              </h5>
-              <button
-                type="button"
-                className="close text-white"
-                onClick={handleCancelar}
-                style={{ opacity: 0.8 }}
-              >
-                <span aria-hidden="true">&times;</span>
-              </button>
-            </div>
-
-            {/* Body */}
-            <div className="modal-body">
-              <div className="alert alert-info border-left-info" role="alert">
-                <i className="fas fa-map-marker-alt mr-2"></i>
-                <strong>{campo}:</strong> {valorCampo}
-              </div>
-              <div className="form-group">
-                <label className="font-weight-bold text-gray-800">
-                  Cliente: <span className="text-danger">*</span>
-                </label>
-                <select
-                  value={clienteSeleccionado}
-                  onChange={(e) => setClienteSeleccionado(e.target.value)}
-                  className="form-control form-control-lg border-left-primary"
-                  style={{ borderLeftWidth: '4px' }}
-                >
-                  <option value="">-- Selecciona un cliente --</option>
-                  {valoresSugeridos.map((valor) => (
-                    <option key={valor.id} value={valor.id}>
-                      {valor.nombre}
-                    </option>
-                  ))}
-                </select>
-                {!clienteSeleccionado && (
-                  <small className="form-text text-muted">
-                    <i className="fas fa-info-circle mr-1"></i>
-                    Por favor selecciona un cliente para continuar
-                  </small>
-                )}
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="modal-footer bg-light">
-              <button
-                type="button"
-                onClick={handleCancelar}
-                className="btn btn-secondary"
-              >
-                <i className="fas fa-times mr-2"></i>
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmar}
-                disabled={!clienteSeleccionado}
-                className="btn btn-success"
-              >
-                <i className="fas fa-check mr-2"></i>
-                Confirmar
-              </button>
+      {/* Gantt Chart */}
+      <div className="mb-8 overflow-x-auto">
+        <div className="min-w-max">
+          {/* Header */}
+          <div className="flex mb-2">
+            <div className="w-64 font-semibold text-sm text-gray-700 pr-4">Etapa</div>
+            <div className="flex-1 flex">
+              {weeks.map(week => (
+                <div key={week} className="w-12 text-center text-xs text-gray-600 border-l border-gray-200">
+                  S{week}
+                </div>
+              ))}
             </div>
           </div>
+
+          {/* Phases */}
+          {phases.map(phase => (
+            <div key={phase.id} className="mb-3">
+              <div className="flex items-center">
+                <div className="w-64 pr-4">
+                  <button
+                    onClick={() => setSelectedPhase(selectedPhase === phase.id ? null : phase.id)}
+                    className="text-left text-sm font-medium text-gray-800 hover:text-blue-600 transition-colors"
+                  >
+                    {phase.name}
+                    <div className="text-xs text-gray-500 mt-1">{phase.duration}</div>
+                  </button>
+                </div>
+                <div className="flex-1 flex relative h-10 items-center">
+                  {weeks.map(week => (
+                    <div key={week} className="w-12 border-l border-gray-200 h-full"></div>
+                  ))}
+                  <div
+                    className={`absolute h-8 ${phase.color} rounded shadow-md cursor-pointer hover:shadow-lg transition-shadow`}
+                    style={{
+                      left: `${(phase.start - 1) * 48}px`,
+                      width: `${phase.length * 48}px`
+                    }}
+                    onClick={() => setSelectedPhase(selectedPhase === phase.id ? null : phase.id)}
+                  ></div>
+                </div>
+              </div>
+
+              {/* Expanded Details */}
+              {selectedPhase === phase.id && (
+                <div className="mt-3 ml-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <h3 className="font-semibold text-sm text-gray-700 mb-2 flex items-center gap-2">
+                        <CheckCircle size={16} className="text-green-600" />
+                        Entregables:
+                      </h3>
+                      <ul className="space-y-1">
+                        {phase.deliverables.map((del, idx) => (
+                          <li key={idx} className="text-sm text-gray-600 flex items-start gap-2">
+                            <span className="text-blue-500 mt-1">•</span>
+                            <span>{del}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-sm text-gray-700 mb-2 flex items-center gap-2">
+                        <Info size={16} className="text-blue-600" />
+                        Consejos:
+                      </h3>
+                      <ul className="space-y-1">
+                        {phase.tips.map((tip, idx) => (
+                          <li key={idx} className="text-sm text-gray-600 flex items-start gap-2">
+                            <span className="text-purple-500 mt-1">→</span>
+                            <span>{tip}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       </div>
-    </>
+
+      {/* Legend */}
+      <div className="mt-8 p-4 bg-blue-50 rounded-lg">
+        <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+          <AlertCircle size={18} className="text-blue-600" />
+          Recomendaciones Generales:
+        </h3>
+        <ul className="grid md:grid-cols-2 gap-3 text-sm text-gray-700">
+          <li className="flex items-start gap-2">
+            <span className="text-blue-600 font-bold">•</span>
+            <span>Mantén reuniones semanales de seguimiento con el gerente</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-blue-600 font-bold">•</span>
+            <span>Usa herramientas de gestión como Jira o Trello</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-blue-600 font-bold">•</span>
+            <span>Documenta todo en tiempo real, no al final</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-blue-600 font-bold">•</span>
+            <span>Solicita revisiones tempranas de entregables críticos</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-blue-600 font-bold">•</span>
+            <span>Considera un buffer del 20% para imprevistos</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-blue-600 font-bold">•</span>
+            <span>Haz control de versiones de todos los documentos</span>
+          </li>
+        </ul>
+      </div>
+
+      <div className="mt-6 text-xs text-gray-500 text-center">
+        Haz clic en cada etapa para ver detalles, entregables y consejos específicos
+      </div>
+    </div>
   );
 };
 
-// Componente Demo
-const Buscador = () => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [clienteAsignado, setClienteAsignado] = useState(null);
-
-  // Datos de ejemplo
-  const clientes = [
-    { id: 1, nombre: 'Autopartes y Componentes SA de CV' },
-    { id: 2, nombre: 'Camiones del Noroeste SA de CV' },
-    { id: 3, nombre: 'Transportes Ejecutivos SA de CV' },
-    { id: 4, nombre: 'Logística y Distribución SA de CV' },
-    { id: 5, nombre: 'Servicios Industriales SA de CV' }
-  ];
-
-  const poblacion = 'Guadalajara, Jalisco';
-
-  const handleSelectCliente = (clienteId) => {
-    const cliente = clientes.find(c => c.id === parseInt(clienteId));
-    setClienteAsignado(cliente);
-  };
-
-  return (
-    <div id="wrapper">
-      <div id="content-wrapper" className="d-flex flex-column">
-        <div id="content">
-          {/* Topbar simulado */}
-          <nav className="navbar navbar-expand navbar-light bg-white topbar mb-4 static-top shadow">
-            <div className="container-fluid">
-              <h1 className="h3 mb-0 text-gray-800">
-                <i className="fas fa-route mr-2"></i>
-                Creador de Rutas - Propuesta IAVE-WEB
-              </h1>
-            </div>
-          </nav>
-
-          {/* Contenido Principal */}
-          <div className="container-fluid">
-            <div className="row">
-              <div className="col-xl-8 col-lg-7">
-                {/* Card Principal */}
-                <div className="card shadow mb-4">
-                  <div className="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-                    <h6 className="m-0 font-weight-bold text-primary">
-                      Información de Punto Intermedio
-                    </h6>
-                  </div>
-                  <div className="card-body">
-                    <div className="border-left-warning border-bottom-warning p-4 mb-4">
-                      <div className="row no-gutters align-items-center">
-                        <div className="col mr-2">
-                          <div className="text-xs font-weight-bold text-warning text-uppercase mb-1">
-                            Punto Intermedio
-                          </div>
-                          <div className="h5 mb-0 font-weight-bold text-gray-800">
-                            {poblacion}
-                          </div>
-                        </div>
-                        <div className="col-auto">
-                          <i className="fas fa-map-marker-alt fa-2x text-gray-300"></i>
-                        </div>
-                      </div>
-                    </div>
-
-                    {clienteAsignado && (
-                      <div className="border-left-success p-4 mb-4">
-                        <div className="row no-gutters align-items-center">
-                          <div className="col mr-2">
-                            <div className="text-xs font-weight-bold text-success text-uppercase mb-1">
-                              Cliente Asignado
-                            </div>
-                            <div className="h6 mb-0 font-weight-bold text-gray-800">
-                              {clienteAsignado.nombre}
-                            </div>
-                          </div>
-                          <div className="col-auto">
-                            <i className="fas fa-check-circle fa-2x text-success"></i>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    <button
-                      onClick={() => setIsModalOpen(true)}
-                      className="btn btn-primary btn-icon-split btn-lg"
-                    >
-                      <span className="icon text-white-50">
-                        <i className="fas fa-user-tie"></i>
-                      </span>
-                      <span className="text">Asignar Cliente a Población</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="col-xl-4 col-lg-5">
-                {/* Card de Instrucciones */}
-                <div className="card shadow mb-4">
-                  <div className="card-header py-3">
-                    <h6 className="m-0 font-weight-bold text-primary">
-                      <i className="fas fa-info-circle mr-2"></i>
-                      Instrucciones
-                    </h6>
-                  </div>
-                  <div className="card-body">
-                    <ol className="pl-3 mb-0 text-gray-800">
-                      <li className="mb-2">Haz clic en el botón para abrir el modal</li>
-                      <li className="mb-2">Selecciona un cliente de la lista desplegable</li>
-                      <li className="mb-2">Confirma la selección o cancela</li>
-                    </ol>
-                    <hr />
-                    <p className="text-xs text-muted mb-0">
-                      <i className="fas fa-palette mr-1"></i>
-                      El diseño usa los estilos de SB Admin 2 con Bootstrap
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-
-      </div>
-
-      {/* Modal */}
-      <ModalSelectorCliente
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSelect={handleSelectCliente}
-        campo="Población"
-        valorCampo={poblacion}
-        valoresSugeridos={clientes}
-        titulo="Selecciona el cliente del origen"
-
-      />
-    </div>
-  );
-}
-
-export default Buscador;
+export default GanttChart;

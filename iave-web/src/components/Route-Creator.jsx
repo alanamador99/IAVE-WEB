@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { parsearMinutos, formatearDinero, RouteOption } from '../components/shared/utils';
-import Buscador from '../components/nuevocomponente.jsx';
+import { ModalSelector, CustomToast, parsearMinutos, formatearDinero, RouteOption, formatearEnteros } from '../components/shared/utils';
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
+import axios from 'axios';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import markerATM from 'leaflet/dist/images/ATM__.png';
@@ -10,6 +10,9 @@ import markerCaseta from 'leaflet/dist/images/MapPinGreen.png';
 import markerB from 'leaflet/dist/images/B.png';
 import markerPin from 'leaflet/dist/images/pin_intermedio.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+import { Container } from 'react-bootstrap';
+import { data } from 'react-router-dom';
+
 
 const API_KEY = 'Jq92BpFD-tYae-BBj2-rEMc-MnuytuOB30ST';
 const API_URL = process.env.REACT_APP_API_URL;
@@ -65,6 +68,8 @@ const RutasModule = () => {
     const [origen, setOrigen] = useState([]);
     const [destino, setDestino] = useState([]);
     const [rutaTusa, setRutaTusa] = useState([]);
+    const [casetasEnRutaTusa, setCasetasEnRutaTusa] = useState([]);
+    const [isModalOpen, setIsModalOpen] = useState(false);
 
     // Estados de carga
     const [loadingOrigen, setLoadingOrigen] = useState(false);
@@ -406,7 +411,10 @@ const RutasModule = () => {
             // Helper: normalizar nombres de lugares
             const normalizarNombre = (lugar) => {
                 const partes = lugar?.nombre.split(',');
-                return partes?.[1]?.trim() || lugar?.nombre.trim();
+                const tmp = partes?.[0]?.trim() || lugar?.nombre.trim();
+                const sinAcentos = tmp.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                const response = sinAcentos.replace(/[^a-zA-Z0-9\s]/g, '').toUpperCase();
+                return response;
             };
 
             // Helper: crear FormData para INEGI
@@ -483,7 +491,7 @@ const RutasModule = () => {
                 const text = await response.text();
                 try {
                     const json = JSON.parse(text);
-                    return json?.data || json;
+                    return json;
                 } catch {
                     return text;
                 }
@@ -534,19 +542,32 @@ const RutasModule = () => {
             // Esperar todas las respuestas
             const resultados = await Promise.all(promesas);
             const [rutaOptima1, rutaLibre1, dataTusa, rutaOptima2, rutaLibre2] = resultados;
-
+            console.dir(dataTusa);
             // Actualizar ruta TUSA y verificar si existe
             const rutaTUSAData = dataTusa?.data || dataTusa || [];
             const existeEnTUSA = Array.isArray(rutaTUSAData)
                 ? rutaTUSAData.length > 0
                 : dataTusa?.enTUSA;
 
+
             setRutaTusa(rutaTUSAData);
-            console.log('rutaTusa:', rutaTUSAData);
+
+            if (dataTusa.total === 1) {
+                const casetasEnTUSA = await axios.get(`${API_URL}/api/casetas/rutas/${rutaTUSAData[0]?.id_Tipo_ruta}/casetasPorRuta`);
+                setCasetasEnRutaTusa(casetasEnTUSA.data);
+            }
+            if (dataTusa.total > 1) {
+                console.dir(rutaTusa);
+                setIsModalOpen(true);
+                alert('⚠️ Se encontraron múltiples rutas en TUSA. Por favor selecciona la ruta correcta.');
+            }
+            
+            console.dir(dataTusa);
+            //console.log('DATA:' , rutaTUSAData[0]?.id_Tipo_ruta)
 
             // Mostrar alerta si la ruta no está en TUSA
             if (!existeEnTUSA) {
-                console.warn('⚠️ Ruta no encontrada en TUSA');
+                console.warn('⚠️ Ruta no encontrada en TUSA', normalizarNombre(origen), normalizarNombre(destino));
 
                 //alert('⚠️ La ruta no existe en TUSA. Se está creando una nueva ruta.');
                 //Aqui se va a cargar el "nuevocomponente que se está desarrollando para que muestre al usuario la opción de seleccionar el cliente al que se le asignará la ruta nueva."
@@ -613,47 +634,60 @@ const RutasModule = () => {
                 <div className="header-RC py-2 rounded-top">
                     <h1>🚛 Creador de Rutas - Propuesta IAVE-WEB</h1>
                     <div className="header-actions-RC">
+
                         <button className="btn btn-success">💾 Guardar Ruta</button>
                     </div>
                 </div>
-                <div className="container-fluid py-1 rounded-top border ">
+                <div className="container-fluid py-1  border ">
                     <div className="alert alert-info border-left-info my-2" role="alert" close="true" >
                         <i className="fas fa-info-circle mr-2"></i>
                         <strong>Estado:</strong> {loadingRutas || loadingRutaSeleccionada ? 'Cargando rutas...' : boolExiste}
                     </div>
-                    <table className='table table-bordered table-scroll table-sm table-hover align-middle mt-2'>
-                        <thead>
-                            <tr>
-                                <th>Tipo de Ruta</th>
-                                <th>Distancia</th>
-                                <th>Tiempo</th>
-                                <th>Costo Casetas</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {loadingRutas && (
+                    <div className="table-container py-0 my-2" style={{ maxHeight: '12rem' }}>
+
+
+                        <table className='table table-bordered table-scroll table-sm table-hover align-middle mt-2' style={{ display: `${(casetasEnRutaTusa && casetasEnRutaTusa.length > 0) ? 'table' : 'none'}` }}>
+                            <thead>
                                 <tr>
-                                    <td>Cargando rutas...</td>
+                                    <th>ID_Caseta</th>
+                                    <th>Nombre</th>
+                                    <th>Estado</th>
+                                    <th>Latitud</th>
+                                    <th>Longitud</th>
+                                    <th>Auto</th>
+                                    <th>Bus 2 Ejes</th>
+                                    <th>C 2 Ejes</th>
+                                    <th>C 3 Ejes</th>
+                                    <th>C 5 Ejes</th>
+                                    <th>C 9 Ejes</th>
+                                    <th>Consecutivo</th>
                                 </tr>
-                            )}
-                            {!loadingRutas && rutas_OyL && (
-                                <>
+                            </thead>
+                            <tbody>
+                                {loadingRutas && (
                                     <tr>
-                                        <td>Ruta Óptima: </td>
-                                        <td> Distancia: {rutas_OyL.optima.distancia.toFixed(2)} km  </td>
-                                        <td> Tiempo: {parsearMinutos(rutas_OyL.optima.tiempo)}  </td>
-                                        <td> Costo Casetas: {formatearDinero(rutas_OyL.optima.costoCasetas)} </td>
+                                        <td>Cargando rutas...</td>
                                     </tr>
-                                    <tr>
-                                        <td>Ruta Libre: </td>
-                                        <td> Distancia: {rutas_OyL.libre.distancia.toFixed(2)} km  </td>
-                                        <td> Tiempo: {parsearMinutos(rutas_OyL.libre.tiempo)}  </td>
-                                        <td> Costo Casetas: {formatearDinero(rutas_OyL.libre.costoCasetas)} </td>
+                                )}
+                                {(casetasEnRutaTusa) && casetasEnRutaTusa.map((caseta, index) => (
+                                    <tr key={caseta.ID_Caseta || index} className='text-center'>
+                                        <td className='text-right'>{caseta.ID_Caseta} <span style={{ cursor: 'help' }} title={caseta.IAVE ? 'SI Acepta el pago con TAG' : 'NO admite el pago con TAG'}>{caseta.IAVE ? '✅' : '❌'}</span></td>
+                                        <td>{caseta.Nombre}</td>
+                                        <td>{caseta.Estado}</td>
+                                        <td>{caseta.latitud}</td>
+                                        <td>{caseta.longitud}</td>
+                                        <td>$ {formatearEnteros(caseta.Automovil)}</td>
+                                        <td>$ {formatearEnteros(caseta.Autobus2Ejes)}</td>
+                                        <td>$ {formatearEnteros(caseta.Camion2Ejes)}</td>
+                                        <td>$ {formatearEnteros(caseta.Camion3Ejes)}</td>
+                                        <td>$ {formatearEnteros(caseta.Camion5Ejes)}</td>
+                                        <td>$ {formatearEnteros(caseta.Camion9Ejes) + ' '}</td>
+                                        <td style={{ placeItems: 'center' }}><input style={{ maxWidth: '3rem', textAlign: 'center' }} className="form-control form-control-sm" maxLength={2} type="text" name="txtCasetaConsecutivo" id={`txtCasetaConsecutivo_${caseta.ID_Caseta}`} defaultValue={caseta.consecutivo || ''} /></td>
                                     </tr>
-                                </>
-                            )}
-                        </tbody>
-                    </table>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
                 <div className="main-content-RC">
                     {/* Sidebar donde se selecciona origen, destino y punto intermedio. */}
@@ -984,6 +1018,12 @@ const RutasModule = () => {
                         </Marker>}
 
 
+                        {/* POLILINEA DE LA RUTA TUSA */}
+                        {rutaTusa?.polilinea && <Polyline color='green' positions={rutaTusa?.polilinea} weight={4} opacity={0.4}>
+                            <Popup> Ruta establecida en TUSA, de acuerdo a las casetas</Popup>
+                        </Polyline>
+                        }
+
                         {/* POLILINEAS DE RUTAS */}
                         {rutas_OyL?.polilineaLibre && rutas_OyL?.polilineaLibre.map((arreglo, i) => {
                             return (<Polyline color='red' positions={arreglo} weight={3} opacity={0.4} key={'libre - ' + i}>
@@ -1130,7 +1170,26 @@ const RutasModule = () => {
                 </div>
             </div>
             <div>
-                <Buscador></Buscador>
+                {/* MODAL PARA SELECCIONAR RUTA CUANDO EXISTE MÁS DE UNA DEL ORIGEN AL DESTINO SELECCIONADOS. */}
+                {(isModalOpen) && (<ModalSelector
+                    isOpen={isModalOpen}
+                    onClose={() => setIsModalOpen(false)}
+                    onSelect={() => alert('Seleccionado')}
+                    campo="La ruta que selecciones se mostrará para poder editar o compararla con la ruta INEGI"
+                    valorCampo={''}
+                    valoresSugeridos={rutaTusa}
+                    tituloDelSelect='Rutas'
+                    titulo={`Rutas TUSA encontradas (${rutaTusa.length})`} />
+                )}
+
+
+
+                <Container style={{ position: 'fixed', bottom: 20, right: '-30px', zIndex: 99999, maxWidth: 'max-content' }}>
+                    <Container style={{ maxWidth: 'max-content' }}>
+                        {(rutas_OyL && rutaSeleccionada && !loadingRutas && rutaTusa.length === 0) && <CustomToast color={'text-warning'} mensaje={'No existe una ruta creada con las poblaciones origen y destino seleccionadas'} tiempo={5000} titulo={'⚠️ Advertencia'} onClick={() => { alert('Advertencia') }} mostrar={1} />}
+                        {(rutas_OyL && rutaSeleccionada && !loadingRutas && rutaTusa.length === 1) && <CustomToast color={'text-success'} mensaje={'Ruta TUSA encontrada y vinculada'} tiempo={5000} titulo={'✅ Éxito'} onClick={() => { alert('Advertencia') }} mostrar={1} />}
+                    </Container>
+                </Container>
             </div>
         </div >
     );

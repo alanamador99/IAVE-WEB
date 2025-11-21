@@ -662,6 +662,9 @@ export const getRutaPorOrigen_Destino = async (req, res) => {
     // Siempre responder con 200, incluso si no hay resultados
     // Esto permite que el frontend procese la ruta INEGI sin errores
     const hayResultados = result.recordset.length > 0;
+    if (hayResultados){
+      result.recordset.push()
+    }
     
     res.json({
       success: true,
@@ -682,3 +685,5 @@ export const getRutaPorOrigen_Destino = async (req, res) => {
     });
   }
 };
+
+

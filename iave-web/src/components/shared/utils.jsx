@@ -133,6 +133,12 @@ const CasetaMapModal = ({ isOpen, onClose, nombreCaseta, lat, lng }) => {
   );
 };
 
+const formatearRazonesSociales = (RazonSocial) => {
+  if (!RazonSocial) return '';
+  const response = RazonSocial.replaceAll('S.A. de C.V.', '').replaceAll('SA. de C.V.', '').replaceAll('SA de CV.', '').replaceAll('S.A. de CV', '').replaceAll('SA de CV', '');
+  return response;
+  
+};
 
 
 const formatearFecha = (fecha) => {
@@ -178,7 +184,7 @@ const formatearEnteros = (monto) => {
 };
 
 
-function CustomToast({ origenDestino, mostrar, cliente = 'NombreCliente' }) {
+function CustomToast({ titulo, mensaje, mostrar, color, tiempo = 5000 }) {
   const [show, setShow] = useState(true);
 
   return (
@@ -187,16 +193,20 @@ function CustomToast({ origenDestino, mostrar, cliente = 'NombreCliente' }) {
       <Toast
         onClose={() => setShow(false)}
         show={mostrar && show}
-        delay={5000}
+        delay={tiempo}
         autohide={true}
         style={{ position: 'relative', bottom: 20, right: 20, minWidth: 250, zIndex: 9999 }}
         className=''
 
       >
-        <Toast.Header className='bg-dark' closeButton={false}>
-          <strong className="m-auto text-warning" style={{ fontSize: '1.3rem', justifyContent: 'center' }}>⚠️ ATENCIÓN</strong>
+        <Toast.Header className='bg-dark' closeButton={true}>
+          <strong className={`m-auto ${color}`} style={{ fontSize: '1.3rem', justifyContent: 'center' }}>{titulo}</strong>
         </Toast.Header>
-        <Toast.Body style={{ fontSize: '1rem', backgroundColor: 'gainsboro' }} className='align-middle text-dark'>¡No existen cargadas las coordenadas del <u>{origenDestino.trim()}</u> en sistema ("<span className='font-weight-bolder text-danger'>{cliente.trim()}</span>")!</Toast.Body>
+        <Toast.Body style={{ fontSize: '1rem', backgroundColor: 'gainsboro', animationName: 'toastAnimate', animationDuration: '6s' }} className='align-middle text-dark'>
+
+          {mensaje}
+
+        </Toast.Body>
       </Toast>
     </>
   );
@@ -242,9 +252,9 @@ function parsearMinutos(totalMinutos) {
 }
 
 
-const RouteOption = ({ tipo, distance, time, distanceUnit = ' KM', costs, advertencias='', color='gray' }) => {
+const RouteOption = ({ tipo, distance, time, distanceUnit = ' KM', costs, advertencias = '', color = 'gray' }) => {
   return (
-    <div className="border rounded p-3 py-0 bg-light" style={{ minWidth: '100px', color:`${color}`}}>
+    <div className="border rounded p-3 py-0 bg-light" style={{ minWidth: '100px', color: `${color}` }}>
       {/* Header con ícono de información */}
       <div className="d-flex align-items-center justify-content-between ">
         <div className="d-flex align-items-center">
@@ -264,7 +274,7 @@ const RouteOption = ({ tipo, distance, time, distanceUnit = ' KM', costs, advert
         <small className="text-muted d-block" style={{ fontSize: '.8rem' }}>Distancia</small>
         <div>
           <strong style={{ fontSize: '1rem' }}>{distance}</strong>
-          <small className="text-muted ms-1" style={{fontSize:'.7rem'}}>{(distanceUnit)}</small>
+          <small className="text-muted ms-1" style={{ fontSize: '.7rem' }}>{(distanceUnit)}</small>
         </div>
       </div>
 
@@ -272,17 +282,132 @@ const RouteOption = ({ tipo, distance, time, distanceUnit = ' KM', costs, advert
       <div className="border-top py-0 pt-1 row">
         <small className="text-muted d-block pr-3" style={{ fontSize: '.7rem' }}>Tiempo</small>
         <strong>{time}</strong>
-        </div>
-        {/* Costos */}
-        <div className="py-0 pt-1 row">
-          <small className="text-muted d-block pr-3" style={{ fontSize: '.7rem' }}>{costs.label}</small>
-        <strong style={{ fontSize: '0.85rem' }}>{(costs.value === 'Sin costo')?'':'$'}{costs.value}</strong>
-        </div>
       </div>
+      {/* Costos */}
+      <div className="py-0 pt-1 row">
+        <small className="text-muted d-block pr-3" style={{ fontSize: '.7rem' }}>{costs.label}</small>
+        <strong style={{ fontSize: '0.85rem' }}>{(costs.value === 'Sin costo') ? '' : '$'}{costs.value}</strong>
+      </div>
+    </div>
   );
 };
 
 
 
+// Componente Modal con clases de Bootstrap/SB Admin
+const ModalSelector = ({ isOpen, onClose, onSelect, valorCampo, valoresSugeridos, titulo = '', campo = '', tituloDelSelect = 'Opciones' }) => {
+  const [clienteSeleccionado, setClienteSeleccionado] = useState('');
+
+  if (!isOpen) return null;
+
+  const handleConfirmar = () => {
+    if (clienteSeleccionado) {
+      onSelect(clienteSeleccionado);
+      setClienteSeleccionado('');
+      onClose();
+    }
+  };
+
+  const handleCancelar = () => {
+    setClienteSeleccionado('');
+    onClose();
+  };
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        className="modal-backdrop fade show"
+        onClick={handleCancelar}
+        style={{ zIndex: 1040 }}
+      ></div>
+
+      {/* Modal */}
+      <div
+        className="modal fade show"
+        style={{ display: 'block', zIndex: 1050 }}
+        tabIndex="-1"
+        role="dialog"
+      >
+        <div className="modal-dialog modal-dialog-centered" role="document">
+          <div className="modal-content shadow-lg">
+            {/* Header */}
+            <div className="modal-header bg-gradient-primary">
+              <h5 className="modal-title text-white">
+                <i className="fas fa-user-tie mr-2"></i>
+                {titulo || 'Seleccionar Cliente para la Población'}
+              </h5>
+              <button
+                type="button"
+                className="close text-white"
+                onClick={handleCancelar}
+                style={{ opacity: 0.8 }}
+              >
+                <span aria-hidden="true">&times;</span>
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="modal-body">
+              <div className="alert alert-info border-left-info" role="alert">
+                <i className="fas fa-map-marker-alt mr-2"></i>
+                <strong>{campo}:</strong> {valorCampo}
+              </div>
+              <div className="form-group">
+                <label className="font-weight-bold text-gray-800">
+                  {tituloDelSelect} <span className="text-danger">*</span>
+                </label>
+                <select
+                  value={clienteSeleccionado}
+                  onChange={(e) => setClienteSeleccionado(e.target.value)}
+                  className="form-control form-control-lg border-left-primary"
+                  style={{ borderLeftWidth: '4px' }}
+                >
+                  <option value="">-- Selecciona una opción --</option>
+                  {valoresSugeridos.map((valor) => (
+                    <option key={valor.id_Tipo_ruta} value={valor.id_Tipo_ruta}>
+                      ID: {valor.id_Tipo_ruta} | {formatearRazonesSociales(valor.RazonOrigen)} → {formatearRazonesSociales(valor.RazonDestino)} __ ({valor.Categoria})
+                    </option>
+                  ))}
+                </select>
+                {!clienteSeleccionado && (
+                  <small className="form-text text-muted">
+                    <i className="fas fa-info-circle mr-1"></i>
+                    Por favor selecciona una opción para ver la ruta asociada en TUSA.
+                  </small>
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="modal-footer bg-light">
+              <button
+                type="button"
+                onClick={handleCancelar}
+                className="btn btn-secondary"
+              >
+                <i className="fas fa-times mr-2"></i>
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmar}
+                disabled={!clienteSeleccionado}
+                className="btn btn-success"
+              >
+                <i className="fas fa-check mr-2"></i>
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
+
+
+
+
 export default CopiarTag;
-export { CopiarTag, CopiarFecha, CasetaMapModal, formatearFecha, formatearFechaConHora, formatearNombre, formatearDinero, formatearEnteros, CustomToast, parsearMinutos, RouteOption };
+export { CopiarTag, CopiarFecha, CasetaMapModal, formatearFecha, formatearFechaConHora, formatearNombre, formatearDinero, formatearEnteros, CustomToast, parsearMinutos, RouteOption, ModalSelector };

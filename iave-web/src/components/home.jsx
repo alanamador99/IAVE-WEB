@@ -9,9 +9,9 @@ const datosCruces = [
   { title: "Nulos", value: 20, color: "#FFFFFF" },
 ];
 
-export default function Homess() {
+export default function Home() {
   return (
-    <div className="bg-[#1a1a1a] p-4 rounded-xl">
+    <div className="bg-secondary p-4 rounded-lg shadow-lg container-fluid py-2 pb-0">
       <h2 className="text-white font-bold text-lg mb-2">Resumenes mensual</h2>
       <DoughnutChart
         chartItems={[
@@ -23,6 +23,8 @@ export default function Homess() {
         formatValue={(value) => `$${value}k`}
         totalLabel="PRESUPUESTO:"
       />
+      <br />
+      <br />
       <DoughnutChart
         chartItems={datosCruces}
         size={300}

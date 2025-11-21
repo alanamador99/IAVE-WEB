@@ -1,4 +1,4 @@
-import Stats from './abusos/Cards';
+import Stats from './abusos/Stats';
 import AbusosTable from './abusos/AbusosTable';
 
 

@@ -8,10 +8,12 @@ import AbusosModule from "./components/Abusos";
 
 import Tags from "./components/Tags.jsx";
 import Sesgos from "./components/Sesgos.jsx";
-import Homess from "./components/homes.jsx";
+import Home from "./components/home.jsx";
 import NotFound from "./components/NotFound.jsx";
 import RutasModule from "./components/Rutas.jsx";
 import RouteCreator from "./components/Route-Creator.jsx";
+import Example from "./components/nuevocomponente.jsx";
+
 
 
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
@@ -28,7 +30,7 @@ function App() {
           <div id="content" className="main-content pb-0">
             <Routes>
               <Route path="/" element={<Cruces />} />
-              <Route path="/Home" element={<Homess />} />
+              <Route path="/Home" element={<Home />} />
               <Route path="/aclaraciones" element={<Aclaraciones />} />
               <Route path="/abusos" element={<AbusosModule />} />
               <Route path="/cruces" element={<Cruces />} />
@@ -39,6 +41,7 @@ function App() {
               <Route path="/casetas" element={<Casetas />} />
               <Route path="/tags" element={<Tags />} />
               <Route path="/sesgos" element={<Sesgos />} />
+              <Route path="/nuevocomponente" element={<Example />} />
               <Route path="/route-creator" element={<RouteCreator />} />
               <Route path="*" element={<NotFound />} />
             </Routes>

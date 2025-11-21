@@ -4,14 +4,14 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 /*
-server: '2.tcp.us-cal-1.ngrok.io', 
-port: 14421,
 
 
 2.tcp.us-cal-1.ngrok.io,14421
 
 // */
 const dbConfig = {
+  server: '0.tcp.us-cal-1.ngrok.io', 
+  port: 10263,
   server: 'server-datos', 
   port: 1433,
   user: 'IAVE',

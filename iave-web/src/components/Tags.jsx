@@ -1,4 +1,4 @@
-import Stats from './tags/Cards.jsx';
+import Stats from './tags/Stats.jsx';
 import TagsTable from './tags/TagsTable';
 
 

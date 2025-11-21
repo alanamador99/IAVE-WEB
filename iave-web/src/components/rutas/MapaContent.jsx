@@ -298,10 +298,10 @@ const MapaContent = ({ rutaSeleccionada, origenDestino }) => {
                         <Container style={{ position: 'fixed', bottom: 20, right: '-30px', zIndex: 99999, maxWidth: 'max-content' }}>
                             <Container style={{ maxWidth: 'max-content' }}>
                                 {!hasValidDestino && destinoNombre && (
-                                    <CustomToast origenDestino={'DESTINO'} mostrar={true} cliente={destinoNombre} />
+                                    <CustomToast titulo={'⚠️ ATENCIÓN'} color={'text-warning'}  mostrar={true} mensaje={`¡No existen cargadas las coordenadas del DESTINO en sistema ("${destinoNombre.trim()}")!`} />
                                 )}
                                 {!hasValidOrigen && origenNombre && (
-                                    <CustomToast origenDestino={'ORIGEN'} mostrar={true} cliente={origenNombre} />
+                                    <CustomToast titulo={'⚠️ ATENCIÓN'} color={'text-warning'} mostrar={true} mensaje={`¡No existen cargadas las coordenadas del ORIGEN en sistema ("${origenNombre.trim()}")!`} />
                                 )}
                             </Container>
                         </Container>
