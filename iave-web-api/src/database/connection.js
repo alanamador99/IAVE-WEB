@@ -7,11 +7,11 @@ dotenv.config();
 
 
 2.tcp.us-cal-1.ngrok.io,14421
+server: '0.tcp.us-cal-1.ngrok.io', 
+port: 10263,
 
 // */
 const dbConfig = {
-  server: '0.tcp.us-cal-1.ngrok.io', 
-  port: 10263,
   server: 'server-datos', 
   port: 1433,
   user: 'IAVE',

@@ -13,7 +13,6 @@ import tagsRoutes from "./routes/tags.routes.js";
 // Se inicializa la aplicación, sobre el puerto 3001.
 
 const app = express();
-const port = 3001;
 app.use(cors({
   origin: '*',
   credentials: true
