@@ -1,17 +1,60 @@
-import { getConnection, sql } from "../database/connection.js";
-const progressClients = new Map(); // Para almacenar las conexiones SSE
+/**
+ * Controlador de Cruces - IAVE WEB API
+ * 
+ * Este módulo gestiona todas las operaciones relacionadas con los registros de "cruces" (pasos)
+ * de vehículos a través de casetas de peaje. Incluye funcionalidades para:
+ * 
+ * - Importación masiva de cruces desde archivos CSV/Excel
+ * - Consulta de estado del personal en fechas específicas
+ * - Conciliación de cruces con órdenes de traslado (OT)
+ * - Actualización de estatus y órdenes de cruces
+ * - Estadísticas y consultas generales
+ * - Streaming de progreso en importaciones mediante SSE (Server-Sent Events)
+ * 
+ * @module cruces.controllers
+ * @requires ../database/connection.js
+ */
 
+import { getConnection, sql } from "../database/connection.js";
+
+/**
+ * Almacena las conexiones SSE activas para notificaciones de progreso en tiempo real
+ * @type {Map<string, Response>}
+ */
+const progressClients = new Map();
+
+/**
+ * Lista de matrículas administrativas para identificar vehículos no operacionales
+ * Se utiliza para evitar errores en el parseo de matrículas y clasificar bases
+ * @type {string[]}
+ */
 const matriculasAdmins = [
   "1", "165", "166", "1436", "1224", "CarlosFTMP", "Frontier", "Highlander", "Versa",
+];
 
-]; // Matriculas de administradores, para evitar errores en el parseo de matrícula
-
-// Utilidad opcional para sanitizar el nombre
+/**
+ * Normaliza un nombre de lugar removiendo caracteres especiales y acentos
+ * 
+ * Convierte a mayúsculas y remueve puntos, guiones y acentos para facilitar
+ * comparaciones exactas entre nombres de casetas de diferentes fuentes
+ * 
+ * @param {string} nombre - Nombre a normalizar
+ * @returns {string} Nombre normalizado en mayúsculas sin acentos
+ * 
+ * @example
+ * normalize("Sólo-la Paz") // "SOLOLA PAZ"
+ */
 function normalize(nombre) {
   return nombre.toUpperCase().replace(/[-.]/g, '').trim().replace('Á', 'A').replace('É', 'E').replace('Í', 'I').replace('Ó', 'O').replace('Ú', 'U');
 }
 
 
+/**
+ * Situaciones laborales que se consideran abusivas o fuera de horario
+ * Se utiliza durante la importación para clasificar cruces cuando el personal
+ * está en situación especial (incapacidad, vacaciones, etc.)
+ * @type {string[]}
+ */
 const situacionesAbusivas = ["Descanso con Derecho",
   "Falta Injustificada",
   "Vacaciones",
@@ -55,8 +98,25 @@ const situacionesAbusivas = ["Descanso con Derecho",
   "Pasaporte",
   "Përmiso"
 ];
-
 //Se limpia completamente la fecha y hora del cruce, descomponiendo la fecha y las partes de la hora.
+/**
+ * Parsea y valida una fecha y hora en formato DD/MM/YYYY y HH:MM:SS
+ * 
+ * Realiza validaciones de formato y crea un objeto Date válido.
+ * Si el formato no es válido, retorna null para evitar errores.
+ * 
+ * Formato esperado:
+ * - Fecha: DD/MM/YYYY (3 partes separadas por /)
+ * - Hora: HH:MM o HH:MM:SS (mínimo 2 partes separadas por :)
+ * 
+ * @param {string} fecha - Fecha en formato DD/MM/YYYY
+ * @param {string} hora - Hora en formato HH:MM:SS o HH:MM
+ * @returns {Date|null} Objeto Date válido o null si el formato es inválido
+ * 
+ * @example
+ * parsearFechaHora("25/11/2025", "14:30:45") // Date object
+ * parsearFechaHora("invalid", "14:30") // null
+ */
 function parsearFechaHora(fecha, hora) {
   if (!fecha || !hora) return null;
 
@@ -84,6 +144,21 @@ function parsearFechaHora(fecha, hora) {
   return isNaN(date.getTime()) ? null : date;
 }
 
+/**
+ * Crea un ID único para un cruce basado en fecha, hora y TAG
+ * 
+ * Formato del ID: YYMMDD_HHMMSS_LASTOURTAG
+ * Ejemplo: 251125_143045_1234
+ * 
+ * @param {string} fechaC - Fecha del cruce en formato DD/MM/YYYY
+ * @param {string} HoraC - Hora del cruce en formato HH:MM:SS
+ * @param {string} TAGC - TAG/Identificador del dispositivo de peaje
+ * @returns {string} ID del cruce con formato normalizado
+ * 
+ * @example
+ * crearID_Cruce("25/11/2025", "14:30:45", "ABC123456789.") 
+ * // Returns: "251125_143045_3456789"
+ */
 function crearID_Cruce(fechaC, HoraC, TAGC) {
   const fechaParts = fechaC.trim().split("/");
   const horaParts = HoraC.trim().split(":");
@@ -113,6 +188,19 @@ function crearID_Cruce(fechaC, HoraC, TAGC) {
 
 
 
+/**
+ * Limpia y convierte un valor monetario a número flotante
+ * 
+ * Remueve símbolos $ y comas, maneja errores y retorna 0 si no es convertible
+ * 
+ * @param {string|number} valor - Valor monetario a limpiar (ej: "$1,234.56")
+ * @returns {number} Valor numérico flotante
+ * 
+ * @example
+ * limpiarImporte("$1,234.56") // 1234.56
+ * limpiarImporte("1000") // 1000
+ * limpiarImporte(null) // 0
+ */
 function limpiarImporte(valor) {
   if (!valor) return 0;
   // Quitar el signo $, comas, espacios y se convierten a números, funcion util en los importes
@@ -128,6 +216,15 @@ function limpiarImporte(valor) {
 
 
 
+/**
+ * Limpia un TAG removiendo puntos finales
+ * 
+ * @param {string} valor - TAG/dispositivo a limpiar
+ * @returns {string} TAG normalizado sin puntos
+ * 
+ * @example
+ * limpiarTAG("ABC123456789.") // "ABC123456789"
+ */
 function limpiarTAG(valor) {
   if (!valor) return "";
   // Quitar el punto que le sigue al TAG
@@ -135,6 +232,32 @@ function limpiarTAG(valor) {
 }
 
 
+/**
+ * Obtiene el estado laboral del personal en una fecha específica
+ * 
+ * Busca el registro del estado del personal (Estado_del_personal) para una matrícula
+ * y fecha determinadas. Si no encuentra registro exacto, busca en ±1 día como fallback.
+ * 
+ * Extrae la matrícula del No_Economico del cruce (primer número antes del espacio).
+ * 
+ * @async
+ * @param {Object} req - Objeto request
+ * @param {string} req.params.ID_Cruce - ID del cruce (formato: YYMMDD_HHMMSS_TAG)
+ * @returns {Promise<Object>} JSON con estado del personal
+ * @returns {Object[]} Array de registros de estado del personal
+ * @returns {Object} error - Si no se encuentra registros (404) o error del servidor (500)
+ * 
+ * @example
+ * GET /api/cruces/status/251125_143045_1234
+ * Response: [
+ *   {
+ *     ID_matricula: "123",
+ *     ID_ordinal: "1",
+ *     Descripcion: "Vacaciones",
+ *     ID_fecha: "2025-11-25"
+ *   }
+ * ]
+ */
 export const getStatusPersonal = async (req, res) => {
   try {
     const IDCruce = req.params.ID_Cruce;
@@ -220,6 +343,39 @@ export const getStatusPersonal = async (req, res) => {
 };
 
 
+/**
+ * Concilia cruces con órdenes de traslado (OT)
+ * 
+ * Compara cada cruce con los registros de orden_status para determinar si:
+ * - El cruce tiene una OT asociada
+ * - La OT tiene rango de fechas completo (iniciada y finalizada)
+ * - El cruce está dentro del rango de la OT
+ * 
+ * Retorna un objeto para cada cruce con:
+ * - Matrícula extraída del No_Economico
+ * - ID de la orden si existe
+ * - Estatus de conciliación (Sin OT, Sin rango, Conciliado, Fuera de horario)
+ * 
+ * Consulta cruces del mes anterior hasta hoy.
+ * 
+ * @async
+ * @param {Object} req - Objeto request
+ * @param {Object} res - Objeto response
+ * @returns {Promise<Object[]>} Array de cruces con información de conciliación
+ * 
+ * @example
+ * GET /api/cruces/conciliacion
+ * Response: [
+ *   {
+ *     ID: "251125_143045_1234",
+ *     No_Economico: "123 Carlos García",
+ *     Fecha: "2025-11-25T14:30:45.000Z",
+ *     matricula: "123",
+ *     ID_orden: "OT-12345",
+ *     EstatusConciliacion: "Conciliado"
+ *   }
+ * ]
+ */
 export const getConciliacion = async (req, res) => {
   try {
     // 1) Conectar y traer todos los cruces
@@ -306,6 +462,24 @@ export const getConciliacion = async (req, res) => {
   }
 };
 
+/**
+ * Asigna una orden de traslado (OT) a un cruce específico
+ * 
+ * Valida que la OT tenga formato válido (OT-XXXXX) antes de actualizar.
+ * 
+ * @async
+ * @param {Object} req - Objeto request
+ * @param {string} req.params.id - ID del cruce a actualizar
+ * @param {Object} req.body - Body de la solicitud
+ * @param {string} req.body.OT - Orden de traslado en formato "OT-12345"
+ * @returns {Promise<Object>} Mensaje de confirmación
+ * @returns {Object} error - Si OT está vacío (400) o error del servidor (500)
+ * 
+ * @example
+ * PUT /api/cruces/251125_143045_1234/ot
+ * Body: { OT: "OT-12345" }
+ * Response: { message: "Se colocó la OT-12345 actualizada correctamente sobre el ID 251125_143045_1234" }
+ */
 export const setOTSbyIDCruce = async (req, res) => {
   const { id } = req.params;
   const { OT } = req.body;
@@ -342,6 +516,31 @@ export const setOTSbyIDCruce = async (req, res) => {
   }
 };
 
+/**
+ * Obtiene todos los cruces registrados
+ * 
+ * Enriquece cada cruce con información adicional:
+ * - Extrae el carácter 6 de id_orden para determinar base (1=Sahagún, 0=Monterrey)
+ * - Asigna base como "Administrativos" si la matrícula está en lista de admins
+ * 
+ * @async
+ * @param {Object} req - Objeto request
+ * @param {Object} res - Objeto response
+ * @returns {Promise<Object[]>} Array de todos los cruces con información enriquecida
+ * 
+ * @example
+ * GET /api/cruces
+ * Response: [
+ *   {
+ *     ID: "251125_143045_1234",
+ *     No_Economico: "123 Carlos García",
+ *     Caseta: "Caseta Sahagún",
+ *     Importe: 150,
+ *     Base: "Base Cd. Sahagún",
+ *     ...
+ *   }
+ * ]
+ */
 export const getCruces = async (req, res) => {
   try {
     const pool = await getConnection();
@@ -364,6 +563,25 @@ export const getCruces = async (req, res) => {
   }
 };
 
+/**
+ * Obtiene estadísticas de cruces agrupadas por estatus
+ * 
+ * Retorna el conteo de cruces para cada estatus posible
+ * (Confirmado, Abuso, Aclaración, CasetaNoEncontradaEnRuta, etc.)
+ * 
+ * @async
+ * @param {Object} req - Objeto request
+ * @param {Object} res - Objeto response
+ * @returns {Promise<Object[]>} Array con objeto {Estatus, total} para cada estatus
+ * 
+ * @example
+ * GET /api/cruces/stats
+ * Response: [
+ *   { Estatus: "Abuso", total: 45 },
+ *   { Estatus: "Aclaración", total: 128 },
+ *   { Estatus: "Confirmado", total: 2350 }
+ * ]
+ */
 export const getStats = async (req, res) => {
   try {
     const pool = await getConnection();
@@ -379,6 +597,28 @@ export const getStats = async (req, res) => {
   }
 };
 
+/**
+ * Obtiene todas las órdenes de traslado (OT) del año actual
+ * 
+ * Consulta tabla Orden_traslados desde el 1 de enero del año actual hasta hoy
+ * 
+ * @async
+ * @param {Object} req - Objeto request
+ * @param {Object} res - Objeto response
+ * @returns {Promise<Object[]>} Array de todas las órdenes de traslado
+ * @returns {Object} error - Si no hay conexión a base de datos (500)
+ * 
+ * @example
+ * GET /api/cruces/ots
+ * Response: [
+ *   {
+ *     ID_orden: "OT-12345",
+ *     ID_clave: "C-3",
+ *     Fecha_traslado: "2025-11-25",
+ *     ...
+ *   }
+ * ]
+ */
 export const getOTS = async (req, res) => {
   try {
     const pool = await getConnection();
@@ -404,6 +644,19 @@ export const getOTS = async (req, res) => {
 };
 
 
+/**
+ * ⚠️ FUNCIÓN HEREDADA - No está en uso en IAVE WEB
+ * 
+ * Elimina un producto de la tabla products por ID
+ * (Código de ejemplo de versión anterior del proyecto)
+ * 
+ * @async
+ * @param {Object} req - Objeto request
+ * @param {string} req.params.id - ID del producto a eliminar
+ * @param {Object} res - Objeto response
+ * @returns {Promise<void>} Status 204 si exitoso, 404 si no existe
+ * @deprecated
+ */
 export const deleteProductById = async (req, res) => {
   try {
     const pool = await getConnection();
@@ -422,12 +675,42 @@ export const deleteProductById = async (req, res) => {
   }
 };
 
+/**
+ * ⚠️ FUNCIÓN HEREDADA - No está en uso en IAVE WEB
+ * 
+ * Obtiene el total de productos en la tabla products
+ * (Código de ejemplo de versión anterior del proyecto)
+ * 
+ * @async
+ * @param {Object} req - Objeto request
+ * @param {Object} res - Objeto response
+ * @returns {Promise<number>} Cantidad total de productos
+ * @deprecated
+ */
 export const getTotalProducts = async (req, res) => {
   const pool = await getConnection();
   const result = await pool.request().query("SELECT COUNT(*) FROM products");
   res.json(result.recordset[0][""]);
 };
 
+/**
+ * ⚠️ FUNCIÓN HEREDADA - No está en uso en IAVE WEB
+ * 
+ * Actualiza los datos de un producto por ID
+ * (Código de ejemplo de versión anterior del proyecto)
+ * 
+ * @async
+ * @param {Object} req - Objeto request
+ * @param {string} req.params.id - ID del producto a actualizar
+ * @param {Object} req.body - Campos a actualizar
+ * @param {string} req.body.name - Nombre del producto
+ * @param {string} req.body.description - Descripción
+ * @param {number} req.body.quantity - Cantidad disponible
+ * @param {number} req.body.price - Precio unitario
+ * @param {Object} res - Objeto response
+ * @returns {Promise<Object>} Producto actualizado
+ * @deprecated
+ */
 export const updateProductById = async (req, res) => {
   const { description, name, quantity = 0, price } = req.body;
 
@@ -463,6 +746,64 @@ export const updateProductById = async (req, res) => {
 };
 
 
+/**
+ * Importa masivamente cruces desde un archivo CSV/Excel
+ * 
+ * ## Flujo de Importación:
+ * 1. Valida que los datos no estén vacíos
+ * 2. Para cada cruce:
+ *    - Valida campos obligatorios (Tag, Fecha, Hora, Caseta)
+ *    - Parsea y valida fecha/hora
+ *    - Crea ID único del cruce
+ *    - Busca matrícula en Control_Tags_Historico (por TAG y fecha)
+ *    - Busca OT coincidente por matrícula y fecha
+ *    - Obtiene tarifa oficial de la caseta según ID_clave
+ *    - Compara importe del cruce con tarifa oficial para determinar estatus
+ *    - Maneja situaciones especiales (vacaciones, incapacidades) como "Abuso"
+ *    - Inserta en tabla Cruces
+ * 3. Registra importación en tabla ImportacionesCruces
+ * 
+ * ## Estatus Posibles:
+ * - **Confirmado**: Importe coincide exactamente con tarifa
+ * - **Se cobró menos**: Importe menor que tarifa
+ * - **Aclaración**: Importe mayor que tarifa
+ * - **Abuso**: Personal en situación especial (vacaciones, incapacidad)
+ * - **CasetaNoEncontradaEnRuta**: Caseta no existe en la ruta de la OT
+ * - **Ruta Sin Casetas**: OT sin casetas asignadas
+ * - **Pendiente**: Sin OT pero en situación especial
+ * 
+ * ## SSE (Server-Sent Events):
+ * Envía actualizaciones de progreso a todos los clientes conectados en tiempo real
+ * 
+ * @async
+ * @param {Object} req - Objeto request
+ * @param {Object} req.body - Array de cruces a importar
+ * @param {Object} req.body[].Tag - TAG del dispositivo
+ * @param {Object} req.body[].No.Economico - Número económico del vehículo
+ * @param {Object} req.body[].Fecha - Fecha en DD/MM/YYYY
+ * @param {Object} req.body[].Hora - Hora en HH:MM:SS
+ * @param {Object} req.body[].Caseta - Nombre de la caseta
+ * @param {Object} req.body[].Importe - Importe cobrado
+ * @param {string} req.headers['x-usuario'] - Usuario que realiza la importación
+ * @param {Object} res - Objeto response
+ * @returns {Promise<Object>} {insertados, omitidos: {incompletos, fechaInvalida, duplicado}}
+ * @returns {Object} error - Si ocurre un error durante la importación (500)
+ * 
+ * @example
+ * POST /api/cruces/import
+ * Headers: { 'x-usuario': 'admin@iave.mx' }
+ * Body: [
+ *   {
+ *     Tag: "ABC123456789.",
+ *     "No.Economico": "123 Carlos García",
+ *     Fecha: "25/11/2025",
+ *     Hora: "14:30:45",
+ *     Caseta: "Caseta Sahagún",
+ *     Importe: "150.00"
+ *   }
+ * ]
+ * Response: { insertados: 1, omitidos: { incompletos: 0, fechaInvalida: 0, duplicado: 0 } }
+ */
 export const importCruces = async (req, res) => {
   const pool = await getConnection();
   const cruces = req.body;
@@ -774,6 +1115,28 @@ WHERE RTRIM(LTRIM(CTags.Dispositivo)) = RTRIM(LTRIM(@tag))
   }
 };
 
+/**
+ * Actualiza masivamente órdenes de traslado (OT) para cruces
+ * 
+ * Para cada cruce proporcionado:
+ * 1. Extrae matrícula del No_Economico
+ * 2. Busca la OT correspondiente por matrícula en orden_status
+ * 3. Verifica que la fecha del cruce esté dentro del rango de la OT
+ * 4. Asigna la OT al cruce y actualiza estatus a "Confirmado"
+ * 
+ * @async
+ * @param {Object} req - Objeto request
+ * @param {Object} req.body - Body de la solicitud
+ * @param {string[]} req.body.ids - Array de IDs de cruces a actualizar
+ * @param {Object} res - Objeto response
+ * @returns {Promise<Object>} {message: "OT actualizada correctamente"}
+ * @returns {Object} error - Si los datos son inválidos (400) o error del servidor (500)
+ * 
+ * @example
+ * POST /api/cruces/update-ots
+ * Body: { ids: ["251125_143045_1234", "251125_143046_1234"] }
+ * Response: { message: "OT actualizada correctamente" }
+ */
 export const actualizarOTMasivo = async (req, res) => {
   console.log(`✅ Proceso de actualización masiva de OTs iniciado`);
   const { ids } = req.body;
@@ -852,10 +1215,33 @@ export const actualizarOTMasivo = async (req, res) => {
 
 
 
-/*
-Esta función no se está utilizando actualmente, pero la intención es poder comparar los nombres y en caso de no encontrar una coincidencia exacta 
-que se busque en una tabla de enlace para que devuelva el ID de la caseta (de acuerdo a la tabla casetas_Plantillas)
-*/
+/**
+ * ⚠️ FUNCIÓN NO UTILIZADA ACTUALMENTE
+ * 
+ * Intenta encontrar una caseta por nombre dentro del sistema
+ * 
+ * ## Estrategia de búsqueda (en orden):
+ * 1. Búsqueda exacta en casetas_Plantillas (nombre normalizado)
+ * 2. Búsqueda en tabla Cat_EntidadCaseta (nombres relacionados con Origen=1)
+ * 3. Si no hay coincidencia, registra sugerencia con Origen=0 para validación manual
+ * 
+ * Esta función fue diseñada para un futuro sistema de validación manual de casetas
+ * con coincidencias ambiguas. El nombre normalizado es insensible a mayúsculas,
+ * acentos y caracteres especiales.
+ * 
+ * @async
+ * @param {Object} req - Objeto request
+ * @param {string} req.params.CasetaNCruce - Nombre de la caseta a buscar
+ * @param {Object} res - Objeto response
+ * @returns {Promise<Object>} Objeto con status y datos de la caseta encontrada
+ * @returns {Object} {status: 'confirmado_exacto', caseta: {...}} - Coincidencia exacta
+ * @returns {Object} {status: 'confirmado_Aux', caseta: {...}} - Coincidencia en tabla auxiliar
+ * @returns {Object} {status: 'sin_match', sugerencia: {...}} - Sin coincidencia (para validar después)
+ * 
+ * @example
+ * GET /api/cruces/caseta-match/Caseta%20Sahagún
+ * Response: { status: 'confirmado_exacto', caseta: {...} }
+ */
 export const getCasetaMatch = async (req, res) => {
   const { CasetaNCruce } = req.params;
 
@@ -917,7 +1303,35 @@ export const getCasetaMatch = async (req, res) => {
 
 
 
-// Nueva ruta para SSE de progreso
+/**
+ * Configura una conexión SSE (Server-Sent Events) para recibir actualizaciones de progreso
+ * 
+ * Cuando se inicia una importación masiva, el cliente se conecta a esta ruta para
+ * recibir actualizaciones de progreso en tiempo real sin necesidad de polling.
+ * 
+ * El cliente recibe eventos con estructura:
+ * ```json
+ * {
+ *   "type": "progress|complete|error",
+ *   "processed": 100,
+ *   "inserted": 95,
+ *   "percentage": 50,
+ *   "message": "Procesando cruce 100 de 200..."
+ * }
+ * ```
+ * 
+ * @param {Object} req - Objeto request
+ * @param {Object} res - Objeto response
+ * @returns {void} Stream de eventos SSE
+ * 
+ * @example
+ * // En el cliente JavaScript
+ * const eventSource = new EventSource('/api/cruces/progress');
+ * eventSource.onmessage = (event) => {
+ *   const progress = JSON.parse(event.data);
+ *   console.log(`Progreso: ${progress.percentage}%`);
+ * };
+ */
 export const getImportProgress = (req, res) => {
   const clientId = Date.now().toString();
 
@@ -946,7 +1360,28 @@ export const getImportProgress = (req, res) => {
 
 
 
-// Función para enviar progreso a todos los clientes conectados
+/**
+ * Envía actualizaciones de progreso a todos los clientes SSE conectados
+ * 
+ * Itera sobre la lista de clientes conectados y envía el mensaje de progreso.
+ * Si hay error enviando a un cliente, lo desconecta automáticamente.
+ * 
+ * @param {Object} progressData - Datos del progreso
+ * @param {string} progressData.type - Tipo de evento (progress, complete, error)
+ * @param {number} progressData.processed - Registros procesados
+ * @param {number} progressData.inserted - Registros insertados
+ * @param {number} progressData.percentage - Porcentaje de progreso
+ * @param {string} progressData.message - Mensaje descriptivo
+ * 
+ * @example
+ * sendProgressToClients({
+ *   type: 'progress',
+ *   processed: 100,
+ *   inserted: 95,
+ *   percentage: 50,
+ *   message: 'Procesando cruce 100 de 200...'
+ * });
+ */
 const sendProgressToClients = (progressData) => {
   const message = `data: ${JSON.stringify(progressData)}\n\n`;
 
@@ -963,10 +1398,28 @@ const sendProgressToClients = (progressData) => {
 
 
 
-/*
-Utilidad para actualizar el 'Estatus' del cruce, para cambiar entre "Confirmado", "Abuso", "Error" o "Aclaración"; Además si el Estatus es "Abuso", 
-se coloca el Estatus_Secundario cómo 'pendiente_reporte', por otro lado si el Estatus que se desea colocar es "Condonado", se corrige  el 'Estatus' a "Confirmado".
-*/
+/**
+ * Actualiza el estatus de un cruce individual
+ * 
+ * ## Lógica especial:
+ * - Si estatus = "Abuso" → Asigna Estatus_Secundario = "pendiente_reporte"
+ * - Si estatus = "Condonado" → Cambia a "Confirmado" con Estatus_Secundario = "Condonado"
+ * - Demás casos → Actualiza solo el Estatus
+ * 
+ * @async
+ * @param {Object} req - Objeto request
+ * @param {string} req.params.id - ID del cruce a actualizar
+ * @param {Object} req.body - Body de la solicitud
+ * @param {string} req.body.estatus - Nuevo estatus (ej: "Abuso", "Aclaración", "Confirmado", "Condonado")
+ * @param {Object} res - Objeto response
+ * @returns {Promise<Object>} {message: "Estatus {estatus} actualizado correctamente sobre el ID {id}"}
+ * @returns {Object} error - Si ocurre un error en la base de datos (500)
+ * 
+ * @example
+ * PUT /api/cruces/251125_143045_1234/status
+ * Body: { estatus: "Aclaración" }
+ * Response: { message: "Estatus Aclaración actualizado correctamente sobre el ID 251125_143045_1234" }
+ */
 export const actualizarEstatusCruce = async (req, res) => {
   const { id } = req.params;
   const { estatus } = req.body;
@@ -995,6 +1448,34 @@ export const actualizarEstatusCruce = async (req, res) => {
 };
 
 
+/**
+ * Actualiza masivamente el estatus de múltiples cruces
+ * 
+ * Aplica la misma lógica de actualizarEstatusCruce pero para múltiples registros.
+ * 
+ * ## Lógica especial por estatus:
+ * - "Abuso" → Estatus_Secundario = "pendiente_reporte"
+ * - "Aclaración" → Estatus_Secundario = "pendiente_aclaracion"
+ * - "Condonado" → Cambia a "Confirmado" con Estatus_Secundario = "Condonado"
+ * - Demás → Solo actualiza Estatus
+ * 
+ * @async
+ * @param {Object} req - Objeto request
+ * @param {Object} req.body - Body de la solicitud
+ * @param {string[]} req.body.ids - Array de IDs de cruces a actualizar
+ * @param {string} req.body.nuevoEstatus - Nuevo estatus para todos los cruces
+ * @param {Object} res - Objeto response
+ * @returns {Promise<Object>} {message: "Estatus {estatus} actualizado correctamente sobre los IDs ..."}
+ * @returns {Object} error - Si datos inválidos (400) o error del servidor (500)
+ * 
+ * @example
+ * PATCH /api/cruces/status-masivo
+ * Body: {
+ *   ids: ["251125_143045_1234", "251125_143046_1234"],
+ *   nuevoEstatus: "Aclaración"
+ * }
+ * Response: { message: "Estatus Aclaración actualizado correctamente sobre los IDs 251125_143045_1234, 251125_143046_1234" }
+ */
 export const actualizarEstatusMasivoCruces = async (req, res) => {
   const { ids, nuevoEstatus } = req.body;
   if (!Array.isArray(ids) || !nuevoEstatus) {
