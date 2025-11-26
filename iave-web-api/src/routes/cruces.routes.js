@@ -3,7 +3,7 @@ import {
   getCruces,
   actualizarEstatusCruce,
   getStats,
-  getOTS, getConciliacion,
+  getOTS,
   getStatusPersonal,
   importCruces,
   setOTSbyIDCruce,
@@ -23,7 +23,6 @@ router.get("/stats", getStats);
 router.get('/progress', getImportProgress);
 router.get("/statusPersonal/:ID_Cruce", getStatusPersonal);
 router.get("/OTS", getOTS);
-router.get("/Conciliacion", getConciliacion);
 router.post("/importar", importCruces);
 router.patch('/:id/estatus', actualizarEstatusCruce);
 router.patch('/:id/setOT', setOTSbyIDCruce);
