@@ -21,7 +21,7 @@ import { getConnection, sql } from "../database/connection.js";
  * Almacena las conexiones SSE activas para notificaciones de progreso en tiempo real
  * @type {Map<string, Response>}
  */
-const progressClients = new Map();
+const clientesConectados = new Map();
 
 /**
  * Lista de matrículas administrativas para identificar vehículos no operacionales
@@ -220,15 +220,17 @@ function limpiarImporte(valor) {
  * Limpia un TAG removiendo puntos finales
  * 
  * @param {string} valor - TAG/dispositivo a limpiar
- * @returns {string} TAG normalizado sin puntos
+ * @returns {string} TAG normalizado sin puntos, o cadena vacía si el valor es vacío o inválido
  * 
  * @example
  * limpiarTAG("ABC123456789.") // "ABC123456789"
+ * limpiarTAG("") // ""
+ * limpiarTAG(null) // ""
  */
 function limpiarTAG(valor) {
   if (!valor) return "";
   // Quitar el punto que le sigue al TAG
-  return valor.replace(/\./g, "").trim() || 0;
+  return valor.replace(/\./g, "").trim() || "";
 }
 
 
@@ -269,7 +271,6 @@ export const getStatusPersonal = async (req, res) => {
       .query(`SELECT * FROM cruces WHERE ID = '${IDCruce}'`);
 
     if (!cruces || cruces.length === 0) {
-
       console.log(`❌ No se encontró el cruce con ID: ${IDCruce}`);
       return res.status(404).json({ mensaje: `Cruce con ID ${IDCruce} no encontrado.` });
     }
@@ -285,20 +286,18 @@ export const getStatusPersonal = async (req, res) => {
       return res.status(400).json({ mensaje: `No se pudo extraer matrícula del cruce.` });
     }
 
-    // Armar fecha del cruce desde el ID (formato: YYMMDD_hh.mm.ss_TAG)
+    // Armar fecha del cruce desde el ID (formato: YYMMDD_hhmmss_TAG)
     const año = "20" + IDCruce.slice(0, 2);
     const mes = IDCruce.slice(2, 4);
     const dia = IDCruce.slice(4, 6);
     const fechaCruce = new Date(`${año}-${mes}-${dia}`);
     console.log("Fecha del cruce:", fechaCruce);
-    // Formato SQL Server seguro
+    // Formato DATETIME SQL Server 
     const sqlDate = `DATEFROMPARTS(${"20" + IDCruce.slice(0, 2)}, ${IDCruce.slice(2, 4)}, ${IDCruce.slice(4, 6)})`;
-    console.log("sqlDate:      ", sqlDate);
 
     // Buscar status exacto
     let { recordset: status } = await pool.request()
       .query(`SELECT * FROM Estado_del_personal WHERE ID_matricula = '${matricula}' AND ID_fecha = ${sqlDate}`);
-    console.log("Status encontrado:", status);
     // Si no hay resultado exacto, buscar ±1 día como fallback
     if (status.length === 0) {
       const fechaMenos1 = new Date(fechaCruce);
@@ -519,7 +518,7 @@ export const setOTSbyIDCruce = async (req, res) => {
 /**
  * Obtiene todos los cruces registrados
  * 
- * Enriquece cada cruce con información adicional:
+ * "Enriquece" cada cruce con información adicional:
  * - Extrae el carácter 6 de id_orden para determinar base (1=Sahagún, 0=Monterrey)
  * - Asigna base como "Administrativos" si la matrícula está en lista de admins
  * 
@@ -643,107 +642,6 @@ export const getOTS = async (req, res) => {
   }
 };
 
-
-/**
- * ⚠️ FUNCIÓN HEREDADA - No está en uso en IAVE WEB
- * 
- * Elimina un producto de la tabla products por ID
- * (Código de ejemplo de versión anterior del proyecto)
- * 
- * @async
- * @param {Object} req - Objeto request
- * @param {string} req.params.id - ID del producto a eliminar
- * @param {Object} res - Objeto response
- * @returns {Promise<void>} Status 204 si exitoso, 404 si no existe
- * @deprecated
- */
-export const deleteProductById = async (req, res) => {
-  try {
-    const pool = await getConnection();
-
-    const result = await pool
-      .request()
-      .input("id", req.params.id)
-      .query("DELETE FROM products WHERE id = @id");
-
-    if (result.rowsAffected[0] === 0) return res.sendStatus(404);
-
-    return res.sendStatus(204);
-  } catch (error) {
-    res.status(500);
-    res.send(error.message);
-  }
-};
-
-/**
- * ⚠️ FUNCIÓN HEREDADA - No está en uso en IAVE WEB
- * 
- * Obtiene el total de productos en la tabla products
- * (Código de ejemplo de versión anterior del proyecto)
- * 
- * @async
- * @param {Object} req - Objeto request
- * @param {Object} res - Objeto response
- * @returns {Promise<number>} Cantidad total de productos
- * @deprecated
- */
-export const getTotalProducts = async (req, res) => {
-  const pool = await getConnection();
-  const result = await pool.request().query("SELECT COUNT(*) FROM products");
-  res.json(result.recordset[0][""]);
-};
-
-/**
- * ⚠️ FUNCIÓN HEREDADA - No está en uso en IAVE WEB
- * 
- * Actualiza los datos de un producto por ID
- * (Código de ejemplo de versión anterior del proyecto)
- * 
- * @async
- * @param {Object} req - Objeto request
- * @param {string} req.params.id - ID del producto a actualizar
- * @param {Object} req.body - Campos a actualizar
- * @param {string} req.body.name - Nombre del producto
- * @param {string} req.body.description - Descripción
- * @param {number} req.body.quantity - Cantidad disponible
- * @param {number} req.body.price - Precio unitario
- * @param {Object} res - Objeto response
- * @returns {Promise<Object>} Producto actualizado
- * @deprecated
- */
-export const updateProductById = async (req, res) => {
-  const { description, name, quantity = 0, price } = req.body;
-
-  if (
-    description == null ||
-    name == null ||
-    quantity == null ||
-    price == null
-  ) {
-    return res.status(400).json({ msg: "Bad Request. Please fill all fields" });
-  }
-
-  try {
-    const pool = await getConnection();
-    const result = await pool
-      .request()
-      .input("id", req.params.id)
-      .input("name", sql.VarChar, name)
-      .input("description", sql.Text, description)
-      .input("quantity", sql.Int, quantity)
-      .input("price", sql.Decimal, price)
-      .query(
-        "UPDATE products SET name = @name, description = @description, quantity = @quantity, price = @price WHERE id = @id"
-      );
-
-    if (result.rowsAffected[0] === 0) return res.sendStatus(404);
-
-    res.json({ name, description, quantity, price, id: req.params.id });
-  } catch (error) {
-    res.status(500);
-    res.send(error.message);
-  }
-};
 
 
 /**
@@ -1095,9 +993,10 @@ WHERE RTRIM(LTRIM(CTags.Dispositivo)) = RTRIM(LTRIM(@tag))
     await pool
       .request()
       .input("Usuario", sql.NVarChar, usuario)
+      .input("FechaImportacion", sql.DateTime, new Date() )
       .input("TotalInsertados", sql.Int, insertados).query(`
-        INSERT INTO ImportacionesCruces (Usuario, TotalInsertados)
-        VALUES (@Usuario, @TotalInsertados)
+        INSERT INTO ImportacionesCruces (Usuario, TotalInsertados, FechaImportacion)
+        VALUES (@Usuario, @TotalInsertados, @FechaImportacion)
       `);
 
     res.json({ insertados, omitidos });
@@ -1344,7 +1243,7 @@ export const getImportProgress = (req, res) => {
   });
 
   // Agregar cliente a la lista
-  progressClients.set(clientId, res);
+  clientesConectados.set(clientId, res);
 
   // Enviar conexión inicial
   res.write(`data: ${JSON.stringify({
@@ -1354,7 +1253,7 @@ export const getImportProgress = (req, res) => {
 
   // Limpiar cuando el cliente se desconecte
   req.on('close', () => {
-    progressClients.delete(clientId);
+    clientesConectados.delete(clientId);
   });
 };
 
@@ -1385,12 +1284,12 @@ export const getImportProgress = (req, res) => {
 const sendProgressToClients = (progressData) => {
   const message = `data: ${JSON.stringify(progressData)}\n\n`;
 
-  progressClients.forEach((client, clientId) => {
+  clientesConectados.forEach((client, clientId) => {
     try {
       client.write(message);
     } catch (error) {
       console.error(`Error enviando a cliente ${clientId}:`, error);
-      progressClients.delete(clientId);
+      clientesConectados.delete(clientId);
     }
   });
 };
