@@ -464,5 +464,5 @@ Para reportar bugs o solicitar funcionalidades:
 
 **Última actualización:** 25/11/2025  
 **Versión:** 2.0  
-**Documentado por:** Sistema de IA  
+**Documentado por:** Alan Amador con apoyo de Copilot (usando Claude Sonnet 4.5)
 **Estado:** ✅ Producción
