@@ -387,7 +387,7 @@ Mínimo `HH:MM`, completo `HH:MM:SS`. Ejemplos:
 - `Caseta` (no vacío)
 
 ### 5. **Validación OT**
-Solo acepta formato: `OT-XXXXX` (donde X son dígitos)
+Solo acepta formato: `OT-XXXXX` (donde X son dígitos númericos)
 
 ---
 
