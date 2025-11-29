@@ -9,7 +9,6 @@ import {
   setOTSbyIDCruce,
   getCasetaMatch,
   getImportProgress,
-  actualizarOTMasivo,
   actualizarEstatusMasivoCruces
 } from "../controllers/cruces.controllers.js";
 
@@ -30,7 +29,7 @@ router.patch('/:id/setOT', setOTSbyIDCruce);
 router.patch('/masivo-estatus', actualizarEstatusMasivoCruces);
 
 
-//Ruta de prueba
+//Ruta de prueba para obtener la caseta asociada a un cruce específico.
 router.get("/caseta/:CasetaNCruce", getCasetaMatch);
 
 

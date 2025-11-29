@@ -42,10 +42,10 @@ const matriculasAdmins = [
  * @returns {string} Nombre normalizado en mayúsculas sin acentos
  * 
  * @example
- * normalize("Sólo-la Paz") // "SOLOLA PAZ"
+ * normalize("PALMILLAS-APASEO gde") // "PALMILLAS APASEO GDE"
  */
 function normalize(nombre) {
-  return nombre.toUpperCase().replace(/[-.]/g, '').trim().replace('Á', 'A').replace('É', 'E').replace('Í', 'I').replace('Ó', 'O').replace('Ú', 'U');
+  return nombre.toUpperCase().replace('-', ' ').replace(/[-.]/g, '').trim().replace('Á', 'A').replace('É', 'E').replace('Í', 'I').replace('Ó', 'O').replace('Ú', 'U');
 }
 
 
@@ -296,8 +296,8 @@ export const getStatusPersonal = async (req, res) => {
     const sqlDate = `DATEFROMPARTS(${"20" + IDCruce.slice(0, 2)}, ${IDCruce.slice(2, 4)}, ${IDCruce.slice(4, 6)})`;
 
     // Buscar status exacto
-    let { recordset: status } = await pool.request()
-      .query(`SELECT * FROM Estado_del_personal WHERE ID_matricula = '${matricula}' AND ID_fecha = ${sqlDate}`);
+    let { recordset: status } = await pool.request().input("matricula", sql.VarChar, matricula)
+      .query(`SELECT * FROM Estado_del_personal WHERE ID_matricula = @matricula AND ID_fecha = ${sqlDate}`);
     // Si no hay resultado exacto, buscar ±1 día como fallback
     if (status.length === 0) {
       const fechaMenos1 = new Date(fechaCruce);
@@ -311,11 +311,11 @@ export const getStatusPersonal = async (req, res) => {
 
       const fallbackQuery = `
         SELECT * FROM Estado_del_personal 
-        WHERE ID_matricula = '${matricula}' 
+        WHERE ID_matricula = @matricula 
         AND ID_fecha BETWEEN ${fecha1} AND ${fecha2}
       `;
 
-      const { recordset: fallbackStatus } = await pool.request().query(fallbackQuery);
+      const { recordset: fallbackStatus } = await pool.request().input("matricula", sql.VarChar, matricula).query(fallbackQuery);
 
       if (fallbackStatus.length === 0) {
         return res.status(404).json({
@@ -345,7 +345,7 @@ export const getStatusPersonal = async (req, res) => {
 
 
 /**
- * Asigna una orden de traslado (OT) a un cruce específico
+ * Asigna una orden de traslado de manera manual a un cruce específico
  * 
  * Valida que la OT tenga formato válido (OT-XXXXX) antes de actualizar.
  * 
@@ -876,7 +876,7 @@ WHERE RTRIM(LTRIM(CTags.Dispositivo)) = RTRIM(LTRIM(@tag))
     await pool
       .request()
       .input("Usuario", sql.NVarChar, usuario)
-      .input("FechaImportacion", sql.DateTime, new Date() )
+      .input("FechaImportacion", sql.DateTime, new Date())
       .input("TotalInsertados", sql.Int, insertados).query(`
         INSERT INTO ImportacionesCruces (Usuario, TotalInsertados, FechaImportacion)
         VALUES (@Usuario, @TotalInsertados, @FechaImportacion)
@@ -897,102 +897,6 @@ WHERE RTRIM(LTRIM(CTags.Dispositivo)) = RTRIM(LTRIM(@tag))
   }
 };
 
-/**
- * Actualiza masivamente órdenes de traslado (OT) para cruces
- * 
- * Para cada cruce proporcionado:
- * 1. Extrae matrícula del No_Economico
- * 2. Busca la OT correspondiente por matrícula en orden_status
- * 3. Verifica que la fecha del cruce esté dentro del rango de la OT
- * 4. Asigna la OT al cruce y actualiza estatus a "Confirmado"
- * 
- * @async
- * @param {Object} req - Objeto request
- * @param {Object} req.body - Body de la solicitud
- * @param {string[]} req.body.ids - Array de IDs de cruces a actualizar
- * @param {Object} res - Objeto response
- * @returns {Promise<Object>} {message: "OT actualizada correctamente"}
- * @returns {Object} error - Si los datos son inválidos (400) o error del servidor (500)
- * 
- * @example
- * POST /api/cruces/update-ots
- * Body: { ids: ["251125_143045_1234", "251125_143046_1234"] }
- * Response: { message: "OT actualizada correctamente" }
- */
-export const actualizarOTMasivo = async (req, res) => {
-  console.log(`✅ Proceso de actualización masiva de OTs iniciado`);
-  const { ids } = req.body;
-  if (!Array.isArray(ids)) {
-    return res.status(400).json({ error: "Datos inválidos" });
-  }
-  try {
-
-    for (const id of ids) {
-      const pool = await getConnection();
-
-      // Obtener cruce
-      const { recordset: cruces } = await pool
-        .request()
-        .query(`SELECT * FROM cruces WHERE ID = '${id}'`);
-
-      if (!cruces || cruces.length === 0) {
-        console.log(`❌ No se encontró el cruce con ID: ${id}`);
-        continue;
-      }
-
-      const cruce = cruces[0];
-
-      // Obtener matrícula (antes del espacio si aplica)
-      const matricula = cruce.No_Economico?.includes(" ")
-        ? cruce.No_Economico.split(" ")[0].trim()
-        : cruce.No_Economico?.trim();
-
-      if (!matricula) {
-        console.log(`❌ No se pudo extraer matrícula del cruce ID: ${id}`);
-        continue;
-      }
-
-      // Armar fecha del cruce desde el ID (formato: YYMMDD_hh.mm.ss_TAG)
-      const año = "20" + id.slice(0, 2);
-      const mes = id.slice(2, 4);
-      const dia = id.slice(4, 6);
-      const fechaCruce = new Date(`${año}-${mes}-${dia}`);
-      console.log("Fecha del cruce:", fechaCruce);
-      // Formato SQL Server seguro
-      const sqlDate = `DATEFROMPARTS(${"20" + id.slice(0, 2)}, ${id.slice(2, 4)}, ${id.slice(4, 6)})`;
-      console.log("sqlDate:      ", sqlDate);
-
-      // Buscar OT exacta
-      let { recordset: status } = await pool.request()
-        .query(`SELECT * FROM orden_status WHERE fk_matricula = '${matricula}' AND iniciada <= ${sqlDate} AND finalizada >= ${sqlDate}`);
-      console.log("OT encontrada:", status);
-
-      if (status.length === 0) {
-        console.log(`❌ No se encontró OT para la matrícula ${matricula} en la fecha ${fechaCruce.toISOString()}`);
-        continue;
-      }
-
-      const ot = status[0];
-      const { fk_orden: ID_orden } = ot;
-
-      // Actualizar cruce con la OT encontrada
-      await pool.request()
-        .input("id", id)
-        .input("OT", sql.VarChar, ID_orden)
-        .query(`
-          UPDATE Cruces
-          SET id_orden = @OT, Estatus = 'Confirmado', Estatus_Secundario='Segunda vuelta'
-          WHERE ID = @id
-        `);
-      console.log(`✅ OT ${ID_orden} asignada al cruce ID: ${id}`);
-    }
-    console.log(`✅ Proceso de actualización masiva de OTs completado`);
-    res.status(200).json({ message: "OT actualizada correctamente" });
-  } catch (error) {
-    console.error("Error al actualizar OT:", error);
-    res.status(500).json({ error: "Error al actualizar OT" });
-  }
-};
 
 
 
@@ -1008,8 +912,8 @@ export const actualizarOTMasivo = async (req, res) => {
  * 3. Si no hay coincidencia, registra sugerencia con Origen=0 para validación manual
  * 
  * Esta función fue diseñada para un futuro sistema de validación manual de casetas
- * con coincidencias ambiguas. El nombre normalizado es insensible a mayúsculas,
- * acentos y caracteres especiales.
+ * con coincidencias ambiguas. El nombre normalizado queda en mayúsculas, omite
+ * acentos y caracteres especiales (permitiendo una comparacion normalizada).
  * 
  * @async
  * @param {Object} req - Objeto request
@@ -1186,6 +1090,7 @@ const sendProgressToClients = (progressData) => {
  * ## Lógica especial:
  * - Si estatus = "Abuso" → Asigna Estatus_Secundario = "pendiente_reporte"
  * - Si estatus = "Condonado" → Cambia a "Confirmado" con Estatus_Secundario = "Condonado"
+ * - Si estatus = "Aclaración" → Cambia a "Aclaración" con Estatus_Secundario = "pendiente_aclaracion"
  * - Demás casos → Actualiza solo el Estatus
  * 
  * @async
@@ -1209,15 +1114,21 @@ export const actualizarEstatusCruce = async (req, res) => {
     const pool = await getConnection();
     if (estatus === 'Abuso') {
       const result =
-        await pool.query`UPDATE Cruces SET Estatus = ${estatus}, Estatus_Secundario = 'pendiente_reporte' WHERE ID = ${id}`;
+        await pool.request().input("estatus", estatus).input("id", id).query`UPDATE Cruces SET Estatus = @estatus, Estatus_Secundario = 'pendiente_reporte' WHERE ID = @id`;
+
     }
     else {
       if (estatus === 'Condonado') {
         const result =
-          await pool.query`UPDATE Cruces SET Estatus = 'Confirmado', Estatus_Secundario = 'Condonado' WHERE ID = ${id}`;
-      } else {
+          await pool.request().input("id", id).query`UPDATE Cruces SET Estatus = 'Confirmado', Estatus_Secundario = 'Condonado' WHERE ID = @id`;
+      }
+      if (estatus === 'Aclaración') {
         const result =
-          await pool.query`UPDATE Cruces SET Estatus = ${estatus} WHERE ID = ${id}`;
+          await pool.request().input("id", id).query`UPDATE Cruces SET Estatus = 'Aclaración', Estatus_Secundario = 'pendiente_aclaracion' WHERE ID = @id`;
+      }
+      else {
+        const result =
+          await pool.request().input("estatus", estatus).input("id", id).query`UPDATE Cruces SET Estatus = @estatus WHERE ID = @id`;
       }
     }
     res.status(200).json({
@@ -1267,18 +1178,18 @@ export const actualizarEstatusMasivoCruces = async (req, res) => {
     const pool = await getConnection();
     if (nuevoEstatus === 'Abuso') {
       const result =
-        await pool.request().query(`
+        await pool.request().input("nuevoEstatus", nuevoEstatus).query(`
         UPDATE Cruces 
-        SET Estatus = '${nuevoEstatus}', 
+        SET Estatus = @nuevoEstatus, 
         Estatus_Secundario = 'pendiente_reporte'
         WHERE ID IN (${"'"}${ids.join("','")}${"'"})
         `);
     }
     else if (nuevoEstatus === 'Aclaración') {
       const result =
-        await pool.query(`
+        await pool.request().input("nuevoEstatus", nuevoEstatus).query(`
         UPDATE Cruces 
-        SET Estatus = '${nuevoEstatus}', 
+        SET Estatus = @nuevoEstatus, 
         Estatus_Secundario = 'pendiente_aclaracion'
         WHERE ID IN (${"'"}${ids.join("','")}${"'"})
         `);

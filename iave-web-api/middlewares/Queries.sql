@@ -1825,3 +1825,18 @@ FROM
 WHERE 
           PB.Ciudad_SCT LIKE '%huehue%'
     AND PBD.Ciudad_SCT LIKE '%Hermo%'
+
+
+
+
+SELECT * from cruces where Estatus='Confirmado'
+
+
+
+SELECT DISTINCT Estatus FROM Cruces 
+
+SELECT * FROM cruces WHERE Estatus = 'CasetaNoEncontradaEnRuta' OR Estatus = 'Sesgos' OR Estatus LIKE '%Ruta Sin Casetas%' ORDER BY ID DESC
+
+
+
+SELECT * FROM cruces WHERE id_orden

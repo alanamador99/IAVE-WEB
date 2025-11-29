@@ -7,7 +7,6 @@ import {
   getSesgos
 } from "../controllers/sesgos.controllers.js";
 
-// Ruta GET para obtener todos los cruces
 
 const router = Router();
 
@@ -22,20 +21,5 @@ router.get("/", getSesgos);
 
 
 
-
-/*
-router.post("/importar", createNewCruces);
-
-router.patch('/:id/estatus', actualizarEstatusCruce);
-
-router.get("/products/count", getTotalCruces);
-
-router.get("/products/:id", getProductById);
-
-router.delete("/products/:id", deleteProductById);
-
-router.put("/products/:id", updateProductById);
-
-*/
 
 export default router;
