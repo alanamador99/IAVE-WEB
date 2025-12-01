@@ -18,7 +18,7 @@ const router = Router();
 router.get("/", getTags);
 router.get("/stats", getStatsTags);
 router.get("/TotalStatsTags", getTotalStatsTags);
-router.post("/exportar-responsiva", generarResponsivaDesdePlantilla);
 router.get("/:fechaBuscada/unavailableOPs", getUnavailableOps)
+router.post("/exportar-responsiva", generarResponsivaDesdePlantilla);
 
 export default router;
