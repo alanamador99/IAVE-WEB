@@ -43,7 +43,8 @@ Un **TAG** es:
        │                          │
   ┌────▼──────────┐      ┌───────▼──────┐
   │  Inactivado   │      │  Extraviado  │
-  │  (Retirado)   │      │  (Perdido)   │
+  │  (Retirado de |      |              |
+  | la operación) │      │  (Perdido)   │
   └───────────────┘      └──────────────┘
 ```
 
