@@ -121,7 +121,7 @@ GET /api/tags/total
 # Response (200 OK)
 [
   {
-    "Total": 257
+    "Total": 822
   }
 ]
 ```
@@ -141,23 +141,23 @@ GET /api/tags/stats
 # Response (200 OK)
 [
   {
-    "asignados": 185,
-    "stockM": 35,
-    "stockS": 28,
-    "inactivos": 8,
-    "extravios": 1
+    "asignados": 78,
+    "stockM": 39,
+    "stockS": 25,
+    "inactivos": 6,
+    "extravios": 674
   }
 ]
 ```
 
 **Interpretación:**
-- **185 TAGs** en operadores activos (trabajando)
-- **35 TAGs** en stock Monterrey (disponibles para asignar)
-- **28 TAGs** en stock Sahagún (disponibles para asignar)
-- **8 TAGs** retirados/devueltos (fuera de servicio)
-- **1 TAG** reportado extraviado (perdido)
+- **78 TAGs** en operadores activos (trabajando)
+- **39 TAGs** en stock Monterrey (disponibles para asignar)
+- **25 TAGs** en stock Sahagún (disponibles para asignar)
+- **6 TAGs** retirados/devueltos (fuera de servicio)
+- **674 TAG** reportado extraviado (perdido)
 
-**Total del sistema:** 185 + 35 + 28 + 8 + 1 = 257 TAGs
+**Total del sistema:** 78 + 39 + 25 + 6 + 674 = 822 TAGs
 
 ---
 
@@ -165,7 +165,7 @@ GET /api/tags/stats
 
 **Ruta:** `POST /api/tags/responsiva`
 
-Genera un documento Excel legalizado con la responsiva de asignación de TAG.
+Genera un documento Excel en formato estandarizado de calidad, con la responsiva de asignación del TAG.
 
 ```bash
 # Request
@@ -173,14 +173,14 @@ POST /api/tags/responsiva
 Content-Type: application/json
 
 {
-  "nombre": "Carlos García López",
-  "matricula": "123",
-  "numeroDispositivo": "ABC123456789",
-  "fechaAsignacion": "2025-11-29"
+  "nombre": "David Cortés Rugerio",
+  "matricula": "2333",
+  "numeroDispositivo": "IMDM28598883",
+  "fechaAsignacion": "2025-01-14"
 }
 
 # Response
-Descarga archivo: Responsiva_TAG_ABC123456789.xlsx
+Descarga archivo: Responsiva_TAG_IMDM28598883.xlsx
 Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
 ```
 
@@ -202,7 +202,7 @@ Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
 
 **Ruta:** `GET /api/tags/unavailable/:fechaBuscada`
 
-Identifica operadores que NO deberían trabajar en una fecha específica.
+Identifica operadores que NO deberían hacer uso de su IAVE en una fecha específica.
 
 ```bash
 # Request
@@ -211,16 +211,16 @@ GET /api/tags/unavailable/29-11-2025
 # Response (200 OK)
 [
   {
-    "ID_matricula": 45,
-    "Nombres": "Miguel",
-    "Ap_paterno": "González",
-    "Ap_materno": "Martínez",
+    "ID_matricula": 2333,
+    "Nombres": "David",
+    "Ap_paterno": "Cortés",
+    "Ap_materno": "Rugerio",
     "Descripcion": "VACACIONES",
     "Fecha_captura": "2025-11-20T08:00:00.000Z",
     "ID_fecha": "2025-11-29",
-    "Captor": "admin@iave.mx",
-    "ID_orden": "OT-12345",
-    "Tag": "DEF987654321"
+    "Captor": "Francis",
+    "ID_orden": "",
+    "Tag": "IMDM28598883"
   },
   { ... más operadores }
 ]
@@ -264,9 +264,10 @@ GET /api/tags/unavailable/29-11-2025
                        │
          ┌─────────────▼──────────────────┐
          │ 3. GENERACIÓN DE RESPONSIVA    │
-         │    generarResponsivaDesdePlant│
-         │    → Documento legal          │
-         │    → Firma de operador        │
+         │    generarResponsiva           │
+         │    → Documento controlado      │
+         │    → Firma de operador         |
+         │   → Resguardo de la responsiva |
          └─────────────┬──────────────────┘
                        │
          ┌─────────────▼─────────────┐
@@ -284,8 +285,9 @@ GET /api/tags/unavailable/29-11-2025
                        │
          ┌─────────────▼──────────────┐
          │ 6. RETIRO O EXTRAVIADO     │
-         │    - Devuelto: inactivo    │
-         │    - Perdido: extravio     │
+         |                            |
+         | - Devuelto: inactivo(stock)│
+         │ - Perdido: extravio        │
          │    UPDATE Control_Tags     │
          └─────────────┬──────────────┘
                        │
@@ -307,8 +309,8 @@ CREATE TABLE Control_Tags (
     id_matricula INT,                       -- ID del operador asignado
     Activa BIT,                            -- ¿Está activo? 1=sí, 0=no
     Fecha_Alta DATETIME,                   -- Cuándo se asignó
-    Fecha_inactiva DATETIME,               -- Cuándo se retiró (si aplica)
-    Fecha_Extravio DATETIME,               -- Cuándo se reportó extraviado
+    Fecha_inactiva DATETIME,               -- Cuándo se inactivó (si aplica)
+    Fecha_Extravio DATETIME,               -- Cuándo se reportó extraviada la IAVE
     
     FOREIGN KEY (id_matricula) REFERENCES Personal(ID_matricula)
 );
@@ -364,7 +366,7 @@ const response = await fetch('/api/tags/responsiva', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(formData)
-});
+}); 
 
 // Descargar automáticamente
 const blob = await response.blob();
@@ -406,10 +408,6 @@ console.log(`- Stock Sahagún: ${stats.stockS}`);
 console.log(`- Retirados: ${stats.inactivos}`);
 console.log(`- Extraviados: ${stats.extravios}`);
 
-// Alertas
-if (stats.extravios > 0) {
-  console.warn(`⚠️ ${stats.extravios} TAG(s) extraviado(s) reportado(s)`);
-}
 ```
 
 ---

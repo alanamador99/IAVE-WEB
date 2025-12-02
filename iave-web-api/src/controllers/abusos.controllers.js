@@ -1,9 +1,79 @@
+/**
+ * @module abusos.controllers
+ * @description
+ * Controlador para gestión de ABUSOS en el sistema IAVE.
+ * Los abusos son infracciones cometidas por operadores de transporte,
+ * como exceso de velocidad, circulación en carril restringido, etc.
+ * 
+ * Funcionalidades principales:
+ * - Consultar abusos registrados en el sistema
+ * - Filtrar abusos por operador
+ * - Agrupar abusos por fecha y operador
+ * - Actualizar estatus de abusos (pendiente, reporte enviado, descuento aplicado, etc)
+ * - Generar estadísticas de abusos
+ * - Obtener ubicaciones geográficas de infracciones
+ * 
+ * Categorías de abusos:
+ * - Velocidad excesiva
+ * - Circulación en carril restringido
+ * - Incumplimiento de normas
+ * 
+ * Estados secundarios:
+ * - pendiente_reporte: Abuso detectado, pendiente de reporte
+ * - reporte_enviado_todo_pendiente: Reporte enviado, pendiente aplicación
+ * - descuento_aplicado_pendiente_acta: Descuento aplicado, pendiente acta
+ * - acta_aplicada_pendiente_descuento: Acta aplicada, pendiente descuento
+ * - completado: Proceso completo
+ * - condonado: Perdonado/anulado
+ * 
+ * @requires ../database/connection.js - Conexión a base de datos MSSQL
+ * @requires ../utils/email.js - Utilidad para envío de correos
+ */
+
 import { getConnection, sql } from "../database/connection.js";
 
 import enviarCorreoAbuso from "../utils/email.js"
 
 
 
+/**
+ * Obtiene todos los abusos registrados en el sistema.
+ * @async
+ * @function getAbusos
+ * @param {Object} req - Objeto de solicitud (sin parámetros)
+ * @param {Object} res - Objeto de respuesta
+ * @returns {Promise<void>} Responde con array de abusos con información enriquecida
+ * @throws {Error} Error 500 si falla la conexión
+ * @description
+ * Consulta tabla Cruces donde Estatus='Abuso' con información adicional:
+ * - Estado personal del operador en esa fecha
+ * - Datos del operador (nombre, apellidos)
+ * - Enriquece NombreCompleto si está vacío usando No_Economico
+ * 
+ * Lógica especial:
+ * - Solo obtiene el PRIMER estado del operador por fecha (rn=1)
+ * - Usa CTE PrimerEstado para evitar duplicados
+ * @example
+ * // GET /api/abusos
+ * // Response (200 OK)
+ * [
+ *   {
+ *     "ID_Cruce": 1,
+ *     "ID_Matricula": 123,
+ *     "NombreCompleto": "Carlos García López",
+ *     "Nombres": "Carlos",
+ *     "Apellidos": "García López",
+ *     "FechaAbuso": "2025-12-01",
+ *     "Estatus": "Abuso",
+ *     "Estatus_Secundario": "pendiente_reporte",
+ *     "No_Economico": "123 Carlos García López",
+ *     "Importe": 250.00,
+ *     "Estado_Personal": "ACTIVO",
+ *     ...
+ *   },
+ *   {...}
+ * ]
+ */
 export const getAbusos = async (req, res) => {
   try {
     const pool = await getConnection();
@@ -43,6 +113,35 @@ WHERE CR.Estatus = 'Abuso' ORDER BY CR.ID DESC;
 };
 
 
+/**
+ * Obtiene abusos de un operador específico.
+ * @async
+ * @function getAbusosByOperador
+ * @param {Object} req - Objeto de solicitud
+ * @param {string} req.params.operador - ID de matrícula del operador
+ * @param {Object} res - Objeto de respuesta
+ * @returns {Promise<void>} Responde con array de abusos del operador
+ * @throws {Error} Error 500 si falla
+ * @description
+ * Retorna abusos y abusos condonados de un operador.
+ * Ordenados por Estatus_Secundario (asc) y Fecha (desc).
+ * 
+ * ⚠️ NOTA: Usa interpolación SQL directa (vulnerable a SQL injection).
+ * Debería usar parametrizadas como en otros endpoints.
+ * @example
+ * // GET /api/abusos/operador/123
+ * // Response
+ * [
+ *   {
+ *     "ID": 1,
+ *     "No_Economico": "123 Carlos García",
+ *     "Estatus": "Abuso",
+ *     "Estatus_Secundario": "condonado",
+ *     "Fecha": "2025-12-01",
+ *     ...
+ *   }
+ * ]
+ */
 export const getAbusosByOperador = async (req, res) => {
   try {
     const { operador } = req.params;
@@ -54,6 +153,40 @@ export const getAbusosByOperador = async (req, res) => {
   }
 };
 
+/**
+ * Obtiene ubicaciones geográficas de un abuso específico durante ese día.
+ * @async
+ * @function getUbicacionesinADayByOperador
+ * @param {Object} req - Objeto de solicitud
+ * @param {string} req.params.IDCruce - ID del cruce/abuso
+ * @param {Object} res - Objeto de respuesta
+ * @returns {Promise<void>} Responde con ubicaciones y polilíneas
+ * @throws {Error} Error 500 si falla
+ * @description
+ * Obtiene registro de geolocalización (tabla geo_op) para el operador en esa fecha.
+ * Retorna:
+ * - ubicaciones: Array completo de registros geo
+ * - polylines: Array de coordenadas filtradas (sin [0,0])
+ * 
+ * Si no hay geolocalización, usa fallback con datos del cruce.
+ * @example
+ * // GET /api/abusos/ubicaciones/1
+ * // Response (200 OK)
+ * {
+ *   "ubicaciones": [
+ *     {
+ *       "latitud": "20.3456",
+ *       "longitud": "-99.1234",
+ *       "fecha": "2025-12-01T10:30:00",
+ *       "fk_op": 123,
+ *       "Nombres": "Carlos",
+ *       "Ap_paterno": "García",
+ *       "Ap_materno": "López"
+ *     }
+ *   ],
+ *   "polylines": [[20.3456, -99.1234], [20.3500, -99.1300], ...]
+ * }
+ */
 export const getUbicacionesinADayByOperador = async (req, res) => {
   try {
     const { IDCruce } = req.params;
@@ -100,6 +233,37 @@ WHERE  Estatus='Abuso' AND cruces.ID = @IDCruce`);
 
 
 
+/**
+ * Obtiene abusos agrupados por fecha y operador.
+ * @async
+ * @function getAbusosAgrupados
+ * @param {Object} req - Objeto de solicitud (sin parámetros)
+ * @param {Object} res - Objeto de respuesta
+ * @returns {Promise<void>} Responde con array de grupos de abusos
+ * @throws {Error} Error 500 si falla
+ * @description
+ * Agrupa abusos por fecha + operador con:
+ * - Conteo de abusos en el grupo
+ * - Importe total
+ * - Información del operador
+ * - Flag de verificación (Operador_Verificado)
+ * 
+ * Ordenado por fecha descendente.
+ * @example
+ * // GET /api/abusos/agrupados
+ * // Response
+ * [
+ *   {
+ *     "ID_Matricula_Agrupado": "2025-12-01_123",
+ *     "Fecha_Cruce": "2025-12-01",
+ *     "NumAbusos": 3,
+ *     "TotalImporte": 750.00,
+ *     "Nombre_Operador": "Carlos García López",
+ *     "Descripcion": "ACTIVO",
+ *     "Operador_Verificado": 1
+ *   }
+ * ]
+ */
 export const getAbusosAgrupados = async (req, res) => {
   try {
     const pool = await getConnection();
@@ -137,6 +301,27 @@ ORDER BY Fecha_Cruce DESC;
   }
 };
 
+/**
+ * Actualiza el comentario/observación de un abuso.
+ * @async
+ * @function actualizarComentarioAbuso
+ * @param {Object} req - Objeto de solicitud
+ * @param {string} req.params.ID - ID del cruce/abuso
+ * @param {string} req.body.nuevoComentario - Nuevo texto de comentario
+ * @param {Object} res - Objeto de respuesta
+ * @returns {Promise<void>} Responde con mensaje de éxito
+ * @throws {Error} 500 si falla
+ * @example
+ * // PUT /api/abusos/comentario/1
+ * // Body
+ * {
+ *   "nuevoComentario": "Operador reportó cambio de ruta"
+ * }
+ * // Response
+ * {
+ *   "message": "Comentario actualizado correctamente"
+ * }
+ */
 export const actualizarComentarioAbuso = async (req, res) => {
   const { ID } = req.params;
   const { nuevoComentario } = req.body;
@@ -153,6 +338,37 @@ export const actualizarComentarioAbuso = async (req, res) => {
 };
 
 
+/**
+ * Actualiza información completa de un abuso.
+ * @async
+ * @function UpdateAbuso
+ * @param {Object} req - Objeto de solicitud
+ * @param {string} req.params.id - ID del abuso/cruce
+ * @param {string} req.body.noAclaracion - Número de aclaración
+ * @param {string} req.body.FechaDictamen - Fecha del dictamen
+ * @param {string} req.body.estatusSecundario - Nuevo estado (pendiente_reporte, completado, etc)
+ * @param {string} req.body.observaciones - Observaciones
+ * @param {boolean} req.body.dictaminado - ¿Ha sido dictaminado?
+ * @param {number} req.body.montoDictaminado - Monto del dictamen
+ * @param {Object} res - Objeto de respuesta
+ * @returns {Promise<void>} Responde con mensaje de éxito
+ * @throws {Error} 500 si falla
+ * @example
+ * // PUT /api/abusos/1
+ * // Body
+ * {
+ *   "noAclaracion": "AC-2025-001",
+ *   "FechaDictamen": "2025-12-01",
+ *   "estatusSecundario": "completado",
+ *   "observaciones": "Descuento aplicado correctamente",
+ *   "dictaminado": true,
+ *   "montoDictaminado": 250.00
+ * }
+ * // Response
+ * {
+ *   "message": "Estatus completado actualizado correctamente sobre el ID 1"
+ * }
+ */
 export const UpdateAbuso = async (req, res) => {
   const { id } = req.params;
   const { noAclaracion, FechaDictamen, estatusSecundario, observaciones, dictaminado, montoDictaminado } = req.body;
@@ -177,6 +393,28 @@ export const UpdateAbuso = async (req, res) => {
     res.status(500).json({ error: "Error en el servidor" });
   }
 };
+/**
+ * Actualiza el estado de múltiples abusos simultáneamente.
+ * @async
+ * @function actualizarEstatusMasivo
+ * @param {Object} req - Objeto de solicitud
+ * @param {Array<string>} req.body.ids - Array de IDs de abusos
+ * @param {string} req.body.nuevoEstatus - Nuevo estado secundario
+ * @param {Object} res - Objeto de respuesta
+ * @returns {Promise<void>} Responde con mensaje de éxito
+ * @throws {Error} 400 si datos inválidos; 500 si falla BD
+ * @example
+ * // PUT /api/abusos/masivo
+ * // Body
+ * {
+ *   "ids": ["1", "2", "3"],
+ *   "nuevoEstatus": "completado"
+ * }
+ * // Response
+ * {
+ *   "message": "Estatus actualizado correctamente"
+ * }
+ */
 export const actualizarEstatusMasivo = async (req, res) => {
   const { ids, nuevoEstatus } = req.body;
   if (!Array.isArray(ids) || !nuevoEstatus) {
@@ -197,6 +435,43 @@ export const actualizarEstatusMasivo = async (req, res) => {
 
 
 
+/**
+ * Obtiene estadísticas agregadas de abusos.
+ * @async
+ * @function getStatsAbusos
+ * @param {Object} _ - Objeto de solicitud (no utilizado)
+ * @param {Object} res - Objeto de respuesta
+ * @returns {Promise<void>} Responde con estadísticas de abusos
+ * @throws {Error} Error 500 si falla
+ * @description
+ * Retorna conteos y montos por estado secundario:
+ * - pendiente_reporte: Abusos detectados sin reporte
+ * - reporte_enviado_todo_pendiente: Reporte enviado
+ * - descuento_aplicado_pendiente_acta: Descuento aplicado
+ * - acta_aplicada_pendiente_descuento: Acta aplicada
+ * - completado: Proceso finalizado
+ * 
+ * Incluye totales generales de conteo e importes.
+ * @example
+ * // GET /api/abusos/stats
+ * // Response
+ * [
+ *   {
+ *     "pendiente_reporte_count": 45,
+ *     "pendiente_reporte_monto": 11250.00,
+ *     "reporte_enviado_todo_pendiente_count": 30,
+ *     "reporte_enviado_todo_pendiente_monto": 7500.00,
+ *     "descuento_aplicado_pendiente_acta_count": 12,
+ *     "descuento_aplicado_pendiente_acta_monto": 3000.00,
+ *     "acta_aplicada_pendiente_descuento_count": 8,
+ *     "acta_aplicada_pendiente_descuento_monto": 2000.00,
+ *     "completado_count": 25,
+ *     "completado_monto": 6250.00,
+ *     "total_count": 120,
+ *     "total_monto": 30000.00
+ *   }
+ * ]
+ */
 export const getStatsAbusos = async (_, res) => {
   try {
     const pool = await getConnection();

@@ -1,4 +1,29 @@
+/**
+ * @module casetas.controllers
+ * @description
+ * Controlador para gestión de CASETAS (estaciones de peaje) en el sistema IAVE.
+ * Las casetas son puntos de cobro de peaje distribuidos en las carreteras del país.
+ * 
+ * Funcionalidades principales:
+ * - Obtener información de casetas (ubicación, precios, disponibilidad)
+ * - Integración con API INEGI Sakbe v3.1 para cálculo de rutas
+ * - Consulta de rutas de transporte con sus casetas asociadas
+ * - Cálculo de coordenadas para mapas interactivos
+ * - Validación y categorización de rutas de transporte
+ * 
+ * @requires ../database/connection.js - Conexión a base de datos MSSQL
+ */
+
 import { getConnection, sql } from "../database/connection.js";
+
+/**
+ * Mapeo de claves SCT a campos de importe en tabla casetas_Plantillas
+ * @type {Object<string, string>}
+ * @constant
+ * @example
+ * 'A ' → 'Automovil'
+ * 'C-3 ' → 'Camion3Ejes'
+ */
 const claveToImporteField = {
   'A ': 'Automovil',
   'B ': 'Autobus2Ejes',
@@ -9,10 +34,27 @@ const claveToImporteField = {
   'C-9 ': 'Camion9Ejes'
 };
 
+/**
+ * Normaliza nombres de ciudades para comparación.
+ * Convierte a mayúsculas y remueve caracteres especiales y acentos.
+ * @function normalize
+ * @param {string} nombre - Nombre de ciudad a normalizar
+ * @returns {string} Nombre normalizado (mayúsculas, sin acentos)
+ * @example
+ * normalize('San Luis Potosí') // 'SAN LUIS POTOSI'
+ * normalize('Hidalgo-Mexico') // 'HILDALGOMEXICO'
+ */
 function normalize(nombre) {
   return nombre.toUpperCase().replace(/[-.]/g, '').trim().replace('Á', 'A').replace('É', 'E').replace('Í', 'I').replace('Ó', 'O').replace('Ú', 'U');
 }
 
+/**
+ * Obtiene el token de autenticación para API INEGI Sakbe v3.1
+ * Este token es necesario para todas las consultas de rutas a INEGI.
+ * @function getToken
+ * @returns {string} Token de autenticación
+ * @private
+ */
 function getToken() {
   return 'Jq92BpFD-tYae-BBj2-rEMc-MnuytuOB30ST';
 }
@@ -158,15 +200,41 @@ const poblaciones = {
   "ZITACUARO": 173986,
   "SAN JUAN DE LOS LAGOS": 276730,
 }
-
-
-
+/**
+ * Obtiene la lista completa de todas las casetas del sistema.
+ * @async
+ * @function getCasetas
+ * @param {Object} req - Objeto de solicitud (sin parámetros requeridos)
+ * @param {Object} res - Objeto de respuesta
+ * @returns {Promise<void>} Responde con array de casetas en formato JSON
+ * @throws {Error} Error 500 si falla la conexión a la base de datos
+ * @example
+ * // GET /api/casetas
+ * // Response (200 OK)
+ * [
+ *   {
+ *     "ID_Caseta": 1,
+ *     "Nombre": "Caseta Tlanalapa",
+ *     "Carretera": "Mex 105",
+ *     "Estado": "HIDALGO",
+ *     "Automovil": 50.50,
+ *     "Autobus2Ejes": 75.25,
+ *     "Camion2Ejes": 100.00,
+ *     "Camion3Ejes": 150.00,
+ *     "Camion5Ejes": 200.00,
+ *     "Camion9Ejes": 280.00,
+ *     "IAVE": true,
+ *     "latitud": "20.3456",
+ *     "longitud": "-99.1234",
+ *     "Nombre_IAVE": "Tlanalapa"
+ *   },
+ *   {...}
+ * ]
+ */
 export const getCasetas = async (req, res) => {
   try {
     const pool = await getConnection();
     const result = await pool.request().query("SELECT * from casetas_Plantillas ORDER BY ID_Caseta ASC;");
-    for (const row of result.recordset) {
-    }
     res.json(result.recordset);
   } catch (error) {
     res.status(500);
@@ -176,6 +244,36 @@ export const getCasetas = async (req, res) => {
 
 
 
+/**
+ * Obtiene casetas con información enriquecida de INEGI para cada ruta.
+ * Consulta las casetas y mapea origen/destino a IDs del INEGI.
+ * @async
+ * @function getCasetasByID
+ * @param {Object} req - Objeto de solicitud
+ * @param {Object} res - Objeto de respuesta
+ * @returns {Promise<void>} Responde con array de casetas enriquecidas
+ * @throws {Error} Error 500 si falla la consulta
+ * @description
+ * Proceso:
+ * 1. Obtiene todas las casetas con sus rutas asociadas (primera por fecha)
+ * 2. Normaliza origen/destino a IDs del INEGI
+ * 3. Consulta API INEGI para cada par origen-destino
+ * @example
+ * // GET /api/casetas/byid
+ * // Response
+ * [
+ *   {
+ *     "ID_Caseta": 1,
+ *     "Nombre_IAVE": "Tlanalapa",
+ *     "Origen": "HIDALGO",
+ *     "Destino": "MEXICO DF",
+ *     "OrigenINEGI": 30655,
+ *     "DestinoINEGI": 2486,
+ *     "ID_orden": "OT-12345",
+ *     "Camion2Ejes": 100.00
+ *   }
+ * ]
+ */
 export const getCasetasByID = async (req, res) => {
   try {
     const pool = await getConnection();
@@ -236,6 +334,16 @@ export const getCasetasByID = async (req, res) => {
 
 
 
+/**
+ * Configura/actualiza casetas (función en desarrollo)
+ * @async
+ * @function setCasetasByID
+ * @param {Object} req - Objeto de solicitud
+ * @param {Object} res - Objeto de respuesta
+ * @returns {Promise<void>} Responde con casetas configuradas
+ * @throws {Error} Error 500 si falla
+ * @note Esta función está en construcción y no tiene implementación completa
+ */
 export const setCasetasByID = async (req, res) => {
   try {
     const pool = await getConnection();
@@ -283,7 +391,19 @@ export const setCasetasByID = async (req, res) => {
     res.status(500).send(error.message);
   }
 };
-// 🔹 Función para obtener ID del INEGI (ejemplo)
+/**
+ * Obtiene el ID del INEGI correspondiente a una ciudad.
+ * @function obtenerIdINEGI
+ * @param {string} nombreCiudad - Nombre de la ciudad
+ * @returns {number|null} ID del INEGI o null si no se encuentra
+ * @description
+ * Consulta el objeto `poblaciones` que contiene un mapeo de ciudades
+ * mexicanas a sus códigos INEGI. Normaliza el nombre antes de buscar.
+ * @example
+ * obtenerIdINEGI('San Luis Potosí')  // 262188
+ * obtenerIdINEGI('Monterrey')         // 263915
+ * obtenerIdINEGI('Ciudad No Existe')  // null
+ */
 function obtenerIdINEGI(nombreCiudad) {
   const ciudadNormalizada = normalize(nombreCiudad);
   return poblaciones[ciudadNormalizada] || null;
@@ -292,6 +412,36 @@ function obtenerIdINEGI(nombreCiudad) {
 
 
 
+/**
+ * Obtiene detalles de casetas y rutas desde la API INEGI Sakbe v3.1
+ * @async
+ * @function getCasetasDetails
+ * @param {Object} req - Objeto de solicitud
+ * @param {number} req.body.originId - ID INEGI de ciudad origen
+ * @param {number} req.body.finalId - ID INEGI de ciudad destino
+ * @param {number} [req.body.vehicleType=5] - Tipo de vehículo (ej: 5=camión 5 ejes)
+ * @param {Object} res - Objeto de respuesta
+ * @returns {Promise<void>} Responde con detalles de casetas en ruta
+ * @throws {Error} 500 si falla la consulta a INEGI
+ * @description
+ * Consulta la API INEGI Sakbe v3.1 con parámetros de origen, destino y tipo de vehículo.
+ * Retorna información detallada de casetas y costos en la ruta.
+ * @example
+ * // POST /api/casetas/details
+ * // Body
+ * {
+ *   "originId": 30655,    // HIDALGO
+ *   "finalId": 2486,      // MEXICO DF
+ *   "vehicleType": 5      // Camión 5 ejes
+ * }
+ * // Response
+ * JSON con estructura de INEGI:
+ * {
+ *   "resultados": [...],
+ *   "distancia": 125.5,
+ *   "casetas": [...]
+ * }
+ */
 export const getCasetasDetails = async (req, res) => {
 
   const { originId, finalId, vehicleType } = req.body;
@@ -322,6 +472,25 @@ export const getCasetasDetails = async (req, res) => {
   }
 }
 
+/**
+ * Obtiene estadísticas de todas las casetas del sistema.
+ * @async
+ * @function getStatsCasetas
+ * @param {Object} req - Objeto de solicitud (sin parámetros)
+ * @param {Object} res - Objeto de respuesta
+ * @returns {Promise<void>} Responde con array de todas las casetas
+ * @throws {Error} Error 500 si falla la conexión
+ * @description
+ * Actualmente retorna el mismo resultado que getCasetas().
+ * Diseñado para futuras agregaciones y estadísticas.
+ * @example
+ * // GET /api/casetas/stats
+ * // Response
+ * [
+ *   {"ID_Caseta": 1, "Nombre": "Tlanalapa", ...},
+ *   {...}
+ * ]
+ */
 export const getStatsCasetas = async (req, res) => {
   try {
     const pool = await getConnection();
@@ -337,6 +506,29 @@ export const getStatsCasetas = async (req, res) => {
 
 
 
+/**
+ * Consulta la API INEGI Sakbe v3.1 para obtener detalles de casetas.
+ * @async
+ * @function getCasetasINEGI
+ * @param {number} originId - ID INEGI de ciudad origen
+ * @param {number} finalId - ID INEGI de ciudad destino  
+ * @param {number} [vehicleType=5] - Tipo de vehículo (por defecto camión 5 ejes)
+ * @returns {Promise<string>} JSON stringificado con datos de casetas
+ * @throws {string} String con mensaje de error si falla
+ * @description
+ * Realiza POST a endpoint INEGI: https://gaia.inegi.org.mx/sakbe_v3.1/detalle_c
+ * Requiere token de autenticación válido.
+ * Tipos de vehículo:
+ * - 1: Automóvil
+ * - 2: Autobús (2 ejes)
+ * - 3: Camión (2 ejes)
+ * - 4: Camión (3 ejes)
+ * - 5: Camión (5 ejes) - DEFAULT
+ * - 6: Camión (9 ejes)
+ * @example
+ * const resultado = await getCasetasINEGI(30655, 2486, 5);
+ * // Retorna JSON con información de casetas en la ruta
+ */
 async function getCasetasINEGI(originId, finalId, vehicleType = 5) {
   try {
     const formData = new URLSearchParams({
@@ -365,6 +557,41 @@ async function getCasetasINEGI(originId, finalId, vehicleType = 5) {
 
 
 
+/**
+ * Obtiene todas las rutas del sistema TUSA con categorización.
+ * @async
+ * @function getRutasTUSA_TRN
+ * @param {Object} req - Objeto de solicitud (sin parámetros)
+ * @param {Object} res - Objeto de respuesta
+ * @returns {Promise<void>} Responde con array de rutas TUSA categorizadas
+ * @throws {Error} Error 500 si falla
+ * @description
+ * Consulta tabla Tipo_de_ruta_N y calcula Categoria según lógica:
+ * - Si 1 campo booleano activo: esa categoría (Latinos, Nacionales, etc)
+ * - Si 2 campos activos + Alterna: el otro campo es categoría
+ * - Otros casos: null
+ * \n * Categorías disponibles:
+ * - Latinos: Transporte de latinoamericanos
+ * - Nacionales: Transporte nacional
+ * - Exportacion: Transporte de exportación
+ * - Otros: Otros tipos
+ * - Cemex: Transporte CEMEX
+ * - Alterna: Ruta alternativa (combinada con otra)
+ * @example
+ * // GET /api/rutas/tusa-trn
+ * // Response
+ * [
+ *   {
+ *     "ID_ruta": 1,
+ *     "id_Tipo_ruta": 100,
+ *     "Categoria": "Nacionales",
+ *     "Km_reales": 125.5,
+ *     "peaje_dos_ejes": 450.00,
+ *     "PoblacionOrigen": "Tlanalapa",
+ *     "PoblacionDestino": "Mexico DF"
+ *   }
+ * ]
+ */
 export const getRutasTUSA_TRN = async (req, res) => {
   try {
     const pool = await getConnection();
@@ -430,6 +657,43 @@ SELECT
 
 
 
+/**
+ * Obtiene todas las casetas en una ruta específica del sistema TUSA.
+ * @async
+ * @function getCasetas_por_RutaTUSA_TRN
+ * @param {Object} req - Objeto de solicitud
+ * @param {number} req.params.IDTipoRuta - ID del tipo de ruta en TUSA
+ * @param {Object} res - Objeto de respuesta
+ * @returns {Promise<void>} Responde con array de casetas en orden de aparición
+ * @throws {Error} 404 si no hay casetas para la ruta; 500 si falla BD
+ * @description
+ * Retorna casetas ordenadas por consecutivo (orden en la ruta).
+ * Incluye:
+ * - Tarifas por tipo de vehículo
+ * - Ubicación (latitud/longitud redondeada a 4 decimales)
+ * - Disponibilidad de IAVE
+ * - Identificación IAVE si existe
+ * @example
+ * // GET /api/casetas/ruta/100
+ * // Response
+ * [
+ *   {
+ *     "ID_Caseta": 1,
+ *     "Nombre": "Tlanalapa",
+ *     "Carretera": "Mex 105",
+ *     "Estado": "HIDALGO",
+ *     "Automovil": 50.50,
+ *     "Autobus2Ejes": 75.25,
+ *     "Camion2Ejes": 100.00,
+ *     "latitud": "20.3456",
+ *     "longitud": "-99.1234",
+ *     "IAVE": true,
+ *     "Nombre_IAVE": "Tlanalapa",
+ *     "consecutivo": 1
+ *   },
+ *   {...}
+ * ]
+ */
 export const getCasetas_por_RutaTUSA_TRN = async (req, res) => {
   const { IDTipoRuta } = req.params;
   try {
@@ -461,20 +725,11 @@ export const getCasetas_por_RutaTUSA_TRN = async (req, res) => {
                   PCasetasporruta PCR ON TRN.Id_Ruta = PCR.Id_Ruta AND TRN.id_Tipo_ruta = PCR.id_Tipo_ruta
                   INNER JOIN
                   casetas_Plantillas CP ON PCR.Id_Caseta = CP.ID_Caseta
-                  INNER JOIN
-                  Poblaciones PBD ON TRN.id_destino = PBD.ID_poblacion
-                  INNER JOIN
-                  Poblaciones PBO ON TRN.id_origen = PBO.ID_poblacion
-                  INNER JOIN 
-                  Directorio DIR_O ON TRN.PoblacionOrigen = DIR_O.ID_entidad
-                  INNER JOIN 
-                  Directorio DIR_D ON TRN.PoblacionDestino = DIR_D.ID_entidad
               WHERE TRN.id_Tipo_ruta = @IDTipoRuta 
               ORDER BY PCR.consecutivo;
         `);
 
     result.recordset.forEach(row => {
-      // Redondea a 4 decimales si existe y es número
       try {
         row.latitud = parseFloat(row.latitud).toFixed(4)
         row.longitud = parseFloat(row.longitud).toFixed(4)
@@ -495,6 +750,30 @@ export const getCasetas_por_RutaTUSA_TRN = async (req, res) => {
 
 
 
+/**
+ * Obtiene coordenadas (latitud/longitud) de origen y destino de una ruta.
+ * @async
+ * @function getCoordenadasOrigenDestino
+ * @param {Object} req - Objeto de solicitud
+ * @param {number} req.params.IDTipoRuta - ID del tipo de ruta
+ * @param {Object} res - Objeto de respuesta
+ * @returns {Promise<void>} Responde con objeto conteniendo origenCoords, destinoCoords y mensajes
+ * @throws {Error} Error 500 si falla
+ * @description
+ * Obtiene coordenadas del Directorio para cada ruta.
+ * Redondea a 4 decimales y valida que no sean 0 o NULL.
+ * Retorna arrays de coordenadas [lat, lon] y mensajes de alertas.
+ * @example
+ * // GET /api/casetas/coordenadas/100
+ * // Response
+ * {
+ *   "origen": [[20.3456, -99.1234]],
+ *   "destino": [[19.4326, -99.1332]],
+ *   "mensajes": [
+ *     "Coordenadas de destino no cargadas para id_Tipo_ruta"
+ *   ]
+ * }
+ */
 export const getCoordenadasOrigenDestino = async (req, res) => {
   const { IDTipoRuta } = req.params;
   try {
@@ -557,6 +836,22 @@ export const getCoordenadasOrigenDestino = async (req, res) => {
 };
 
 
+/**
+ * Obtiene nombres concatenados de origen y destino de una ruta.
+ * @async
+ * @function getNombresOrigenDestino
+ * @param {Object} req - Objeto de solicitud
+ * @param {number} req.params.IDTipoRuta - ID del tipo de ruta
+ * @param {Object} res - Objeto de respuesta
+ * @returns {Promise<void>} Responde con string con formato "Origen - Destino"
+ * @throws {Error} Error 500 si falla
+ * @description
+ * Concatena nombres del Directorio en formato útil para UI.
+ * @example
+ * // GET /api/casetas/nombres/100
+ * // Response
+ * "Tlanalapa - Mexico DF"
+ */
 export const getNombresOrigenDestino = async (req, res) => {
   const { IDTipoRuta } = req.params;
   try {
@@ -582,6 +877,58 @@ SELECT
     res.send(error.message);
   }
 };
+/**
+ * Busca una ruta en el sistema TUSA por ciudades origen y destino.
+ * @async
+ * @function getRutaPorOrigen_Destino
+ * @param {Object} req - Objeto de solicitud
+ * @param {string} req.body.origen - Nombre de ciudad origen (búsqueda parcial OK)
+ * @param {string} req.body.destino - Nombre de ciudad destino (búsqueda parcial OK)
+ * @param {Object} res - Objeto de respuesta
+ * @returns {Promise<void>} Responde con objeto conteniendo:
+ *   - success: boolean
+ *   - data: array de rutas encontradas
+ *   - total: número de rutas
+ *   - enTUSA: boolean indicando si la ruta existe en TUSA
+ *   - mensaje: descripción del resultado
+ * @throws {Error} 400 si faltan origen o destino; 500 si falla BD
+ * @description
+ * Busca en TUSA usando LIKE sobre Ciudad_SCT.
+ * Calcula automáticamente:
+ * - Categoría de ruta (Latinos, Nacionales, etc)
+ * - Si es ruta alternativa (Alterna=true + otro campo)
+ * \n * Retorna 200 OK incluso si no hay resultados, permitiendo que
+ * el frontend caiga a INEGI automáticamente.
+ * \n * Lógica de categorización:
+ * - 1 campo booleano activo → esa categoría
+ * - 2 campos activos + Alterna → el otro campo es categoría
+ * - Otros → null
+ * @example
+ * // POST /api/casetas/ruta/buscar
+ * // Body
+ * {
+ *   "origen": "Hidalgo",
+ *   "destino": "Mexico"
+ * }
+ * // Response (200 OK)
+ * {
+ *   "success": true,
+ *   "data": [
+ *     {
+ *       "id_Tipo_ruta": 100,
+ *       "Origen": "HIDALGO",
+ *       "Destino": "MEXICO DF",
+ *       "Categoria": "Nacionales",
+ *       "RutaAlterna": false,
+ *       "RazonOrigen": "Tlanalapa",
+ *       "RazonDestino": "Mexico DF"
+ *     }
+ *   ],
+ *   "total": 1,
+ *   "enTUSA": true,
+ *   "mensaje": "Ruta encontrada en TUSA"
+ * }
+ */
 export const getRutaPorOrigen_Destino = async (req, res) => {
   const { origen, destino } = req.body;
   
