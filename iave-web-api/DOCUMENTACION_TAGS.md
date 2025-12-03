@@ -640,7 +640,7 @@ GET /api/tags/unavailable/29-11-2025
 ## 📞 Soporte
 
 Para reportes de bugs o solicitudes:
-- 📧 Email: desarrollo@iave.mx
+- 📧 Email: alan.amador@atmexicana.com.mx
 - 🐛 GitHub Issues: [enlace al repo]
 
 ---

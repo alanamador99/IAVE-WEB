@@ -14,8 +14,6 @@
  * - Obtener ubicaciones geográficas de infracciones
  * 
  * Categorías de abusos:
- * - Velocidad excesiva
- * - Circulación en carril restringido
  * - Incumplimiento de normas
  * 
  * Estados secundarios:
@@ -26,14 +24,11 @@
  * - completado: Proceso completo
  * - condonado: Perdonado/anulado
  * 
- * @requires ../database/connection.js - Conexión a base de datos MSSQL
- * @requires ../utils/email.js - Utilidad para envío de correos
- */
+ * @requires ../database/connection.js - Conexión a base de datos MSSQL */
 
 import { getConnection, sql } from "../database/connection.js";
 
-import enviarCorreoAbuso from "../utils/email.js"
-
+¿
 
 
 /**

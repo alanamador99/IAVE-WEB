@@ -325,7 +325,7 @@ Esta documentación sirvirá como:
 ## 📞 Contacto/Soporte
 
 Para preguntas sobre la documentación:
-- 📧 Email: desarrollo@iave.mx
+- 📧 Email: alan.amador@atmexicana.com.mx
 - 🐛 Reportar problemas: GitHub Issues
 - 💬 Sugerencias: Pull Requests
 

@@ -456,7 +456,7 @@ Se registra el usuario que realiza importación via header `x-usuario`.
 ## 📞 Contacto y Soporte
 
 Para reportar bugs o solicitar funcionalidades:
-- 📧 Email: desarrollo@iave.mx
+- 📧 Email: alan.amador@atmexicana.com.mx
 - 🐛 GitHub Issues: [enlace al repo]
 - 📱 Whatsapp: +52 XXXX XXXXXX
 

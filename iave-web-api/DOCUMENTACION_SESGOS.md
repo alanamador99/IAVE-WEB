@@ -570,7 +570,7 @@ const carga_por_investigador = en_investigacion / promedio_investigadores;
 ## 📞 Soporte
 
 Para reportes de bugs o solicitudes de funcionalidades:
-- 📧 Email: desarrollo@iave.mx
+- 📧 Email: alan.amador@atmexicana.com.mx
 - 🐛 GitHub Issues: [enlace al repo]
 
 ---

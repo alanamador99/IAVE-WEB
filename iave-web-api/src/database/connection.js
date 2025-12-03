@@ -52,3 +52,6 @@ const getConnection = async () => {
 getConnection().then(() => console.log("✅ Conexión a Tusa OK"));
 
 export { getConnection, sql };
+
+
+

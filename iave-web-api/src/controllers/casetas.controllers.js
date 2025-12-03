@@ -671,26 +671,29 @@ SELECT
  * Incluye:
  * - Tarifas por tipo de vehículo
  * - Ubicación (latitud/longitud redondeada a 4 decimales)
- * - Disponibilidad de IAVE
- * - Identificación IAVE si existe
+ * - Validación del uso del dispositivo IAVE en la caseta
  * @example
- * // GET /api/casetas/ruta/100
+ * // GET /api/casetas/ruta/3
  * // Response
  * [
- *   {
- *     "ID_Caseta": 1,
- *     "Nombre": "Tlanalapa",
- *     "Carretera": "Mex 105",
- *     "Estado": "HIDALGO",
- *     "Automovil": 50.50,
- *     "Autobus2Ejes": 75.25,
- *     "Camion2Ejes": 100.00,
- *     "latitud": "20.3456",
- *     "longitud": "-99.1234",
- *     "IAVE": true,
- *     "Nombre_IAVE": "Tlanalapa",
- *     "consecutivo": 1
- *   },
+ *     {
+ *    "ID_Caseta": 223,
+ *    "Nombre": "Costa Rica",
+ *    "Carretera": "Mex 015D",
+ *    "Estado": "Sinaloa",
+ *    "Automovil": 218,
+ *    "Autobus2Ejes": 355,
+ *    "Camion2Ejes": 368,
+ *    "Camion3Ejes": 368,
+ *    "Camion5Ejes": 418,
+ *    "Camion9Ejes": 525,
+ *    "IAVE": true,
+ *    "latitud": "24.5703",
+ *    "longitud": "-107.4302",
+ *    "Nombre_IAVE": "Costa Rica I",
+ *    "Notas": "Ent. La Cruz - Costa Rica",
+ *    "consecutivo": 1
+ *  },
  *   {...}
  * ]
  */
@@ -740,7 +743,7 @@ export const getCasetas_por_RutaTUSA_TRN = async (req, res) => {
     if (result.recordset.length === 0) {
       return res.status(404).json({ message: "No se encontraron casetas para la ruta proporcionada." });
     }
-    res.json(result.recordset);
+    res.status(200).json(result.recordset);
   } catch (error) {
     res.status(500);
     res.send(error.message);
@@ -760,19 +763,27 @@ export const getCasetas_por_RutaTUSA_TRN = async (req, res) => {
  * @returns {Promise<void>} Responde con objeto conteniendo origenCoords, destinoCoords y mensajes
  * @throws {Error} Error 500 si falla
  * @description
- * Obtiene coordenadas del Directorio para cada ruta.
- * Redondea a 4 decimales y valida que no sean 0 o NULL.
+ * Obtiene coordenadas del Directorio para la ruta solicitada en req.params (IDTipoRuta).
+ * Redondea a 5 decimales y valida que no sean 0 o NULL.
  * Retorna arrays de coordenadas [lat, lon] y mensajes de alertas.
  * @example
  * // GET /api/casetas/coordenadas/100
  * // Response
- * {
- *   "origen": [[20.3456, -99.1234]],
- *   "destino": [[19.4326, -99.1332]],
- *   "mensajes": [
- *     "Coordenadas de destino no cargadas para id_Tipo_ruta"
- *   ]
- * }
+* {
+*   "origen": [
+*     [
+*       "24.77338",
+*       "-107.43676"
+*     ]
+*   ],
+*   "destino": [
+*     [
+*       "19.78228",
+*       "-98.58594"
+*     ]
+*   ],
+*   "mensajes": []
+* }
  */
 export const getCoordenadasOrigenDestino = async (req, res) => {
   const { IDTipoRuta } = req.params;
@@ -793,35 +804,32 @@ export const getCoordenadasOrigenDestino = async (req, res) => {
           Directorio DIR_D ON TRN.PoblacionDestino = DIR_D.ID_entidad
         WHERE 
           TRN.id_Tipo_ruta=@IDTipoRuta
-        ORDER BY
-          TRN.id_Tipo_ruta ASC
       `);
     const origenCoords = [];
     const destinoCoords = [];
     const mensajes = [];
 
-    result.recordset.forEach(row => {
-      // Redondea a 4 decimales si existe y es número
-      const latOrigen = (typeof row.LatitudOrigen === 'number') ? Number(row.LatitudOrigen.toFixed(4)) : row.LatitudOrigen;
-      const lonOrigen = (typeof row.LongitudOrigen === 'number') ? Number(row.LongitudOrigen.toFixed(4)) : row.LongitudOrigen;
-      const latDestino = (typeof row.LatitudDestino === 'number') ? Number(row.LatitudDestino.toFixed(4)) : row.LatitudDestino;
-      const lonDestino = (typeof row.LongitudDestino === 'number') ? Number(row.LongitudDestino.toFixed(4)) : row.LongitudDestino;
+    // Redondea a 5 decimales si existe y no es número 0
 
-      const origen = [latOrigen, lonOrigen];
-      const destino = [latDestino, lonDestino];
+    const latOrigen = (result.recordset[0].LatitudOrigen) ? parseFloat(result.recordset[0].LatitudOrigen).toFixed(5) : result.recordset[0].LatitudOrigen;
+    const lonOrigen = (result.recordset[0].LongitudOrigen) ? parseFloat(result.recordset[0].LongitudOrigen).toFixed(5) : result.recordset[0].LongitudOrigen;
+    const latDestino = (result.recordset[0].LatitudDestino) ? parseFloat(result.recordset[0].LatitudDestino).toFixed(5) : result.recordset[0].LatitudDestino;
+    const lonDestino = (result.recordset[0].LongitudDestino) ? parseFloat(result.recordset[0].LongitudDestino).toFixed(5) : result.recordset[0].LongitudDestino;
 
-      if (origen[0] == 0 || origen[1] == 0 || origen[0] == null || origen[1] == null) {
-        mensajes.push(`Coordenadas de origen no cargadas para id_Tipo_ruta`);
-      } else {
-        origenCoords.push(origen);
-      }
+    const origen = [latOrigen, lonOrigen];
+    const destino = [latDestino, lonDestino];
 
-      if (destino[0] == 0 || destino[1] == 0 || destino[0] == null || destino[1] == null) {
-        mensajes.push(`Coordenadas de destino no cargadas para id_Tipo_ruta`);
-      } else {
-        destinoCoords.push(destino);
-      }
-    });
+    if (origen[0] == 0 || origen[1] == 0 || origen[0] == null || origen[1] == null) {
+      mensajes.push(`Coordenadas de origen no cargadas para id_Tipo_ruta: ${IDTipoRuta}`);
+    } else {
+      origenCoords.push(origen);
+    }
+
+    if (destino[0] == 0 || destino[1] == 0 || destino[0] == null || destino[1] == null) {
+      mensajes.push(`Coordenadas de destino no cargadas para id_Tipo_ruta: ${IDTipoRuta}`);
+    } else {
+      destinoCoords.push(destino);
+    }
 
     const responseObj = {
       origen: origenCoords,
@@ -848,9 +856,9 @@ export const getCoordenadasOrigenDestino = async (req, res) => {
  * @description
  * Concatena nombres del Directorio en formato útil para UI.
  * @example
- * // GET /api/casetas/nombres/100
+ * // GET /api/casetas/nombres/1
  * // Response
- * "Tlanalapa - Mexico DF"
+ * "Gemi Pachuca - UNNE Morelos"
  */
 export const getNombresOrigenDestino = async (req, res) => {
   const { IDTipoRuta } = req.params;
@@ -931,17 +939,17 @@ SELECT
  */
 export const getRutaPorOrigen_Destino = async (req, res) => {
   const { origen, destino } = req.body;
-  
+
   // Validación de entrada
   if (!origen || !destino) {
-    return res.status(400).json({ 
-      error: 'Los campos origen y destino son requeridos' 
+    return res.status(400).json({
+      error: 'Los campos origen y destino son requeridos'
     });
   }
 
   try {
     const pool = await getConnection();
-    
+
     const result = await pool.request()
       .input("Origen", sql.VarChar, `%${origen}%`)
       .input("Destino", sql.VarChar, `%${destino}%`)
@@ -1009,26 +1017,26 @@ export const getRutaPorOrigen_Destino = async (req, res) => {
     // Siempre responder con 200, incluso si no hay resultados
     // Esto permite que el frontend procese la ruta INEGI sin errores
     const hayResultados = result.recordset.length > 0;
-    if (hayResultados){
+    if (hayResultados) {
       result.recordset.push()
     }
-    
+
     res.json({
       success: true,
       data: result.recordset,
       total: result.recordset.length,
-      mensaje: hayResultados 
-        ? 'Ruta encontrada en TUSA' 
+      mensaje: hayResultados
+        ? 'Ruta encontrada en TUSA'
         : 'Ruta no encontrada en TUSA. Mostrando solo información de INEGI',
       enTUSA: hayResultados // Flag para que el frontend sepa si está en TUSA
     });
 
   } catch (error) {
     console.error('Error al obtener ruta:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       error: 'Error al procesar la solicitud',
-      mensaje: error.message 
+      mensaje: error.message
     });
   }
 };
