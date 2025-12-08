@@ -2,15 +2,15 @@
  * @module aclaraciones.controllers
  * @description
  * Controlador para gestión de ACLARACIONES en el sistema IAVE.
- * Una aclaración es un reclamo por diferencia en cobro de peaje.
+ * Una aclaración es un ticket que se levanta en el portal de PASE por diferencia en cobro de peaje.
  * 
  * Puede ocurrir cuando:
  * - Se cobra una tarifa incorrecta (mayor a la programada)
  * - Hay error en clasificación del vehículo
- * - Duplicación de cobro
+ * - Duplicación de cobro de la caseta 
  * - Error del sistema
  * 
- * Funcionalidades principales:
+ * Funcionalidades principales de este controlador:
  * - Consultar aclaraciones registradas
  * - Filtrar por orden de traslado
  * - Calcular diferencia entre importe cobrado e importe oficial
@@ -18,12 +18,12 @@
  * - Generar estadísticas
  * 
  * Estados secundarios:
- * - pendiente_aclaracion: Aclaración registrada, pendiente resolución
- * - aclaracion_levantada: Aclaración resuelta a favor del cliente
- * - dictaminado: Dictamen emitido sobre la aclaración
+ * - pendiente_aclaracion: Aclaración identificada, pendiente levantar aclaración en el portal PASE
+ * - aclaracion_levantada: Aclaración registrada en el portal PASE, pendiente de dictaminación por parte del proveedor para saber si procedió o no.
+ * - dictaminado: Dictamen emitido sobre la aclaración (Pueden no ser procedente).
  * - completado: Proceso finalizado
  * 
- * @requires ../database/connection.js - Conexión a base de datos MSSQL
+ * @requires ../database/connection.js - Es necesario iniciar una conexión a la base de datos SQL-Server, mediante el motor MSSQL.
  */
 
 import { getConnection, sql } from "../database/connection.js";
@@ -41,7 +41,7 @@ import { getConnection, sql } from "../database/connection.js";
  * @returns {Promise<void>} Responde con array de aclaraciones enriquecidas
  * @throws {Error} Error 500 si falla
  * @description
- * Consulta tabla Cruces donde Estatus='Aclaración' e incluye:
+ * Consultamos la tabla de Cruces donde Estatus='Aclaración' e incluye:
  * - Información de orden de traslado (ID_clave)
  * - Datos de caseta (nombre, tarifas, ubicación)
  * - Cálculo de diferencia: Importe - ImporteOficial
