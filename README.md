@@ -14,16 +14,17 @@ El proyecto IAVE se centra en la detección de anomalías en los cruces de opera
 
 
 
-## 📖 **INDICE**
+##  **INDICE DE ESTE DOCUMENTO**
 ```
 
 Resumen:
 ├─ 1) Objetivo
 ├─ 2) Indice
+   └─ 2.1) 🗂️ Directorio completo del proyecto
 ├─ 3) Atributos con tipos de datos
 ├─ 4) Mapeo por módulo (6 módulos)
 ├─ 5) Operaciones por tabla
-├─ 6) 6 flujos de datos
+├─ 6) Flujos de datos
 ├─ 7) Matriz de relaciones
 ├─ 8) Estadísticas de volumen
 └─ 9) Recomendaciones de mejora
@@ -32,7 +33,9 @@ Resumen:
 
 ---
 
-## 🗂️ ESTRUCTURA COMPLETA
+
+
+## 🗂️ Directorio completo del proyecto
 
 ```
 Proyecto IAVE WEB/
@@ -53,7 +56,29 @@ Proyecto IAVE WEB/
     └── INDICE_DOCUMENTACION.md
 ```
 
+   ### Referencias de los archivos:
+
+
+```
+📊 MAPEO_COMPLETO_TABLAS_ATRIBUTOS.md
+   └─ Para comprender el esquema de la base de datos en uso.
+
+📋 RESUMEN_TABLAS_ATRIBUTOS.md
+   └─ 
+
+🔗 MATRIZ_OPERACIONES_DETALLADA.md
+   └─ Especificaciones técnicas detalladas
+
+🗺️ DIAGRAMA_Y_REFERENCIA_RAPIDA.md
+   └─ Visualización y ejemplos 
+
+📚 INDICE_MAPEO_TABLAS.md
+   └─ Cómo tal es la navegación entre las tablas de la BD
+
+```
+
 --- 
+## Atributos con tipos de datos
 
 ### **RESUMEN_TABLAS_ATRIBUTOS.md**
 ```
@@ -230,7 +255,7 @@ Cruce:      8 estatus posibles
 ### 2. **Flujos Detallados**
 Cada operación principal documentada paso a paso con:
 - Entrada (INPUT)
-- Procesamiento (transformación)
+- Procesamiento (TRANSFORMACIÓN)
 - Persistencia (BD)
 - Salida (OUTPUT)
 
@@ -324,9 +349,8 @@ Ejemplo completo de flujo end-to-end:
 ## 💡 INSIGHTS PRINCIPALES
 
 ### 1. **Tabla Central: `cruces`**
-- Aquí es donde convergen todas las operaciones del sistema
+- Esta tabla es el eje central del proyecto, pues se ejecuta la conciliación de los cruces para verificar si se trata de un cruce planeado y cobrado como se debe o si es un abuso o incluso si es una aclaración.
 - Se insertan hasta 1,500 registros al día
-- Los estados secundarios se definen según contexto (aclaración: Pendiente Levantar → En Proceso → Dictaminada )
 
 ### 2. **Operación Más Crítica: Importación**
 - `POST /api/cruces/import`
@@ -336,7 +360,7 @@ Ejemplo completo de flujo end-to-end:
 - ~1,000-1,500 registros por batch
 
 ### 3. **Validaciones Complejas**
-- Estatus_Secundario tiene ciclo de vida específico por tipo
+- Estatus_Secundario tiene ciclo de vida específico por tipo (Según sea la dictaminación del cruce: Sesgo, Aclaración o Abuso)
 - Diferencia = Importe - ImporteOficial (usado en aclaraciones)
 - Operador disponible = NOT en Estado_del_personal
 
@@ -352,38 +376,29 @@ Ejemplo completo de flujo end-to-end:
 - Cachear datos estáticos para mejor performance
 
 
-## CHECKLIST DE VALIDACIÓN
+## TABLAS MÁS IMPORTANTES:
 
-Documentación completada para:
+- `cruces` (20 atributos)
+      
+- `ImportacionesCruces` (4 atributos)
+- `Tags` (5 atributos)
+- `Personal` (4 atributos)
+- `Estado_del_personal` (5 atributos)
+- `Orden_traslados` (7 atributos)
+- `casetas_Plantillas` (10 atributos)
+- `Tipo_de_ruta_N` (20 atributos)
 
-✅ Tabla `cruces` (20 atributos)
-✅ Tabla `ImportacionesCruces` (4 atributos)
-✅ Tabla `Tags` (5 atributos)
-✅ Tabla `Personal` (4 atributos)
-✅ Tabla `Estado_del_personal` (5 atributos)
-✅ Tabla `Orden_traslados` (7 atributos)
-✅ Tabla `casetas_Plantillas` (10 atributos)
-✅ Tabla `Tipo_de_ruta_N` (20 atributos)
+## ENDPOINTS SEGÚN EL CONTROLADOR:
 
-Módulos documentados:
+- tags.controllers.js (5 endpoints)
+- casetas.controllers.js (4 endpoints)
+- abusos.controllers.js (5 endpoints)
+- aclaraciones.controllers.js (4 endpoints)
+- sesgos.controllers.js (3 endpoints)
+- cruces.controllers.js (10 endpoints)- 
 
-✅ tags.controllers.js (5 endpoints)
-✅ casetas.controllers.js (4 endpoints)
-✅ abusos.controllers.js (5 endpoints)
-✅ aclaraciones.controllers.js (4 endpoints)
-✅ sesgos.controllers.js (3 endpoints)
-✅ cruces.controllers.js (10 endpoints)
 
-Análisis completado:
 
-✅ Operaciones (SELECT, INSERT, UPDATE)
-✅ Validaciones críticas
-✅ Flujos de datos
-✅ Relaciones FK
-✅ Valores enumerados
-✅ Estadísticas de volumen
-✅ Recomendaciones
-✅ Ejemplos prácticos
 
 ---
 
@@ -396,7 +411,7 @@ Análisis completado:
 4. Actualizar fecha de "Última actualización"
 5. Considerar si afecta otros documentos
 
-### Cambios típicos:
+### Cambios típicos identificados → con la sugerencia de validación:
 - Nueva tabla → Actualizar todos
 - Nuevo atributo → Actualizar MAPEO_COMPLETO + MATRIZ
 - Nuevo endpoint → Actualizar DIAGRAMA + RESUMEN
@@ -404,28 +419,6 @@ Análisis completado:
 
 
 ---
-
-## 📋 RESUMEN FINAL
-
-### Documentación (con su descripción)
-
-```
-📊 MAPEO_COMPLETO_TABLAS_ATRIBUTOS.md
-   └─ Para comprender el esquema de la base de datos en uso.
-
-📋 RESUMEN_TABLAS_ATRIBUTOS.md
-   └─ 
-
-🔗 MATRIZ_OPERACIONES_DETALLADA.md
-   └─ Especificaciones técnicas detalladas
-
-🗺️ DIAGRAMA_Y_REFERENCIA_RAPIDA.md
-   └─ Visualización y ejemplos 
-
-📚 INDICE_MAPEO_TABLAS.md
-   └─ Cómo tal es la navegación entre las tablas de la BD
-
-```
 
 ### Cobertura Alcanzada
 
@@ -442,6 +435,6 @@ Análisis completado:
 
 
 ---
-**Análisis Completado:** 4 de Diciembre de 2025  
+**Documentación realizada el:** 4 de Diciembre de 2025  
 **Versión:** 1.0  
 ---

@@ -188,7 +188,9 @@ CICLO DE VIDA:
       → descuento_aplicado_pendiente_acta
       → acta_aplicada_pendiente_descuento
         → completado
+
   O
+
   → condonado
 ```
 
@@ -238,18 +240,19 @@ ATRIBUTOS CLAVE:
   ✓ Lee:  Tipo_de_ruta_N (poblaciones, Km, categorías)
 
 ANOMALÍAS DETECTADAS:
-  - CasetaNoEncontradaEnRuta: caseta ∉ ruta
-  - Ruta Sin Casetas: OT sin casetas definidas
+  - CasetaNoEncontradaEnRuta: Es un estado que se define en la importación de los cruces para identificar un tipo de sesgo que requiere corrección.
+  - Ruta Sin Casetas: OT sin casetas definidas y con cruces detectados durante la duración de la OT
 ```
 
 ---
 
-### 🔄 **cruces.controllers.js** (CORE)
+### 🔄 **cruces.controllers.js** 
 ```
 Tablas: cruces (WRITE) ← Tags + Orden_traslados + casetas_Plantillas + Estado_del_personal
 
 ENDPOINTS:
   POST /api/cruces/import             # Importar masivo ★★★
+  GET  /api/cruces/progress           # SSE progreso
   GET  /api/cruces                    # Obtener todos
   GET  /api/cruces/stats              # Estadísticas
   GET  /api/cruces/conciliacion       # Validar vs OT
@@ -258,20 +261,19 @@ ENDPOINTS:
   GET  /api/cruces/ots                # Listar OT
   PUT  /api/cruces/{id}/ot            # Asignar OT
   POST /api/cruces/update-ots         # Asignar OT masivo
-  GET  /api/cruces/progress           # SSE progreso
 
 LÓGICA DE IMPORTACIÓN:
-  1. Input: {Tag, Fecha, Hora, Caseta, Clase, Importe}
-  2. Generar ID: YYMMDD_HHMMSS_TAG
-  3. Tags.find(Tag) → ID_matricula
-  4. Orden_traslados.find(ID_matricula, Fecha) → id_orden
+  1. Se carga el CSV de PASE con: {Tag, Fecha, Hora, Caseta, Clase, Importe}
+  2. Generamos ID: YYMMDD_HHMMSS_TAG
+  3. Se busca la asignación en Tags.find(Tag) → con base en ID_matricula
+  4. Obtenemos de Orden_traslados.find(ID_matricula, Fecha) → id_orden
   5. casetas_Plantillas.getTarifa(Caseta, Clase) → ImporteOficial
   6. Estado_del_personal.find(ID_matricula, Fecha) → Descripcion
   7. Asignar Estatus según lógica
   8. INSERT cruces + ImportacionesCruces
 
-LÓGICA DE ESTATUS:
-  IF Importe = ImporteOficial → 'Confirmado'
+LÓGICA DE ASIGNACIÓN DEL ESTATUS:
+  IF Importe = ImporteOficial → 'Confirmado' (esto porque existe un importe contra el cuál compararlo, lo que quiere decir que se tiene OT y a su vez la OT tiene casetas en la ruta asignada y el importe coincide con el presupuestado).
   ELSE IF Importe < ImporteOficial → 'Se cobró menos'
   ELSE IF Importe > ImporteOficial → 'Aclaración'
   ELSE IF Estado_personal IN (Vacaciones, Incapacidad, ...) → 'Abuso'
@@ -295,7 +297,7 @@ Tags.ID_matricula ────→ Personal.ID_matricula
 Estado_del_personal.ID_matricula ────→ Personal.ID_matricula
 
 cruces.No_Economico ─┐
-                     ├─→ Estado_del_personal (lookup por fecha)
+                     ├─→ Estado_del_personal (busqueda por fecha)
 cruces.Fecha ─────────┘
 ```
 
