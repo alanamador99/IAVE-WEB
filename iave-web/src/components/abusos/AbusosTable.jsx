@@ -423,7 +423,7 @@ const AbusosTable = () => {
     try {
       const id = cruceSeleccionado.ID;
 
-      const payload = { FechaDictamen: ((estatusAbuso === 'pendiente_reporte') ? null : fechaAbuso), montoDictaminado: vMontoDescontado, estatusSecundario: estatusAbuso, estatusSecundario: estatusAbuso, observaciones: vComentarios, dictaminado: actaAplicada ? 1 : 0 };
+      const payload = { FechaDictamen: ((estatusAbuso === 'pendiente_reporte') ? null : fechaAbuso), montoDictaminado: vMontoDescontado, estatusSecundario: estatusAbuso, observaciones: vComentarios, dictaminado: actaAplicada ? 1 : 0 };
       const { status, data } = await axios.patch(`${API_URL}/api/abusos/${id}/UpdateAbuso`, payload);
       if (status === 200) {
         setCruces(prev => prev.map(c => c.ID === id ? { ...c, Estatus_Secundario: estatusAbuso, montoDictaminado: vMontoDescontado, FechaDictamen: fechaAbuso, observaciones: vComentarios, Aplicado: payload.dictaminado } : c));

@@ -28,3 +28,6 @@ CREATE TABLE ImportacionesCruces
     FechaImportacion datetime,
     TotalInsertados int
 )
+
+
+SELECT * FROM cruces WHERE Estatus = 'Abuso'

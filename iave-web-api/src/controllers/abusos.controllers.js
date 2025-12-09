@@ -141,7 +141,7 @@ export const getAbusosByOperador = async (req, res) => {
   try {
     const { operador } = req.params;
     const pool = await getConnection();
-    const result = await pool.request().query(`SELECT * FROM cruces WHERE (Estatus='Abuso' OR Estatus_Secundario='Condonado') AND SUBSTRING(No_Economico, 1, CHARINDEX(' ', No_Economico) - 1) = '${operador}' ORDER BY Estatus_Secundario asc, Fecha DESC`);
+    const result = await pool.request().input("Operador", sql.VarChar, operador).query(`SELECT * FROM cruces WHERE (Estatus='Abuso' OR Estatus_Secundario='Condonado') AND SUBSTRING(No_Economico, 1, CHARINDEX(' ', No_Economico) - 1) = @Operador ORDER BY Estatus_Secundario asc, Fecha DESC`);
     res.json(result.recordset);
   } catch (error) {
     res.status(500).send(error.message);
@@ -324,7 +324,10 @@ export const actualizarComentarioAbuso = async (req, res) => {
   try {
     const pool = await getConnection();
 
-    const result = await pool.query`UPDATE cruces SET observaciones = ${nuevoComentario} WHERE ID = ${ID}`;
+    const result = await pool.request()
+      .input("nuevoComentario", sql.VarChar, nuevoComentario)
+      .input("ID", sql.VarChar, ID)
+      .query(`UPDATE cruces SET observaciones = @nuevoComentario WHERE ID = @ID`);
     res.status(200).json({ message: 'Comentario actualizado correctamente' });
   } catch (error) {
     console.error('Error actualizando estatus:', error);
@@ -366,20 +369,19 @@ export const actualizarComentarioAbuso = async (req, res) => {
  */
 export const UpdateAbuso = async (req, res) => {
   const { id } = req.params;
-  const { noAclaracion, FechaDictamen, estatusSecundario, observaciones, dictaminado, montoDictaminado } = req.body;
+  const {  FechaDictamen, estatusSecundario, observaciones, dictaminado, montoDictaminado } = req.body;
 
   try {
     const pool = await getConnection();
-    console.log("UPDATE ABUSOOOOOOO", id, noAclaracion, FechaDictamen, estatusSecundario, observaciones, dictaminado, montoDictaminado);
+    console.log("UPDATE ABUSO", id, FechaDictamen, estatusSecundario, observaciones, dictaminado, montoDictaminado);
     const result = await pool.request()
       .input("FechaDictamen", sql.VarChar, FechaDictamen)
-      .input("noAclaracion", sql.VarChar, noAclaracion)
       .input("dictaminado", sql.Bit, dictaminado)
       .input("observaciones", sql.VarChar, observaciones)
       .input("estatusSecundario", sql.VarChar, estatusSecundario)
       .input("montoDictaminado", sql.Decimal(18, 2), (montoDictaminado || 0))
       .input("id", sql.VarChar, id)
-      .query(`UPDATE cruces SET NoAclaracion = @noAclaracion, FechaDictamen = @FechaDictamen, aplicado = @dictaminado, observaciones = @observaciones, Estatus_Secundario = @estatusSecundario, montoDictaminado = @montoDictaminado WHERE ID = @id`);
+      .query(`UPDATE cruces SET FechaDictamen = @FechaDictamen, aplicado = @dictaminado, observaciones = @observaciones, Estatus_Secundario = @estatusSecundario, montoDictaminado = @montoDictaminado WHERE ID = @id`);
     res.status(200).json({
       message: `Estatus ${estatusSecundario} actualizado correctamente sobre el ID ${id}`,
     });
@@ -402,7 +404,7 @@ export const UpdateAbuso = async (req, res) => {
  * // PUT /api/abusos/masivo
  * // Body
  * {
- *   "ids": ["1", "2", "3"],
+ *   "ids": ["250101_134953_28285093", "250201_134953_28285093", "250301_134953_28285093"],
  *   "nuevoEstatus": "completado"
  * }
  * // Response
@@ -417,10 +419,10 @@ export const actualizarEstatusMasivo = async (req, res) => {
   }
   try {
     const pool = await getConnection();
-    await pool.request().query(`
+    await pool.request().input("nuevoEstatus", sql.VarChar, nuevoEstatus).input("ids", sql.VarChar, ids.join("','")).query(`
         UPDATE cruces
-        SET Estatus_Secundario = '${nuevoEstatus}'
-        WHERE ID IN (${"'"}${ids.join("','")}${"'"}) AND Estatus = 'Abuso'
+        SET Estatus_Secundario = @nuevoEstatus
+        WHERE ID IN (${'@ids'}) AND Estatus = 'Abuso'
       `);
     res.status(200).json({ message: "Estatus actualizado correctamente" });
   } catch (error) {

@@ -18,88 +18,17 @@ El proyecto IAVE se centra en la detección de anomalías en los cruces de opera
 ```
 
 Resumen:
-├─ Objetivo
-├─ Indice
-├─ Atributos con tipos de datos
-├─ Mapeo por módulo (6 módulos)
-├─ Operaciones por tabla
-├─ 6 flujos de datos
-├─ Matriz de relaciones
-├─ Estadísticas de volumen
-└─ Recomendaciones de mejora
+├─ 1) Objetivo
+├─ 2) Indice
+├─ 3) Atributos con tipos de datos
+├─ 4) Mapeo por módulo (6 módulos)
+├─ 5) Operaciones por tabla
+├─ 6) 6 flujos de datos
+├─ 7) Matriz de relaciones
+├─ 8) Estadísticas de volumen
+└─ 9) Recomendaciones de mejora
 ```
 
-### **RESUMEN_TABLAS_ATRIBUTOS.md**
-```
-Contiene:
-├─ Resumen de 8 tablas (formato compacto)
-├─ Valores permitidos (enumerados)
-├─ Operaciones por módulo (simplificadas)
-├─ Relaciones FK
-├─ Matriz de lectura/escritura
-├─ Operaciones críticas
-├─ Campos para validar
-├─ Flujo típico de cruce
-├─ Volumen estimado
-└─ Consultas SQL comunes
-```
-
-### 3️⃣ **MATRIZ_OPERACIONES_DETALLADA.md** (TÉCNICO)
-```
-Tamaño: ~600+ líneas
-Secciones: 8
-Objetivo: Especificaciones técnicas detalladas
-
-Contiene:
-├─ Matriz tabla/atributo/tipo/NULL/propósito
-├─ Para cada tabla (8 tablas detalladas)
-├─ Matriz de operaciones por módulo
-├─ Matriz de relaciones
-├─ Índices recomendados (8 índices)
-├─ Validaciones críticas (10+ validaciones)
-└─ Valores permitidos (enumerados)
-```
-
-### 4️⃣ **DIAGRAMA_Y_REFERENCIA_RAPIDA.md** (VISUAL)
-```
-Tamaño: ~500+ líneas
-Secciones: 11
-Objetivo: Visualización e ejemplos prácticos
-
-Contiene:
-├─ Diagrama ASCII de arquitectura
-├─ 4 flujos detallados con explicaciones
-├─ Matriz quién-lee-qué (gráfica)
-├─ Atributos clave por operación
-├─ Transformaciones de datos (importación)
-├─ Estadísticas de volumen (visual)
-├─ Frecuencia de operaciones (tabla)
-├─ Cheat sheet de valores permitidos
-├─ Validaciones críticas (resumen)
-├─ Lista de 25+ endpoints API
-└─ Ejemplo flujo completo
-```
-
-### 5️⃣ **INDICE_MAPEO_TABLAS.md** (ÍNDICE NAVEGABLE)
-```
-Tamaño: ~400 líneas
-Secciones: 12
-Objetivo: Navegación entre documentos
-
-Contiene:
-├─ Índice de 4 documentos
-├─ Cuándo usar cada documento
-├─ Estructura de archivos
-├─ Tabla principal resumida
-├─ 6 módulos resumidos
-├─ Búsqueda rápida por necesidad
-├─ Casos de uso comunes
-├─ Preguntas frecuentes (8 Q&A)
-├─ Validaciones críticas
-├─ Estadísticas globales
-├─ Cómo usar los documentos
-└─ Referencias cruzadas
-```
 
 ---
 
@@ -124,23 +53,100 @@ Proyecto IAVE WEB/
     └── INDICE_DOCUMENTACION.md
 ```
 
----
+--- 
 
-## 🎯 LO QUE HEMOS DOCUMENTADO
+### **RESUMEN_TABLAS_ATRIBUTOS.md**
+```
+Contiene:
+├─ 1) Resumen del contenido de las tablas (BD)
+├─ 2) Valores permitidos (enumerados)
+├─ 3) Operaciones por módulo
+├─ 4) Relaciones FK
+├─ 5) Matriz de lectura/escritura
+├─ 6) Operaciones críticas
+├─ 7) Campos para validar
+├─ 8) Flujo típico de cruce
+├─ 9) Volumen estimado
+└─10) Consultas SQL comunes
+```
+
+### 3️⃣ **MATRIZ_OPERACIONES_DETALLADA.md** (TÉCNICO)
+```
+Objetivo: Especificaciones técnicas detalladas
+
+Contiene:
+├─1) Matriz tabla/atributo/tipo/NULL/propósito
+├─2) Para cada tabla (8 tablas detalladas)
+├─3) Matriz de operaciones por módulo
+├─4) Matriz de relaciones
+├─5) Índices recomendados (8 índices)
+├─6) Validaciones críticas (10+ validaciones)
+└─7) Valores permitidos (enumerados)
+```
+
+### 4️⃣ **DIAGRAMA_Y_REFERENCIA_RAPIDA.md** (VISUAL)
+```
+Objetivo: Visualización de los ejemplos prácticos de cada caso
+
+Contiene:
+├─  1) Diagrama ASCII de arquitectura
+├─  2) 4 flujos detallados con explicaciones
+├─  3) Matriz quién-lee-qué (gráfica)
+├─  4) Atributos clave por operación
+├─  5) Transformaciones de datos (importación)
+├─  6) Estadísticas de volumen (visual)
+├─  7) Frecuencia de operaciones (tabla)
+├─  8) Cheat sheet de valores permitidos
+├─  9) Validaciones críticas (resumen)
+├─ 10) Lista de 25+ endpoints API
+└─ 11) Ejemplo flujo completo
+```
+
+### 5️⃣ **INDICE_MAPEO_TABLAS.md** (ÍNDICE NAVEGABLE)
+```
+Objetivo: Navegación entre documentos
+
+Contiene:
+├─  1) Índice de 4 documentos
+├─  2) Cuándo usar cada documento
+├─  3) Estructura de archivos
+├─  4) Tabla principal resumida
+├─  5) 6 módulos resumidos
+├─  6) Búsqueda rápida por necesidad
+├─  7) Casos de uso comunes
+├─  8) Preguntas frecuentes (8 Q&A)
+├─  9) Validaciones críticas
+├─ 10) Estadísticas globales
+├─ 11) Cómo usar los documentos
+└─ 12) Referencias cruzadas
+```
+
+
+
+## 🎯 ESTIMACIÓN DE REGISTROS DE MANERA PERIODICA.
 
 ### TABLAS (8)
 
-| # | Tabla | Registros/Día | Criticalidad | Documentación |
+| # | Tabla | Registros/Periodicidad | Importancia(impacto) | Documentación |
 |---|-------|---------------|--------------|---------------|
-| 1 | **cruces** ⭐ | ~10,000 | ★★★ | 20 atributos + ciclos |
-| 2 | **ImportacionesCruces** | 5-10 | ★★ | 4 atributos + auditoría |
-| 3 | **Tags** ⭐ | 300 (estático) | ★★★ | 5 atributos + estados |
-| 4 | **Personal** | 200 (estático) | ★★ | 4 atributos + referencias |
-| 5 | **Estado_del_personal** | ~5,000 | ★★★ | 5 atributos + 40 valores |
-| 6 | **Orden_traslados** | 500-1000/año | ★★★ | 7 atributos + FK |
-| 7 | **casetas_Plantillas** | 100-150 (estático) | ★★ | 10 atributos + tarifas |
-| 8 | **Tipo_de_ruta_N** | 100-200 (estático) | ★★ | 20 atributos + categorías |
+| 1 | **cruces**  | 80 - 350 día | ★★★★★ | 20 atributos + ciclos |
+| 2 | **ImportacionesCruces** | 1 - 2 día | ★★★★★ | 4 atributos + auditoría |
+| 3 | **Tags**  | 50 mes | ★★★ | 5 atributos + estados |
+| 4 | **Personal** | 20 mes | ★★ | 4 atributos + referencias |
+| 5 | **Estado_del_personal** | ~500 día | ★★★★ | 5 atributos + 40 valores |
+| 6 | **Orden_traslados** | 500-1000/año | ★★★★ | 7 atributos + FK |
+| 7 | **casetas_Plantillas** | 10-100 mes | ★★ | 10 atributos + tarifas |
+| 8 | **Tipo_de_ruta_N** | 100-200 (estático) | ★★★ | 20 atributos + categorías |
 
+
+- Los registros de cruces se realizan de manera diaria a través de la conciliación sobre el portal IAVE-WEB, generando a su vez un log por cada importación de cruces. Se estima que podrían llegarse a realizar hasta 2 importaciones, pero lo ideal es 1.
+- Se contempla que la asignación, retiro o el extravío de TAGS generan un registro en la tabla, por lo que se contemplan hasta 50 registros (considerando el alta y baja de ops).
+- Sobre la tabla de personal se estiman las contrataciones y las bajas de ops, que realmente no es tan alta.
+- En la tabla de Estado_del_personal, se contemplan todos los registros que realiza:
+      1) Rastreo
+      2) Administración y personal 
+      3) Los guardías (al momento de ingresar a planta).
+Contemplando que en ocasiones llegan a ser hasta 3 registros por operador, de manera diaria.
 ### MÓDULOS (6)
 
 | # | Módulo | Endpoints | Operaciones | Complejidad |
@@ -318,17 +324,16 @@ Ejemplo completo de flujo end-to-end:
 ## 💡 INSIGHTS PRINCIPALES
 
 ### 1. **Tabla Central: `cruces`**
-- 20 atributos
-- Inserta ~10,000 registros/día
-- 3 Estados Secundarios diferentes según contexto
-- Donde convergen todas las operaciones del sistema
+- Aquí es donde convergen todas las operaciones del sistema
+- Se insertan hasta 1,500 registros al día
+- Los estados secundarios se definen según contexto (aclaración: Pendiente Levantar → En Proceso → Dictaminada )
 
 ### 2. **Operación Más Crítica: Importación**
 - `POST /api/cruces/import`
 - 5 lookups (Tags, OT, Caseta, Estado, etc.)
 - Lógica compleja de asignación de Estatus
 - SSE para progreso en tiempo real
-- ~1,000-10,000 registros por batch
+- ~1,000-1,500 registros por batch
 
 ### 3. **Validaciones Complejas**
 - Estatus_Secundario tiene ciclo de vida específico por tipo
@@ -347,7 +352,7 @@ Ejemplo completo de flujo end-to-end:
 - Cachear datos estáticos para mejor performance
 
 
-## 🏆 CHECKLIST DE VALIDACIÓN
+## CHECKLIST DE VALIDACIÓN
 
 Documentación completada para:
 
@@ -382,7 +387,7 @@ Análisis completado:
 
 ---
 
-## 📞 CÓMO MANTENER ESTA DOCUMENTACIÓN
+## CÓMO MANTENER ESTA DOCUMENTACIÓN
 
 ### Cuando hay cambios:
 1. Identificar qué documento afecta
@@ -397,74 +402,44 @@ Análisis completado:
 - Nuevo endpoint → Actualizar DIAGRAMA + RESUMEN
 - Nuevo módulo → Actualizar todo
 
-### Revisión trimestral:
-- [ ] Validar que atributos sean correctos
-- [ ] Verificar que operaciones sean actuales
-- [ ] Revisar volúmenes estimados
-- [ ] Actualizar ejemplos
-- [ ] Validar referencias cruzadas
 
 ---
 
 ## 📋 RESUMEN FINAL
 
-### Documentación Entregada
+### Documentación (con su descripción)
 
 ```
 📊 MAPEO_COMPLETO_TABLAS_ATRIBUTOS.md
-   └─ Referencia técnica completa (500+ líneas)
+   └─ Para comprender el esquema de la base de datos en uso.
 
 📋 RESUMEN_TABLAS_ATRIBUTOS.md
-   └─ Quick reference (400 líneas)
+   └─ 
 
 🔗 MATRIZ_OPERACIONES_DETALLADA.md
-   └─ Especificaciones técnicas (600+ líneas)
+   └─ Especificaciones técnicas detalladas
 
 🗺️ DIAGRAMA_Y_REFERENCIA_RAPIDA.md
-   └─ Visualización e ejemplos (500+ líneas)
+   └─ Visualización y ejemplos 
 
 📚 INDICE_MAPEO_TABLAS.md
-   └─ Navegación (400 líneas)
+   └─ Cómo tal es la navegación entre las tablas de la BD
 
-TOTAL: ~2,400 líneas de documentación
 ```
 
 ### Cobertura Alcanzada
 
-```
-✅ 8/8 tablas (100%)
-✅ 140+ atributos (100%)
-✅ 6/6 módulos (100%)
-✅ 25+ endpoints (100%)
-✅ 6 relaciones FK (100%)
-✅ 30+ valores enumerados (100%)
-✅ 10+ validaciones documentadas
-✅ 6 flujos detallados
-✅ 8 índices recomendados
-```
+- 16 tablas de la base de datos.
+- Interacción con 147 campos
+- 6 módulos (rutas/controladores)
+- 31 API endpoints 
+- 6 relaciones FK 
+- 30 valores identificados cómo de interacción constante
+- 13 validaciones documentadas
+- 6 flujos detallados
+- 8 índices recomendados
 
----
 
-## 🎉 CONCLUSIÓN
-
-Se ha completado con éxito un **mapeo exhaustivo y profesional** de TODO el proyecto IAVE WEB.
-
-### Lo que ahora tienes:
-✅ Documentación completa del esquema de BD
-✅ Referencia de operaciones por módulo
-✅ Flujos de datos detallados
-✅ Validaciones documentadas
-✅ Ejemplos prácticos
-✅ Recomendaciones de mejora
-✅ Herramientas de navegación
-
-### Puedes usar esta documentación para:
-✅ Onboarding de nuevos developers
-✅ Debugging y troubleshooting
-✅ Optimización de queries
-✅ Planificación de features
-✅ Auditoría y compliance
-✅ Capacitación del equipo
 
 ---
 **Análisis Completado:** 4 de Diciembre de 2025  

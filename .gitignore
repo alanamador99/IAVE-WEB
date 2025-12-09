@@ -39,3 +39,4 @@ Thumbs.db
 node_modules/
 
 iave-web-api/src/database/connection.js
+iave-web-api/middlewares/Queries.sql
