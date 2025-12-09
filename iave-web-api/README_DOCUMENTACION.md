@@ -4,12 +4,12 @@
 
 Se ha completado la documentación exhaustiva de **todos los controladores del backend IAVE**. Cada controlador cuenta con:
 
-- ✅ **JSDoc inline** en comentarios de código
-- ✅ **Markdown detallado** con guías de uso
-- ✅ **Ejemplos prácticos** de implementación
-- ✅ **Estructura de base de datos** documentada
-- ✅ **Problemas conocidos** identificados
-- ✅ **Mejoras futuras** sugeridas
+-  **JSDoc inline** en comentarios de código
+-  **Markdown detallado** con guías de uso
+-  **Ejemplos prácticos** de implementación
+-  **Estructura de base de datos** documentada
+-  **Problemas conocidos** identificados
+-  **Mejoras futuras** sugeridas
 
 ---
 
