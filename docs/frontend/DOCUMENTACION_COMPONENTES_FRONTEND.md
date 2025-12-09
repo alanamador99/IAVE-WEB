@@ -28,11 +28,12 @@
 - Envolver toda la aplicación con contexto de enrutamiento
 
 ### Estructura de Layout
-```
 
-![Maquetación IAVE WEB](docs/Maquetación iave-web.png)
 
-```
+
+![OpenWebDocs Logo: Carle el ratón de biblioteca](../img/Maquetación%20iave-web.png)
+
+
 
 ### Rutas Definidas
 | Ruta | Componente | Descripción |
