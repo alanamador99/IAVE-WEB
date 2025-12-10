@@ -58,20 +58,11 @@
 - `react-router-dom`: Enrutamiento
 - Componentes propios del sistema
 
-### Ejemplo de Uso
-```jsx
-import App from './App';
-
-// En index.js o main.jsx
-ReactDOM.render(<App />, document.getElementById('root'));
-```
-
----
 
 ## Abusos.jsx
 
 ### Descripción General
-`Abusos.jsx` es el componente padre del módulo de Abusos. Los abusos son infracciones cometidas por operadores de transporte (exceso de velocidad, circulación en carril restringido, etc.).
+`Abusos.jsx` es el componente padre del módulo de Abusos. Los abusos son cruces de operadores por casetas que no están en la ruta definida o en días que no se encontraban en operación.
 
 ### Funcionalidades
 - Mostrar estadísticas de abusos registrados
@@ -115,14 +106,33 @@ Abusos (padre)
 ```json
 [
   {
-    "ID": 1,
-    "No_Economico": "123 Carlos García",
+    "ID_Matricula": 2354,
+    "NombreCompleto": "Jesus",
+    "FechaAbuso": "2025-09-26T00:00:00.000Z",
+    "ID": "250926_17241_28484563",
+    "Caseta": "PACHUCA",
+    "No_Economico": "2354 Jesus Rodr",
+    "Fecha": "2025-09-26T23:24:01.000Z",
+    "Importe": 95,
+    "Tag": "IMDM28484563",
+    "Carril": "PACHUCA 1",
+    "Clase": "1",
+    "Consecar": "39301560",
+    "FechaAplicacion": "2025-09-26T18:00:00.000Z",
     "Estatus": "Abuso",
-    "Estatus_Secundario": "pendiente_reporte",
-    "Importe": 250.00,
-    "Fecha": "2025-12-01",
-    "Estado_Personal": "ACTIVO"
-  }
+    "id_orden": null,
+    "observaciones": "Se tuvo el abuso después de un traslado que tenía de Planta Culiacán ? Patio TUSA Sahagún (OT-5091260).",
+    "Estatus_Secundario": "completado",
+    "Aplicado": true,
+    "FechaDictamen": "2025-09-29T00:00:00.000Z",
+    "ImporteOficial": 0,
+    "NoAclaracion": null,
+    "montoDictaminado": 95,
+    "idCaseta": "",
+    "Estado_Personal": null,
+    "Nombres": "Jesus",
+    "Apellidos": " "
+  },
 ]
 ```
 
@@ -237,7 +247,7 @@ Cada registro incluye:
 - `POST /api/cruces/import`: Importa cruces masivamente
 
 ### Observaciones
-Los comentarios del componente indican que las estadísticas se deben actualizar conforme cambia el estatus de los cruces.
+Actualmente sobre este componente hace falta implementar el cambio automático de las estadisticas (mediante el uso de  props).
 
 ---
 
@@ -286,6 +296,8 @@ Ninguno. Es un componente puramente presentacional.
 - **Navegación**: Enlace para volver al inicio
 
 ### Elementos Visuales
+
+
 ```
 ┌─────────────────────┐
 │       404           │ (15rem font size)
@@ -298,6 +310,8 @@ Ninguno. Es un componente puramente presentacional.
 │ ← Volver al Inicio  │ (botón)
 └─────────────────────┘
 ```
+
+![Imagen cuando existe una ruta sin coincidencia](image.png)
 
 ### Props
 No recibe props.
@@ -321,38 +335,10 @@ No recibe props.
 ## nuevocomponente.jsx
 
 ### Descripción General
-`nuevocomponente.jsx` es un componente de demostración que implementa un Gantt chart interactivo para visualizar etapas de un proyecto.
+`nuevocomponente.jsx` es un componente de testing que permite la ejecución de pruebas. Se encuentra actualmente enrutado en React, sin una href asignada aún (desde el sidebar o cualquier elemento)
 
 ### Funcionalidades
-- Mostrar fases del proyecto con duración
-- Indicar entregables por fase
-- Proporcionar tips/consejos por fase
-- Seleccionar fases para ver detalles
-
-### Fases del Proyecto
-1. **ETAPA 1: ANÁLISIS Y DISEÑO** (3 semanas)
-2. **ETAPA 2: DESARROLLO Y CÓDIGO** (6 semanas)
-3. **ETAPA 3: TESTING Y CALIDAD** (3 semanas)
-4. **ETAPA 4: DEPLOYMENT** (2 semanas)
-5. **ETAPA 5: OPERACIÓN Y SOPORTE** (2 semanas)
-
-### Estado Local
-```javascript
-const [selectedPhase, setSelectedPhase] = useState(null);
-```
-
-### Componentes Utilizados
-- `Calendar`: Icono de calendario (lucide-react)
-- `CheckCircle`: Icono de confirmación (lucide-react)
-- `AlertCircle`: Icono de alerta (lucide-react)
-- `Info`: Icono de información (lucide-react)
-
-### Datos Mostrados por Fase
-Cada fase incluye:
-- Nombre y duración
-- Lista de entregables
-- Tips y mejores prácticas
-- Color identificador
+- Probar la disposición/maquetación de nuevos elementos visuales.
 
 ### Propósito
 Componente de prueba/testing para demostración de funcionalidades.
@@ -362,7 +348,7 @@ Componente de prueba/testing para demostración de funcionalidades.
 ## Route-Creator.jsx
 
 ### Descripción General
-`Route-Creator.jsx` es un componente avanzado que implementa un creador interactivo de rutas de transporte con integración de mapas y cálculos de costos de peaje.
+`Route-Creator.jsx` es un componente *avanzado* que implementa un creador interactivo de rutas de transporte con integración de mapas, cálculos de costos de peaje y vinculación de las rutas TUSA actuales.
 
 ### Funcionalidades Principales
 - **Creación de Rutas**: Permite seleccionar origen, destino y puntos intermedios
@@ -370,6 +356,7 @@ Componente de prueba/testing para demostración de funcionalidades.
 - **Visualización en Mapas**: Muestra rutas en mapa interactivo (Leaflet)
 - **Cálculo de Casetas**: Identifica casetas en la ruta
 - **Cálculo de Costos**: Calcula importe total de peajes
+- **Ruta TUSA**: Permite la visualización de la ruta actualmente registrada en TUSA que coincide con las poblaciones buscadas (De origen y destino).
 
 ### Estados Principales
 ```javascript
@@ -535,9 +522,12 @@ Retorna rutas con discrepancias
 `sidebar.jsx` es el componente de navegación lateral fija de la aplicación. Proporciona acceso a todos los módulos principales del sistema.
 
 ### Estructura
+
+
+
 ```
 ┌─────────────────────┐
-│   Logo IAVE        │ (fijo en altura 70px)
+│   Logo IAVE         │ (fijo en altura 70px)
 ├─────────────────────┤
 │ • Inicio            │
 ├─────────────────────┤
@@ -560,6 +550,7 @@ Retorna rutas con discrepancias
 │ • Gestión de TAGs   │
 └─────────────────────┘
 ```
+![alt text](image-1.png)
 
 ### Características de Posicionamiento
 - **Posición**: Fixed (fija en la pantalla)

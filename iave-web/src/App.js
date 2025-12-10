@@ -12,7 +12,7 @@ import Home from "./components/home.jsx";
 import NotFound from "./components/NotFound.jsx";
 import RutasModule from "./components/Rutas.jsx";
 import RouteCreator from "./components/Route-Creator.jsx";
-import Example from "./components/nuevocomponente.jsx";
+import Nuevocomponente from "./components/nuevocomponente.jsx";
 
 
 
@@ -41,7 +41,7 @@ function App() {
               <Route path="/casetas" element={<Casetas />} />
               <Route path="/tags" element={<Tags />} />
               <Route path="/sesgos" element={<Sesgos />} />
-              <Route path="/nuevocomponente" element={<Example />} />
+              <Route path="/nuevocomponente" element={<Nuevocomponente />} />
               <Route path="/route-creator" element={<RouteCreator />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
