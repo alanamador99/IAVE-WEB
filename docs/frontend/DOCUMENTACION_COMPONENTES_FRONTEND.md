@@ -167,7 +167,50 @@ Abusos (padre)
 - `GET /api/aclaraciones`: Lista todas las aclaraciones
 - `GET /api/aclaraciones/stats`: Obtiene estadísticas
 
-### Datos Enriquecidos
+
+### Ejemplo de Respuesta API
+```json
+[
+  {
+    "ID": "251002_235747_28967172",
+    "Caseta": "TAMPICO",
+    "No_Economico": "2386 Gabriel Fu",
+    "Fecha": "2025-10-03T05:57:47.000Z",
+    "Importe": 82,
+    "Tag": "IMDM28967172",
+    "Carril": "TAMPICO 2",
+    "Clase": "10",
+    "Consecar": "39422335",
+    "FechaAplicacion": "2025-10-03T18:00:00.000Z",
+    "Estatus": "Aclaración",
+    "id_orden": "OT-5091325",
+    "observaciones": null,
+    "Estatus_Secundario": "dictaminado",
+    "Aplicado": null,
+    "FechaDictamen": null,
+    "ImporteOficial": 76,
+    "NoAclaracion": null,
+    "montoDictaminado": 0,
+    "idCaseta": "296",
+    "ID_clave": "C-2 ", ←
+    "Nombre_IAVE": "Tampico", ←
+    "Automovil": 35, ←
+    "Camion2Ejes": 76, ←
+    "Camion3Ejes": 76, ←
+    "Camion5Ejes": 140, ←
+    "Camion9Ejes": 195, ←
+    "latitud": "22.218325", ←
+    "longitud": "-97.824741", ←
+    "Estado": "Tamaulipas", ←
+    "diferencia": 6 ←
+  },
+]
+```
+
+---
+
+
+### Datos Enriquecidos (* ← *)
 Cada registro incluye:
 - Información de orden de traslado (ID_clave)
 - Datos de caseta (nombre, tarifas, ubicación)
