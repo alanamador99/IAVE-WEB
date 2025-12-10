@@ -264,8 +264,8 @@ Cada registro incluye:
 - Actualizar estatus de cruces
 - Aplicar filtros y búsquedas
 
-### Estados de Cruces
-- **Cruce Normal**: Paso regular de vehículo
+### Estados de Cruces actualmente definidos/identificados
+- **Cruce Normal(Confirmado)**: Paso regular de vehículo
 - **Aclaración**: Diferencia en cobro de peaje
 - **Abuso**: Infracción por parte del operador
 - **Sesgos**: Discrepancia en ruta o caseta
@@ -702,11 +702,16 @@ No recibe props.
 
 ### Estructura
 ```
-┌────────────────────────────────────┐
-│ [☰] [Logo]          [🔔] [👤]     │
-│     Bienvenido Usuario  HH:MM      │
-└────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│ [☰](ROL) [UserIcon] Bienvenido Usuario     [🔔 Alerta de usuarios   ] │
+│ {#PERFIL}                                   [Para inactivación de TAG] │
+| {#CONFIGURACIÓN}                                                       |
+| {#HISTORIAL DE ACTIVIDAD}                                              |
+| {#CERRAR SESIÓN}→(cambio no  implementado)                             |
+└────────────────────────────────────────────────────────────────────────┘
 ```
+
+![alt text](image-2.png)
 
 ### Elementos Principales
 
@@ -725,7 +730,7 @@ No recibe props.
 - **Color**: Rojo (`badge-danger`)
 - **Dropdown**: Lista de notificaciones
 
-#### 3. Perfil de Usuario
+#### 3. Perfil de Usuario (Aún no implementado).
 - **Foto**: Imagen de perfil (`undraw_profile.svg`)
 - **Nombre**: Hardcodeado como "Amador Martínez, José Alan"
 - **Dropdown**: Menú con opciones
@@ -822,31 +827,6 @@ REACT_APP_API_URL: URL del backend (ej: http://localhost:3001)
 - Estados de carga para mejor UX
 
 ---
-
-## Conclusiones y Recomendaciones
-
-### Fortalezas
-✅ Modularidad: Componentes bien separados  
-✅ Reutilización: Componentes compartidos  
-✅ Respuesta: Interfaz responsiva  
-✅ Documentación: Comentarios útiles en código  
-
-### Áreas de Mejora
-⚠️ Hardcodeado: Usuario, fechas en Topbar  
-⚠️ Estado Global: No usa Context API o Redux (considerar para aplicación grande)  
-⚠️ Tipos: No usa TypeScript  
-⚠️ Errores: Manejo básico de errores  
-⚠️ Testing: No hay tests unitarios visibles  
-
-### Recomendaciones
-1. Implementar TypeScript para mayor seguridad de tipos
-2. Usar Context API o Redux para estado global
-3. Agregar manejo robusto de errores
-4. Implementar tests unitarios y E2E
-5. Parametrizar valores hardcodeados en Topbar
-6. Agregar validación más robusta en formularios
-7. Implementar cache de datos para mejor performance
-8. Agregar autenticación/autorización
 
 ---
 
