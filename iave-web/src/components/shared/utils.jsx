@@ -1,3 +1,20 @@
+/**
+ * @fileoverview Módulo de utilidades compartidas para la aplicación IAVE WEB
+ * @description Contiene componentes reutilizables y funciones auxiliares para:
+ * - Copiar información al portapapeles
+ * - Mostrar mapas interactivos
+ * - Formatear datos (fechas, dinero, nombres)
+ * - Mostrar notificaciones (Toast)
+ * - Modales de selección
+ * 
+ * @module shared/utils
+ * @requires react
+ * @requires react-bootstrap
+ * @requires lucide-react
+ * @requires react-leaflet
+ * @requires leaflet
+ */
+
 import React, { useState } from 'react';
 import { Toast } from 'react-bootstrap';
 
@@ -6,7 +23,23 @@ import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-
+/**
+ * Componente para copiar el TAG de un cruce al portapapeles
+ * @component
+ * @param {Object} props - Props del componente
+ * @param {Object} props.cruceSeleccionado - Objeto del cruce con la propiedad Tag
+ * @param {string} props.cruceSeleccionado.Tag - TAG a copiar
+ * @returns {React.ReactElement} Elemento visual con icono de copiar y notificación
+ * 
+ * @example
+ * <CopiarTag cruceSeleccionado={{ Tag: 'ABC123456789' }} />
+ * 
+ * @description
+ * - Renderiza un icono de clipboard clickeable
+ * - Al hacer click, copia el TAG al portapapeles
+ * - Muestra confirmación visual por 1 segundo
+ * - Incluye tooltip con instrucciones
+ */
 const CopiarTag = ({ cruceSeleccionado }) => {
   const [copiado, setCopiado] = useState(false);
 
@@ -53,7 +86,22 @@ const CopiarTag = ({ cruceSeleccionado }) => {
   );
 };
 
-
+/**
+ * Componente para copiar la fecha de un cruce al portapapeles
+ * @component
+ * @param {Object} props - Props del componente
+ * @param {Object} props.cruceSeleccionado - Objeto del cruce
+ * @param {string} props.cruceSeleccionado.Fecha - Fecha a copiar
+ * @returns {React.ReactElement} Elemento visual con icono de copiar y notificación
+ * 
+ * @example
+ * <CopiarFecha cruceSeleccionado={{ Fecha: '2025-12-01T14:30:45' }} />
+ * 
+ * @description
+ * Similar a CopiarTag pero para fechas
+ * - Copia la fecha al portapapeles
+ * - Muestra confirmación visual por 1 segundo
+ */
 const CopiarFecha = ({ cruceSeleccionado }) => {
   const [copiado, setCopiado] = useState(false);
 
@@ -100,10 +148,21 @@ const CopiarFecha = ({ cruceSeleccionado }) => {
   );
 };
 
+// ============================================
+// CONFIGURACIÓN DE LEAFLET - MARCADORES
+// ============================================
 
-
-
-// Ajustar icono porque por defecto no se muestra
+/**
+ * Configuración de iconos por defecto en Leaflet
+ * @description
+ * Ajusta los iconos de marcadores porque por defecto no se muestran correctamente
+ * en aplicaciones React con bundlers (webpack, vite, etc.)
+ * 
+ * Define las rutas de las imágenes:
+ * - marker-icon.png: Icono normal
+ * - marker-icon-2x.png: Icono de alta resolución (retina)
+ * - marker-shadow.png: Sombra del marcador
+ */
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: require('leaflet/dist/images/marker-icon-2x.png'),
@@ -111,6 +170,34 @@ L.Icon.Default.mergeOptions({
   shadowUrl: require('leaflet/dist/images/marker-shadow.png'),
 });
 
+/**
+ * Componente modal para visualizar una caseta en mapa
+ * @component
+ * @param {Object} props - Props del componente
+ * @param {boolean} props.isOpen - Determina si el modal está visible
+ * @param {Function} props.onClose - Callback cuando se cierra el modal
+ * @param {string} props.nombreCaseta - Nombre de la caseta a mostrar
+ * @param {number} props.lat - Latitud de la caseta
+ * @param {number} props.lng - Longitud de la caseta
+ * @returns {React.ReactElement|null} Modal con mapa Leaflet o null si no está abierto
+ * 
+ * @example
+ * const [mapOpen, setMapOpen] = useState(false);
+ * <CasetaMapModal 
+ *   isOpen={mapOpen} 
+ *   onClose={() => setMapOpen(false)}
+ *   nombreCaseta="Caseta Tlanalapa"
+ *   lat={20.3456}
+ *   lng={-99.1234}
+ * />
+ * 
+ * @description
+ * - Modal overlay con fondo oscuro semitransparente
+ * - Mapa interactivo centrado en coordenadas
+ * - Marcador con popup del nombre de la caseta
+ * - Botón X para cerrar (esquina superior derecha)
+ * - Usa OpenStreetMap como capa base
+ */
 const CasetaMapModal = ({ isOpen, onClose, nombreCaseta, lat, lng }) => {
   if (!isOpen) return null;
 
@@ -133,6 +220,28 @@ const CasetaMapModal = ({ isOpen, onClose, nombreCaseta, lat, lng }) => {
   );
 };
 
+// ============================================
+// FUNCIONES DE FORMATEO
+// ============================================
+
+/**
+ * Formatea una razón social removiendo sufijos comunes
+ * @function formatearRazonesSociales
+ * @param {string} RazonSocial - Razón social a formatear
+ * @returns {string} Razón social sin sufijos ("S.A. de C.V.", etc.)
+ * 
+ * @example
+ * formatearRazonesSociales("Transportes ACME S.A. de C.V.")
+ * // Returns: "Transportes ACME"
+ * 
+ * @description
+ * Elimina los sufijos legales comunes en México:
+ * - "S.A. de C.V."
+ * - "SA. de C.V."
+ * - "SA de CV."
+ * - "S.A. de CV"
+ * - "SA de CV"
+ */
 const formatearRazonesSociales = (RazonSocial) => {
   if (!RazonSocial) return '';
   const response = RazonSocial.replaceAll('S.A. de C.V.', '').replaceAll('SA. de C.V.', '').replaceAll('SA de CV.', '').replaceAll('S.A. de CV', '').replaceAll('SA de CV', '');
@@ -140,7 +249,26 @@ const formatearRazonesSociales = (RazonSocial) => {
   
 };
 
-
+/**
+ * Formatea una fecha a formato legible corto
+ * @function formatearFecha
+ * @param {string|Date} fecha - Fecha a formatear (ISO string o Date)
+ * @returns {string} Fecha formateada como "DD-Mmm-YYYY" (ej: "01-Dic-2025")
+ * @returns {string} String vacío si la fecha es inválida
+ * 
+ * @example
+ * formatearFecha("2025-12-01")
+ * // Returns: "01-Dic-2025"
+ * 
+ * formatearFecha(new Date(2025, 11, 1))
+ * // Returns: "01-Dic-2025"
+ * 
+ * @description
+ * - Formatea con nombre de mes abreviado (3 letras)
+ * - Rellena día con 0 si es necesario
+ * - Retorna string vacío si la fecha es inválida (isNaN)
+ * - Meses: Ene, Feb, Mar, Abr, May, Jun, Jul, Ago, Sep, Oct, Nov, Dic
+ */
 const formatearFecha = (fecha) => {
   if (!fecha) return '';
   const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
@@ -152,6 +280,23 @@ const formatearFecha = (fecha) => {
   return `${dia}-${mes}-${anio}`;
 };
 
+/**
+ * Formatea una fecha con hora incluida
+ * @function formatearFechaConHora
+ * @param {string} fecha - Fecha ISO con hora (ej: "2025-12-01T14:30:45.000Z")
+ * @returns {string} Fecha y hora formateadas (ej: "01-Dic-2025 a las 14:30:45")
+ * @returns {string} String vacío si la fecha es inválida
+ * 
+ * @example
+ * formatearFechaConHora("2025-12-01T14:30:45.000Z")
+ * // Returns: "01-Dic-2025 a las 14:30:45"
+ * 
+ * @description
+ * - Combina formateo de fecha + hora
+ * - Extrae hora de la parte después de "T" en formato ISO
+ * - Remove milisegundos de la hora mostrada
+ * - Formato: "DD-Mmm-YYYY a las HH:MM:SS"
+ */
 const formatearFechaConHora = (fecha) => {
   if (!fecha) return '';
   const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
@@ -164,10 +309,52 @@ const formatearFechaConHora = (fecha) => {
   return `${dia}-${mes}-${anio} a las ${fecha.split("T")[1].split(".")[0]}`;
 };
 
+/**
+ * Formatea nombre completo de una persona
+ * @function formatearNombre
+ * @param {Object} obj - Objeto con datos de persona
+ * @param {string} obj.Nombres - Nombres de pila
+ * @param {string} obj.Ap_paterno - Apellido paterno
+ * @param {string} obj.Ap_materno - Apellido materno
+ * @returns {string} Nombre completo formateado
+ * 
+ * @example
+ * formatearNombre({
+ *   Nombres: "Carlos",
+ *   Ap_paterno: "García",
+ *   Ap_materno: "López"
+ * })
+ * // Returns: "Carlos García López"
+ * 
+ * @description
+ * - Concatena nombres y apellidos con espacios
+ * - Maneja propiedades faltantes (undefined/null)
+ * - Orden: Nombres + Ap_paterno + Ap_materno
+ */
 const formatearNombre = (obj) => {
   return `${obj.Nombres || ''} ${obj.Ap_paterno || ''} ${obj.Ap_materno || ''}`;
 };
 
+/**
+ * Formatea un monto de dinero con separador de miles y 2 decimales
+ * @function formatearDinero
+ * @param {number} monto - Monto a formatear
+ * @returns {string} Monto formateado con comas y 2 decimales (ej: "1,234.56")
+ * @returns {string} String vacío si monto es falsy
+ * 
+ * @example
+ * formatearDinero(1234.5)
+ * // Returns: "1,234.50"
+ * 
+ * formatearDinero(1000000.999)
+ * // Returns: "1,000,000.99"
+ * 
+ * @description
+ * - Inserta coma cada 3 dígitos
+ * - Siempre muestra 2 decimales (toFixed(2))
+ * - Usa regex para insertar separadores: /\B(?=(\d{3})+(?!\d))/g
+ * - Uso: precios, importes, tarifas
+ */
 const formatearDinero = (monto) => {
   if (!monto) return '';
   //La intención es colocar el número con una coma cada tres dígitos, pero CON dos decimales.
@@ -175,6 +362,27 @@ const formatearDinero = (monto) => {
   partes[0] = partes[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   return partes.join('.');
 };
+
+/**
+ * Formatea un número entero con separador de miles (sin decimales)
+ * @function formatearEnteros
+ * @param {number} monto - Número a formatear
+ * @returns {string} Número formateado con comas (ej: "1,234,567")
+ * @returns {string} String vacío si monto es falsy
+ * 
+ * @example
+ * formatearEnteros(1234567)
+ * // Returns: "1,234,567"
+ * 
+ * formatearEnteros(1000)
+ * // Returns: "1,000"
+ * 
+ * @description
+ * - Similar a formatearDinero pero sin decimales
+ * - Inserta coma cada 3 dígitos
+ * - Redondea usando toFixed(0)
+ * - Uso: cantidades, km, unidades
+ */
 const formatearEnteros = (monto) => {
   if (!monto) return '';
   //La intención es colocar el número con una coma cada tres dígitos, pero sin decimales.
@@ -183,7 +391,37 @@ const formatearEnteros = (monto) => {
   return partes.join('.');
 };
 
+// ============================================
+// COMPONENTES DE NOTIFICACIÓN Y SELECTORES
+// ============================================
 
+/**
+ * Componente de notificación tipo Toast (alerta emergente)
+ * @component
+ * @param {Object} props - Props del componente
+ * @param {string} props.titulo - Título de la notificación
+ * @param {string} props.mensaje - Mensaje a mostrar
+ * @param {boolean} props.mostrar - Controla visibilidad
+ * @param {string} props.color - Clase CSS de color (ej: "text-success", "text-danger")
+ * @param {number} [props.tiempo=5000] - Duración en ms antes de auto-ocultarse
+ * @returns {React.ReactElement} Componente Toast de Bootstrap
+ * 
+ * @example
+ * const [showToast, setShowToast] = useState(false);
+ * <CustomToast
+ *   titulo="Éxito"
+ *   mensaje="Datos guardados correctamente"
+ *   mostrar={showToast}
+ *   color="text-success"
+ *   tiempo={3000}
+ * />
+ * 
+ * @description
+ * - Usa componente Toast de react-bootstrap
+ * - Se auto-oculta después del tiempo especificado
+ * - Posicionado en esquina inferior derecha (fixed)
+ * - Color personalizable mediante clases Bootstrap
+ */
 function CustomToast({ titulo, mensaje, mostrar, color, tiempo = 5000 }) {
   const [show, setShow] = useState(true);
 
@@ -212,7 +450,32 @@ function CustomToast({ titulo, mensaje, mostrar, color, tiempo = 5000 }) {
   );
 }
 
-
+/**
+ * Convierte minutos totales a formato legible (días, horas, minutos)
+ * @function parsearMinutos
+ * @param {number} totalMinutos - Total de minutos a convertir
+ * @returns {string} Formato legible (ej: "2 días, 3 h, 45 min")
+ * @returns {string} Mensaje de error si totalMinutos es negativo
+ * @returns {string} "0 min" si totalMinutos es 0
+ * 
+ * @example
+ * parsearMinutos(1505)
+ * // Returns: "1 día, 1 h, 5 min"
+ * 
+ * parsearMinutos(125)
+ * // Returns: "2 h, 5 min"
+ * 
+ * parsearMinutos(45)
+ * // Returns: "45 min"
+ * 
+ * @description
+ * - Desglose: totalMinutos / 1440 = días
+ * - Resto / 60 = horas
+ * - Resto = minutos
+ * - Solo muestra componentes > 0
+ * - Pluraliza "día/días" correctamente
+ * - Uso: duración de viajes, tiempos de proceso
+ */
 function parsearMinutos(totalMinutos) {
   if (totalMinutos < 0) {
     return "El número de minutos no puede ser negativo.";
@@ -251,7 +514,38 @@ function parsearMinutos(totalMinutos) {
   return partes.join(', ');
 }
 
-
+/**
+ * Componente para visualizar opciones de ruta con detalles
+ * @component
+ * @param {Object} props - Props del componente
+ * @param {string} props.tipo - Tipo de ruta (ej: "Óptima", "Libre", "Recomendada")
+ * @param {string|number} props.distance - Distancia de la ruta
+ * @param {string} props.time - Tiempo de viaje estimado
+ * @param {string} [props.distanceUnit=" KM"] - Unidad de distancia
+ * @param {Object} props.costs - Objeto de costos
+ * @param {string} props.costs.label - Etiqueta de costo (ej: "Peaje")
+ * @param {string|number} props.costs.value - Valor del costo
+ * @param {string} [props.advertencias=""] - Advertencias adicionales
+ * @param {string} [props.color="gray"] - Color del texto/icono
+ * @returns {React.ReactElement} Card con información de ruta
+ * 
+ * @example
+ * <RouteOption
+ *   tipo="Óptima"
+ *   distance="850"
+ *   time="12 h, 30 min"
+ *   costs={{ label: "Peaje", value: "450.00" }}
+ *   advertencias="Incluye casetas de peaje"
+ *   color="green"
+ * />
+ * 
+ * @description
+ * - Renderiza tarjeta con borde redondeado
+ * - Muestra tipo, distancia, tiempo, costos
+ * - Icono "i" con tooltip de advertencias
+ * - Diseño responsivo con Bootstrap
+ * - Color personalizable para cada opción
+ */
 const RouteOption = ({ tipo, distance, time, distanceUnit = ' KM', costs, advertencias = '', color = 'gray' }) => {
   return (
     <div className="border rounded p-3 py-0 bg-light" style={{ minWidth: '100px', color: `${color}` }}>
@@ -292,9 +586,47 @@ const RouteOption = ({ tipo, distance, time, distanceUnit = ' KM', costs, advert
   );
 };
 
-
-
-// Componente Modal con clases de Bootstrap/SB Admin
+/**
+ * Modal de selección con dropdown
+ * @component
+ * @param {Object} props - Props del componente
+ * @param {boolean} props.isOpen - Controla visibilidad del modal
+ * @param {Function} props.onClose - Callback al cerrar
+ * @param {Function} props.onSelect - Callback con valor seleccionado
+ * @param {string} props.valorCampo - Valor actual del campo (mostrado en alerta)
+ * @param {Array<Object>} props.valoresSugeridos - Array de opciones
+ * @param {string} props.valoresSugeridos[].id_Tipo_ruta - ID de la ruta
+ * @param {string} props.valoresSugeridos[].RazonOrigen - Origen
+ * @param {string} props.valoresSugeridos[].RazonDestino - Destino
+ * @param {string} props.valoresSugeridos[].Categoria - Categoría
+ * @param {string} [props.titulo=""] - Título del modal
+ * @param {string} [props.campo=""] - Nombre del campo
+ * @param {string} [props.tituloDelSelect="Opciones"] - Etiqueta del select
+ * @returns {React.ReactElement|null} Modal o null si no está abierto
+ * 
+ * @example
+ * const [modalOpen, setModalOpen] = useState(false);
+ * const [selected, setSelected] = useState(null);
+ * 
+ * <ModalSelector
+ *   isOpen={modalOpen}
+ *   onClose={() => setModalOpen(false)}
+ *   onSelect={(value) => setSelected(value)}
+ *   valorCampo="Guadalajara"
+ *   valoresSugeridos={rutasData}
+ *   titulo="Seleccionar Ruta"
+ *   campo="Origen"
+ *   tituloDelSelect="Rutas disponibles"
+ * />
+ * 
+ * @description
+ * - Modal centrado con backdrop
+ * - Select dropdown con opciones
+ * - Formatea razones sociales automáticamente
+ * - Botones Cancelar y Confirmar
+ * - Botón confirmar deshabilitado si nada seleccionado
+ * - Estilos Bootstrap SB Admin
+ */
 const ModalSelector = ({ isOpen, onClose, onSelect, valorCampo, valoresSugeridos, titulo = '', campo = '', tituloDelSelect = 'Opciones' }) => {
   const [clienteSeleccionado, setClienteSeleccionado] = useState('');
 
@@ -406,8 +738,42 @@ const ModalSelector = ({ isOpen, onClose, onSelect, valorCampo, valoresSugeridos
   );
 };
 
+// ============================================
+// EXPORTS
+// ============================================
 
-
+/**
+ * Exportación de componentes y funciones
+ * @module shared/utils
+ * 
+ * @exports CopiarTag - Componente copiar TAG
+ * @exports CopiarFecha - Componente copiar fecha
+ * @exports CasetaMapModal - Componente modal con mapa
+ * @exports formatearFecha - Función formatear fecha
+ * @exports formatearFechaConHora - Función fecha con hora
+ * @exports formatearNombre - Función formatear nombre
+ * @exports formatearDinero - Función formatear dinero
+ * @exports formatearEnteros - Función formatear números
+ * @exports formatearRazonesSociales - Función limpiar razones sociales
+ * @exports CustomToast - Componente notificación
+ * @exports parsearMinutos - Función parsear minutos
+ * @exports RouteOption - Componente opción de ruta
+ * @exports ModalSelector - Componente modal selector
+ */
 
 export default CopiarTag;
-export { CopiarTag, CopiarFecha, CasetaMapModal, formatearFecha, formatearFechaConHora, formatearNombre, formatearDinero, formatearEnteros, CustomToast, parsearMinutos, RouteOption, ModalSelector };
+export { 
+  CopiarTag, 
+  CopiarFecha, 
+  CasetaMapModal, 
+  formatearFecha, 
+  formatearFechaConHora, 
+  formatearNombre, 
+  formatearDinero, 
+  formatearEnteros, 
+  formatearRazonesSociales,
+  CustomToast, 
+  parsearMinutos, 
+  RouteOption, 
+  ModalSelector 
+};
