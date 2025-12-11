@@ -17,7 +17,7 @@ El proyecto IAVE se centra en la detección de anomalías en los cruces de opera
 
 
 - **`/iave-web-api`** - Backend REST API (Node.js/Express)
-- **`/iave-web`** - Frontend (React/Vite)
+- **`/iave-web`** - Frontend (React)
 - **`/docs`** - Documentación técnica completa
 
 ## Quick Start (Comandos de ejecución actuales)

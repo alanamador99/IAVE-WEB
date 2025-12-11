@@ -298,7 +298,7 @@ El módulo configura automáticamente iconos de Leaflet:
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({...});
 ```
-Esto es necesario porque webpack/vite no carga las imágenes automáticamente.
+Esto es necesario porque webpack no carga las imágenes automáticamente.
 
 ### Estados Controlados
 Los componentes usan hooks de React para estado:
