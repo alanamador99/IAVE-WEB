@@ -32,7 +32,7 @@ import 'leaflet/dist/leaflet.css';
  * @returns {React.ReactElement} Elemento visual con icono de copiar y notificación
  * 
  * @example
- * <CopiarTag cruceSeleccionado={{ Tag: 'ABC123456789' }} />
+ * <CopiarTag cruceSeleccionado={{ Tag: 'IMDM29083641' }} />
  * 
  * @description
  * - Renderiza un icono de clipboard clickeable

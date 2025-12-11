@@ -69,13 +69,13 @@ Content-Type: application/json
 {
   "nombre": "Carlos García López",
   "matricula": "123",
-  "numeroDispositivo": "ABC123456789",
+  "numeroDispositivo": "IMDM29083641",
   "fechaAsignacion": "2025-12-01"
 }
 
 # Response (200 OK)
 Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
-Content-Disposition: attachment; filename=Responsiva_TAG_ABC123456789.xlsx
+Content-Disposition: attachment; filename=Responsiva_TAG_IMDM29083641.xlsx
 
 [Archivo Excel descargado con campos rellenados]
 ```
@@ -91,7 +91,7 @@ Content-Disposition: attachment; filename=Responsiva_TAG_ABC123456789.xlsx
 |-------|-------|---------|
 | **B33** | Nombre completo | Carlos García López |
 | **B38** | Matrícula | 123 |
-| **E5** | Número TAG | ABC123456789 |
+| **E5** | Número TAG | IMDM29083641 |
 | **B21** | Fecha y lugar | Tlanalapa Hidalgo 01/12/2025 |
 
 **Formato de fecha:**
@@ -140,7 +140,7 @@ ResponsivaTags.xlsx
 const formData = {
   nombre: "Carlos García López",
   matricula: "123",
-  numeroDispositivo: "ABC123456789",
+  numeroDispositivo: "IMDM29083641",
   fechaAsignacion: "2025-12-01"
 };
 

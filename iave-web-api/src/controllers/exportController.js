@@ -53,11 +53,11 @@ import dayjs from 'dayjs';
  * {
  *   "nombre": "Carlos García López",
  *   "matricula": "123",
- *   "numeroDispositivo": "ABC123456789",
+ *   "numeroDispositivo": "IMDM29083641",
  *   "fechaAsignacion": "2025-12-01"
  * }
  * // Response
- * // Descarga: Responsiva_TAG_ABC123456789.xlsx
+ * // Descarga: Responsiva_TAG_IMDM29083641.xlsx
  * // Archivo contiene responsiva completa con campos rellenados
  * 
  * @note

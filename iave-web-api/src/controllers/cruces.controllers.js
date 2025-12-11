@@ -156,7 +156,7 @@ function parsearFechaHora(fecha, hora) {
  * @returns {string} ID del cruce con formato normalizado
  * 
  * @example
- * crearID_Cruce("25/11/2025", "14:30:45", "ABC123456789.") 
+ * crearID_Cruce("25/11/2025", "14:30:45", "IMDM29083641.") 
  * // Returns: "251125_143045_3456789"
  */
 function crearID_Cruce(fechaC, HoraC, TAGC) {
@@ -223,7 +223,7 @@ function limpiarImporte(valor) {
  * @returns {string} TAG normalizado sin puntos, o cadena vacía si el valor es vacío o inválido
  * 
  * @example
- * limpiarTAG("ABC123456789.") // "ABC123456789"
+ * limpiarTAG("IMDM29083641.") // "IMDM29083641"
  * limpiarTAG("") // ""
  * limpiarTAG(null) // ""
  */
@@ -575,7 +575,7 @@ export const getOTS = async (req, res) => {
  * Headers: { 'x-usuario': 'admin@iave.mx' }
  * Body: [
  *   {
- *     Tag: "ABC123456789.",
+ *     Tag: "IMDM29083641.",
  *     "No.Economico": "123 Carlos García",
  *     Fecha: "25/11/2025",
  *     Hora: "14:30:45",

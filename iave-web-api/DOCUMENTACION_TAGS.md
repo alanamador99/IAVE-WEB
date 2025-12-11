@@ -18,7 +18,7 @@ El controlador `tags.controllers.js` gestiona todas las operaciones relacionadas
 
 Un **TAG** es:
 - **Dispositivo físico**: Pequeño transceptor electrónico de identificación
-- **Número de serie**: Código único (ej: "ABC123456789")
+- **Número de serie**: Código único (ej: "IMDM29083641")
 - **Asignación personal**: Se asigna a un operador específico
 - **Responsabilidad legal**: El operador es responsable del dispositivo
 
@@ -76,7 +76,7 @@ GET /api/tags
 [
   {
     "id_control_tags": 1,
-    "Dispositivo": "ABC123456789",
+    "Dispositivo": "IMDM29083641",
     "id_matricula": 123,
     "Nombres": "Carlos",
     "Ap_paterno": "García",
@@ -358,7 +358,7 @@ if (disponibles < 10) {
 const formData = {
   nombre: "Carlos García López",
   matricula: "123",
-  numeroDispositivo: "ABC123456789",
+  numeroDispositivo: "IMDM29083641",
   fechaAsignacion: "2025-11-29"
 };
 
@@ -557,7 +557,7 @@ limpiarImporte("150")        // 150
 ### `limpiarTAG(valor)`
 Limpia números de TAG.
 ```javascript
-limpiarTAG("ABC123456789.")  // "ABC123456789"
+limpiarTAG("IMDM29083641.")  // "IMDM29083641"
 ```
 
 ---
@@ -607,7 +607,7 @@ GET /api/tags/unavailable/29-11-2025
 // ❌ Error
 {
   "nombre": "",           // Vacío
-  "numeroDispositivo": "ABC123456789"
+  "numeroDispositivo": "IMDM29083641"
   // Falta matricula y fechaAsignacion
 }
 
@@ -615,7 +615,7 @@ GET /api/tags/unavailable/29-11-2025
 {
   "nombre": "Carlos García López",
   "matricula": "123",
-  "numeroDispositivo": "ABC123456789",
+  "numeroDispositivo": "IMDM29083641",
   "fechaAsignacion": "2025-11-29"
 }
 ```
@@ -641,11 +641,10 @@ GET /api/tags/unavailable/29-11-2025
 
 Para reportes de bugs o solicitudes:
 - 📧 Email: alan.amador@atmexicana.com.mx
-- 🐛 GitHub Issues: [enlace al repo]
+- 🐛 GitHub Issues: [\[enlace al repo\]](https://github.com/alanamador99/IAVE-WEB/issues)
 
 ---
 
 **Última actualización:** 29/11/2025  
-**Versión:** 2.0  
-**Documentado por:** Sistema de IA  
-**Estado:** ✅ Producción
+**Versión:** 1.0  
+**Estado:** Producción

@@ -19,8 +19,7 @@
 
 import { getConnection, sql } from "../database/connection.js";
 
-import pkg from 'exceljs';
-const { Workbook } = pkg;
+
 import { dirname } from 'path';
 import { fileURLToPath } from 'url';
 import dayjs from 'dayjs';
@@ -132,7 +131,7 @@ function limpiarImporte(valor) {
  * @returns {string} TAG normalizado sin puntos
  * 
  * @example
- * limpiarTAG("ABC123456789.") // "ABC123456789"
+ * limpiarTAG("IMDM29083641.") // "IMDM29083641"
  */
 function limpiarTAG(valor) {
   if (!valor) return "";
@@ -181,7 +180,7 @@ function limpiarTAG(valor) {
  * Response: [
  *   {
  *     id_control_tags: 1,
- *     Dispositivo: "ABC123456789",
+ *     Dispositivo: "IMDM29083641",
  *     id_matricula: 123,
  *     Activa: true,
  *     Estatus_Secundario: "activo",
@@ -356,10 +355,10 @@ export const getStatsTags = async (req, res) => {
  * Body: {
  *   "nombre": "Carlos García López",
  *   "matricula": "123",
- *   "numeroDispositivo": "ABC123456789",
+ *   "numeroDispositivo": "IMDM29083641",
  *   "fechaAsignacion": "2025-11-29"
  * }
- * Response: Descarga archivo "Responsiva_TAG_ABC123456789.xlsx"
+ * Response: Descarga archivo "Responsiva_TAG_IMDM29083641.xlsx"
  */
 export const generarResponsivaDesdePlantilla = async (req, res) => {
   try {
@@ -438,7 +437,7 @@ export const generarResponsivaDesdePlantilla = async (req, res) => {
  * @example
  * GET /api/tags/unavailable/29-11-2025
  * Response: [\n *   {\n *     ID_matricula: 45,\n
- *      Nombres: \"Miguel\",\n *     Ap_paterno: \"González\",\n *     Ap_materno: \"Martínez\",\n *     Descripcion: \"VACACIONES\",\n *     Fecha_captura: \"2025-11-20T08:00:00.000Z\",\n *     ID_fecha: \"2025-11-29\",\n *     Captor: \"admin@iave.mx\",\n *     Tag: \"ABC123456789\"\n *   }\n * ]\n * \n 
+ *      Nombres: \"Miguel\",\n *     Ap_paterno: \"González\",\n *     Ap_materno: \"Martínez\",\n *     Descripcion: \"VACACIONES\",\n *     Fecha_captura: \"2025-11-20T08:00:00.000Z\",\n *     ID_fecha: \"2025-11-29\",\n *     Captor: \"admin@iave.mx\",\n *     Tag: \"IMDM29083641\"\n *   }\n * ]\n * \n 
  * @note Si no hay operadores no disponibles, retorna array vacío []\n 
  * @note Útil para validar inconsistencias en registros de cruces\n */
 export const getUnavailableOps = async (req, res) => {

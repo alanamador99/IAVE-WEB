@@ -232,7 +232,7 @@ Legend: W=Write, R=Read, U=Update
 **INPUT:**
 ```javascript
 {
-  Tag: "ABC123456789",
+  Tag: "IMDM29083641",
   Fecha: "01/12/2025",
   Hora: "14:30:45",
   Caseta: "Caseta Palmillas",
@@ -245,10 +245,10 @@ Legend: W=Write, R=Read, U=Update
 ```javascript
 {
   // Generado
-  ID: "251201_143045_ABC123456789",
+  ID: "251201_143045_IMDM29083641",
   
   // Copiado del input
-  Tag: "ABC123456789",
+  Tag: "IMDM29083641",
   Fecha: "2025-12-01 14:30:45",
   Caseta: "Caseta Palmillas",
   Clase: "C-3",
@@ -288,7 +288,7 @@ Legend: W=Write, R=Read, U=Update
 **INPUT:**
 ```javascript
 {
-  id: "251201_143045_ABC123456789",
+  id: "251201_143045_IMDM29083641",
   estatus: "Abuso",
   estatusSecundario: "descuento_aplicado_pendiente_acta",
   noAclaracion: "ACL-2025-001",
@@ -308,7 +308,7 @@ UPDATE cruces SET
   montoDictaminado = 250.00,
   observaciones = 'Operador en situación irregular',
   Aplicado = 1
-WHERE ID = '251201_143045_ABC123456789'
+WHERE ID = '251201_143045_IMDM29083641'
 ```
 
 ---
@@ -521,7 +521,7 @@ GET /api/abusos/operador/123
   → Estado: "Vacaciones"
 
 PASO 4: Actualizar estatus del abuso
-PUT /api/abusos/251201_143045_ABC123456789
+PUT /api/abusos/251201_143045_IMDM29083641
   Body: {
     estatusSecundario: "descuento_aplicado_pendiente_acta",
     montoDictaminado: 250.00,

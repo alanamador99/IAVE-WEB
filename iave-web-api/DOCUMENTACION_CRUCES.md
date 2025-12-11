@@ -55,7 +55,7 @@ Envía progreso en tiempo real a clientes conectados:
 
 #### Headers Requeridos:
 ```
-x-usuario: email@iave.mx  // Usuario realizando la importación
+x-usuario: alan.amador@atmexicana.com.mx  // Usuario realizando la importación
 ```
 
 ---
@@ -374,6 +374,7 @@ Debe ser exactamente `DD/MM/YYYY`. Ejemplos válidos:
 - ❌ `2025-11-25`
 - ❌ `11/25/2025`
 
+
 ### 3. **Formato de Hora**
 Mínimo `HH:MM`, completo `HH:MM:SS`. Ejemplos:
 - ✅ `14:30`
@@ -437,7 +438,7 @@ console.error('❌ Error al calcular la ruta:', error);
 
 ---
 
-## 🔐 Seguridad
+##  Seguridad
 
 ### Headers de SSE
 ```
@@ -457,12 +458,11 @@ Se registra el usuario que realiza importación via header `x-usuario`.
 
 Para reportar bugs o solicitar funcionalidades:
 - 📧 Email: alan.amador@atmexicana.com.mx
-- 🐛 GitHub Issues: [enlace al repo]
-- 📱 Whatsapp: +52 XXXX XXXXXX
+- 🐛 GitHub Issues: [\[enlace al repo\]](https://github.com/alanamador99/IAVE-WEB/issues)
 
 ---
 
 **Última actualización:** 25/11/2025  
-**Versión:** 2.0  
+**Versión:** 1.0  
 **Documentado por:** Alan Amador con apoyo de Copilot (usando Claude Sonnet 4.5)
 **Estado:** ✅ Producción

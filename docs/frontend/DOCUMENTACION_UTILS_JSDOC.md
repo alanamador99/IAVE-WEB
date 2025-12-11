@@ -48,7 +48,7 @@ El archivo `utils.jsx` es un módulo de utilidades compartidas que contiene:
 import { CopiarTag } from './shared/utils';
 
 export default function MiComponente() {
-  const cruce = { Tag: 'ABC123456789' };
+  const cruce = { Tag: 'IMDM29083641' };
   
   return (
     <div>
@@ -327,7 +327,7 @@ Todos los estilos utilizan:
 ### Recomendaciones Futuras
 ```javascript
 // Considerar React.memo para componentes que reciben props estáticas
-export const CopiarTag = React.memo(CopiarTagComponent);
+export const CopiarTTag = React.memo(CopiarTagComponent);
 
 // O usar useMemo para funciones de formateo si se llaman frecuentemente
 const memoFecha = useMemo(() => formatearFecha(fecha), [fecha]);

@@ -73,7 +73,7 @@ GET /api/sesgos
 [
   {
     "ID": "251125_143045_1234",
-    "Tag": "ABC123456789",
+    "Tag": "IMDM29083641",
     "No_Economico": "123 Carlos García",
     "Fecha": "2025-11-25T14:30:45.000Z",
     "Caseta": "Caseta Desconocida",
@@ -571,11 +571,10 @@ const carga_por_investigador = en_investigacion / promedio_investigadores;
 
 Para reportes de bugs o solicitudes de funcionalidades:
 - 📧 Email: alan.amador@atmexicana.com.mx
-- 🐛 GitHub Issues: [enlace al repo]
+- 🐛 GitHub Issues: [\[enlace al repo\]](https://github.com/alanamador99/IAVE-WEB/issues)
 
 ---
 
 **Última actualización:** 26/11/2025  
-**Versión:** 2.0  
-**Documentado por:** Sistema de IA  
-**Estado:** ✅ Producción
+**Versión:** 1.0  
+**Estado:** Producción
