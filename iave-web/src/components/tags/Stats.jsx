@@ -39,7 +39,7 @@ const configCards = [
 function StatsTags() {
   const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);
-  const [total,setTotal] = useState(0);
+  const [total, setTotal] = useState(0);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -49,7 +49,7 @@ function StatsTags() {
         const resTotal = await axios.get(`${API_URL}/api/tags/TotalStatsTags`);
         setTotal((resTotal.data[0].Total) || {});
 
-          
+
       } catch (error) {
         console.error("Error al obtener estadísticas:", error);
       } finally {
@@ -74,24 +74,24 @@ function StatsTags() {
   return (
     <div className="row mt-4 pt-4 justify-content-center">
       {configCards.map(({ key, titulo, descripcion, bg, icon }) => (
-        
+
         <DashboardCard
           key={key}
           titulo={titulo}
           descripcion={descripcion}
           valor={icon || 0}
-          valordefault={(key==='stock') ? 'Sahagún: '+stats[0]['stockS'] + ' | ' + 'Monterrey: '+stats[0]['stockM'] : stats[0][key]}
+          valordefault={(key === 'stock') ? 'Sahagún: ' + stats[0]['stockS'] + ' | Monterrey: ' + stats[0]['stockM'] : stats[0][key]}
           bg={bg}
           ruta={null}
           grande={false}
-          bateriaSuperior={(key==='stock') ? 
+          bateriaSuperior={(key === 'stock') ?
             <>
-            <span className="text-success font-weight-bold" style={{fontSize:'1.2rem'}}>
-           { stats[0]['stockS'] + stats[0]['stockM'] +' | '}
-          </span>
-           {( 100*(stats[0]['stockS'] + stats[0]['stockM']) /total).toFixed(1)+'%'}
+              <span className="text-success font-weight-bold" style={{ fontSize: '1.2rem' }}>
+                {stats[0]['stockS'] + stats[0]['stockM'] + ' | '}
+              </span>
+              {(100 * (stats[0]['stockS'] + stats[0]['stockM']) / total).toFixed(1) + '%'}
             </>
-            :(100*stats[0][key]/total).toFixed(1) + '%' }
+            : (100 * stats[0][key] / total).toFixed(1) + '%'}
         />
       ))}
     </div>

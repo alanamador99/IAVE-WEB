@@ -7,7 +7,6 @@ import {
   Info,
   TicketCheck,
   ChartNoAxesGantt,
-  ExternalLink,
   AlertTriangle,
   Target,
   HandCoins,
@@ -26,12 +25,11 @@ import axios from 'axios';
 import dayjs from 'dayjs';
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import L, { polyline } from 'leaflet';
+import L from 'leaflet';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerIconTollB from 'leaflet/dist/images/LittleTollBoth.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
-import { max, set } from 'lodash';
 
 // Fix leaflet's default icon issue with webpack
 L.Icon.Default.mergeOptions({
@@ -50,18 +48,7 @@ const markerIconToollBs = L.icon({
 
 const API_URL = process.env.REACT_APP_API_URL;
 
-const abrirPortalPASE = () => {
-  const url = 'https://apps.pase.com.mx/uc/';
-  const width = 800;
-  const height = 600;
-  const left = window.innerWidth - width + 20;
-  const top = (window.innerHeight - height) / 2 + 200;
-  window.open(
-    url,
-    '_blank',
-    `toolbar=no,location=no,status=no,menubar=no,scrollbars=yes,resizable=yes,innerwidth=${width},height=${height},top=${top},left=${left},noopener,noreferrer,titlebar=no,rel="noreferrer"`
-  );
-};
+
 
 const formatearFecha = (fecha) => {
   if (!fecha) return '';
@@ -86,11 +73,8 @@ const formatearFechaConHora = (fecha) => {
   return `${dia}-${mes}-${anio} a las ${fecha.split("T")[1].split(".")[0]}`;
 };
 
-//Ahora lo que quiero es que se incluya la funcionalidad de que si el importe del abuso aún no se ha recuperado completamente que se cree una tarea en el gestor de tareas (ClickUp) para que se haga el seguimiento del mismo.
 
-const asignatStatusMasivo = () => {
 
-}
 const estatusMap = {
   pendiente_reporte: {
     label: 'Pendiente Reporte',
@@ -217,18 +201,7 @@ const AbusosTable = () => {
 
 
 
-  const copiarTablaAlPortapapeles = () => {
-    if (!tableRef.current) return;
-    let texto = '';
-    for (const row of tableRef.current.rows) {
-      let fila = [];
-      for (const cell of row.cells) {
-        fila.push(cell.innerText);
-      }
-      texto += fila.join('\t') + '\n';
-    }
-    navigator.clipboard.writeText(texto);
-  };
+
 
 
 
@@ -250,7 +223,7 @@ const AbusosTable = () => {
       if (value < 0) return; // Evitar valores negativos
       if (isNaN(value)) return; // Evitar valores no numéricos
 
-      if (value == cruceSeleccionado?.Importe) {
+      if (value === cruceSeleccionado?.Importe) {
         if (estatusAbuso === 'reporte_enviado_todo_pendiente') {
           setEstatusAbuso('descuento_aplicado_pendiente_acta');
         }
@@ -279,7 +252,7 @@ const AbusosTable = () => {
 
     if (name === 'inActaAplicada') {
 
-      if (vMontoDescontado == cruceSeleccionado?.Importe && !!actaAplicada) {
+      if (vMontoDescontado === cruceSeleccionado?.Importe && !!actaAplicada) {
 
         setEstatusAbuso('descuento_aplicado_pendiente_acta');
       }
@@ -292,7 +265,7 @@ const AbusosTable = () => {
 
         setEstatusAbuso('acta_aplicada_pendiente_descuento');
       }
-      if (vMontoDescontado == cruceSeleccionado?.Importe && !actaAplicada) {
+      if (vMontoDescontado === cruceSeleccionado?.Importe && !actaAplicada) {
         setEstatusAbuso('completado');
       }
       return setActaAplicada(!!checked);
@@ -353,7 +326,7 @@ const AbusosTable = () => {
     setCruceSeleccionado(cruce);
     setvComentarios(cruce.observaciones || '');
     setActaAplicada(!!cruce.Aplicado);
-    setvMontoDescontado((cruce.montoDictaminado == 0) ? '' : cruce.montoDictaminado)
+    setvMontoDescontado((cruce.montoDictaminado === 0) ? '' : cruce.montoDictaminado)
     setEstatusAbuso(cruce.Estatus_Secundario || 'reporte_enviado_todo_pendiente');
     setShowModal(true);
     setFechaAbuso((cruce.FechaDictamen) ? cruce.FechaDictamen.split('T')[0] : dayjs().format('YYYY-MM-DD'))
@@ -424,7 +397,7 @@ const AbusosTable = () => {
       const id = cruceSeleccionado.ID;
 
       const payload = { FechaDictamen: ((estatusAbuso === 'pendiente_reporte') ? null : fechaAbuso), montoDictaminado: vMontoDescontado, estatusSecundario: estatusAbuso, observaciones: vComentarios, dictaminado: actaAplicada ? 1 : 0 };
-      const { status, data } = await axios.patch(`${API_URL}/api/abusos/${id}/UpdateAbuso`, payload);
+      const { status } = await axios.patch(`${API_URL}/api/abusos/${id}/UpdateAbuso`, payload);
       if (status === 200) {
         setCruces(prev => prev.map(c => c.ID === id ? { ...c, Estatus_Secundario: estatusAbuso, montoDictaminado: vMontoDescontado, FechaDictamen: fechaAbuso, observaciones: vComentarios, Aplicado: payload.dictaminado } : c));
       } else console.error('No se pudo actualizar el estatus');
@@ -439,7 +412,7 @@ const AbusosTable = () => {
     try {
       const id = cruceSeleccionado.ID;
       const payload = { FechaDictamen: fechaAbuso, estatusSecundario: estatusAbuso, observaciones: vComentarios, dictaminado: actaAplicada ? 1 : 0 };
-      const { status, data } = await axios.patch(`${API_URL}/api/cruces/${id}/estatus`, { estatus: 'Condonado' });
+      const { status } = await axios.patch(`${API_URL}/api/cruces/${id}/estatus`, { estatus: 'Condonado' });
       if (status === 200) {
         setCruces(prev => prev.map(c => c.ID === id ? { ...c, Estatus_Secundario: estatusAbuso, FechaDictamen: fechaAbuso, observaciones: vComentarios, Aplicado: payload.dictaminado } : c));
         setFiltered(prev => prev.map(c => c.ID === id ? { ...c, Estatus_Secundario: estatusAbuso, FechaDictamen: fechaAbuso, observaciones: vComentarios, Aplicado: payload.dictaminado } : c));
@@ -718,9 +691,9 @@ const AbusosTable = () => {
                           </div>
 
                         </td>
-                        <td className="justify-content-center" style={{ verticalAlign: 'middle', fontSize: ((abuso?.Importe - abuso?.montoDictaminado == 0) ? '0.8rem' : '1.1rem'), color: ((abuso?.Importe - abuso?.montoDictaminado == 0) ? 'green' : 'darkblue'), fontWeight: ((abuso?.Importe - abuso?.montoDictaminado == 0) ? 'bold' : 'bolder') }}>
+                        <td className="justify-content-center" style={{ verticalAlign: 'middle', fontSize: ((abuso?.Importe - abuso?.montoDictaminado === 0) ? '0.8rem' : '1.1rem'), color: ((abuso?.Importe - abuso?.montoDictaminado === 0) ? 'green' : 'darkblue'), fontWeight: ((abuso?.Importe - abuso?.montoDictaminado === 0) ? 'bold' : 'bolder') }}>
                           <div>
-                            <div>{(abuso?.Importe - abuso?.montoDictaminado == 0) ? '$ ' + abuso?.Importe.toFixed(2) + ` OK` : '$' + (abuso?.Importe - abuso?.montoDictaminado).toFixed(2)}</div>
+                            <div>{(abuso?.Importe - abuso?.montoDictaminado === 0) ? '$ ' + abuso?.Importe.toFixed(2) + ` OK` : '$' + (abuso?.Importe - abuso?.montoDictaminado).toFixed(2)}</div>
                           </div>
                         </td>
                         <td style={{ verticalAlign: 'middle', }}>

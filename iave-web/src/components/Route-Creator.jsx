@@ -426,7 +426,7 @@ const RutasModule = () => {
                 setCasetasEnRutaTusa(casetasEnTUSA.data);
             }
             
-            if (dataTusa.total > 1) {
+            if (dataTusa.total > 0) {
                 setIsModalOpen(true);
             }
 
@@ -490,7 +490,6 @@ const RutasModule = () => {
         return [coords[1], coords[0]];
     }, [puntoIntermedio]);
 
-    // ===== RENDER =====
     return (
         <div className="container-fluid py-0">
             <div className="container-fluid py-0 rounded-top">
@@ -911,7 +910,7 @@ const RutasModule = () => {
                             </Polyline>
                         ))}
 
-                        {rutaSeleccionada[1]?.map((item, index) => (
+                        {rutaSeleccionada[0]?.map((item, index) => (
                             <Marker 
                                 key={item?.id || item?.cve_caseta || index} 
                                 position={[JSON.parse(item?.geojson).coordinates[1], JSON.parse(item?.geojson).coordinates[0]]} 
@@ -1101,7 +1100,7 @@ const RutasModule = () => {
                 />
             )}
 
-            {/* TOASTS DE NOTIFICACIÓN */}
+            {/* ESPACIO PARA NOTIFICACIONES */}
             <Container style={{ position: 'fixed', bottom: 20, right: '-30px', zIndex: 99999, maxWidth: 'max-content' }}>
                 <Container style={{ maxWidth: 'max-content' }}>
                     {rutas_OyL && rutaSeleccionada && !loadingRutas && rutaTusa.length === 0 && (

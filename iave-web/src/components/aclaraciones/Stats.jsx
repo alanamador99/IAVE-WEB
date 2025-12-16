@@ -1,31 +1,12 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import DashboardCard from "../shared/DashboardCard";
-import { Target, AlertTriangle, DollarSign, Gavel, HandCoins, CircleCheckBig } from 'lucide-react';
+import { Target, DollarSign, Gavel, HandCoins} from 'lucide-react';
 
-//import { AlertTriangle, Clock, CheckCircle, DollarSign } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
-/*
-const iconos = {
-  pendiente: <AlertTriangle className="h-8 w-8 text-red-500" />,
-  aclaracion_levantada: <Clock className="h-8 w-8 text-yellow-500" />,
-  dictaminado: <CheckCircle className="h-8 w-8 text-green-500" />,
-  totalDiferencia: <DollarSign className="h-8 w-8 text-blue-500" />
-};
 
-  {
-    key:'pendiente_reporte',
-    titulo: 'Pendientes',
-    descripcion: 'Nuevos abusos identificados, pendientes de proceso.',
-    bg: 'bg-danger',
-    icon: <Target  className="h-8 w-8 text-red-500" />, // Este valor se actualizará dinámicamente
-    valordefault: 1
-
-  },
-
-*/
 const configCards = [
   {
     key: 'pendiente',
@@ -40,7 +21,7 @@ const configCards = [
     titulo: 'En proceso',
     descripcion: 'Aclaración levantada; esperando respuesta de PASE.',
     bg: 'bg-warning',
-    icon: <HandCoins className="h-8 w-8 text-red-500" />, // Este valor se actualizará dinámicamente
+    icon: <HandCoins className="h-8 w-8 text-red-500" />, 
     valordefault: 2
   },
   {
@@ -48,7 +29,7 @@ const configCards = [
     titulo: 'Resueltos',
     descripcion: 'Cruces con aclaración resuelta; devolución completada',
     bg: 'bg-success',
-    icon: <Gavel className="h-8 w-8 text-red-500" />, // Este valor se actualizará dinámicamente
+    icon: <Gavel className="h-8 w-8 text-red-500" />, 
     valordefault: 3
   },
   {
@@ -56,7 +37,7 @@ const configCards = [
     titulo: 'Total Diferencia',
     descripcion: 'Suma total de diferencias tarifarias pendientes de aclaración',
     bg: 'bg-info',
-    icon: <DollarSign className="h-8 w-8 text-red-500" />, // Este valor se actualizará dinámicamente
+    icon: <DollarSign className="h-8 w-8 text-red-500" />, 
     valordefault: 4
   }
 ];

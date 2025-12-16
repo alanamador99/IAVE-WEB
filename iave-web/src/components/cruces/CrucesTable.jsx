@@ -26,7 +26,6 @@ const API_URL = process.env.REACT_APP_API_URL;
 
 function CrucesTable() {
   const checkboxes = useRef();
-  const [porcentaje, setPorcentaje] = useState(1);
   const [selectedCruces, setSelectedCruces] = useState([]);
   const [progreso, setProgreso] = useState(null); // % de carga (0-100)
   const [sortColumn, setSortColumn] = useState(null); //Columna mandante para el ordenamiento
@@ -177,6 +176,10 @@ function CrucesTable() {
             alert(`❌ Error durante la importación: ${data.message}`);
             setProgreso(null);
             break;
+
+            default:
+              console.warn('❓ Evento desconocido en SSE:', data);
+              break;
         }
       } catch (error) {
         console.error('Error parsing SSE data:', error);
@@ -408,7 +411,6 @@ function CrucesTable() {
         return;
       }
 
-      const descripcion = data[0]?.Descripcion || "sin descripción";
       let fechaTemp = new Date(Fecha);
       let fechaTemp1 = new Date(Fecha);
       fechaTemp.setDate(fechaTemp.getDate() + 1); // Aumenta un día
@@ -611,7 +613,6 @@ function CrucesTable() {
           </div>
 
           <h6 className="m-0 font-weight-bold text-primary ml-3" style={{ flex: 'auto', }}>Cruces que aplican según los parametros seleccionados  - (<span className="text sm">{new Intl.NumberFormat("es-MX").format(sorted.length)})
-            {(porcentaje !== 1) ? ' ' + (porcentaje * 100) + '%' : ''}
 
           </span></h6>
           {selectedCruces.length > 0 && (

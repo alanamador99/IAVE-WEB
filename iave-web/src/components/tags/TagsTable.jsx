@@ -1,11 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Button } from 'react-bootstrap';
 import {
-  BanknoteArrowUp,
   Tag,
   Info,
-  ChartNoAxesGantt,
-  ExternalLink,
   Edit3,
   Calendar,
   FunnelX,
@@ -26,19 +23,6 @@ import dayjs from 'dayjs';
 
 
 const API_URL = process.env.REACT_APP_API_URL;
-
-const abrirPortalPASE = () => {
-  const url = 'https://apps.pase.com.mx/uc/';
-  const width = 800;
-  const height = 600;
-  const left = window.innerWidth - width + 20;
-  const top = (window.innerHeight - height) / 2 + 200;
-  window.open(
-    url,
-    '_blank',
-    `toolbar=no,location=no,status=no,menubar=no,scrollbars=yes,resizable=yes,innerwidth=${width},height=${height},top=${top},left=${left},noopener,noreferrer,titlebar=no,rel="noreferrer"`
-  );
-};
 
 const formatearFecha = (fecha) => {
   if (!fecha) return '';
@@ -91,7 +75,6 @@ const TagsTable = () => {
   const [vNoAclaracion, setvNoAclaracion] = useState('');
   const [vComentarios, setvComentarios] = useState('');
   const [isDictaminado, setIsDictaminado] = useState(false);
-  const [vMontoAclaracion, setvMontoAclaracion] = useState();
   const [tags, setTags] = useState([]);
   const [filtros, setFiltros] = useState({ fechaInicio: '', fechaFin: '', operador: '', tag: '', estatus: 'todos' });
   const [tagSeleccionado, setTagSeleccionado] = useState(null);
@@ -115,7 +98,6 @@ const TagsTable = () => {
   const handleChange = ({ target: { name, value, checked, type } }) => {
     if (name === 'inAclaracionN') return setvNoAclaracion(value);
     if (name === 'inDictaminado') return setIsDictaminado(checked);
-    if (name === 'inMontoAclaracion') return setvMontoAclaracion(value);
     if (name === 'inFechaCreacion') return setFechaAclaracion(value);
     if (name === 'inComentarios') return setvComentarios(value);
   };
@@ -350,7 +332,7 @@ const TagsTable = () => {
 
                         <td style={{ alignContent: 'center' }} className='col-2'>
                           <textarea id={`observación-${i}`} className={`d-inline-flex form-control  align-items-center ${estatusInfo?.color}`}
-                            style={{ alignContent: 'center', width: '100%', height: '4rem', resize: 'none', border: 'none', background: (estatusInfo.status === 'inactivo') ? 'navy' : 'gainsboro', overflow: 'hidden', fontSize: '0.75rem', fontWeight: 'lighter', overflow: 'auto' }}
+                            style={{ alignContent: 'center', width: '100%', height: '4rem', resize: 'none', border: 'none', background: (estatusInfo.status === 'inactivo') ? 'navy' : 'gainsboro', fontSize: '0.75rem', fontWeight: 'lighter', overflow: 'auto' }}
                             readOnly value={tag.Observaciones || 'Sin observaciones'} />
                         </td>
 

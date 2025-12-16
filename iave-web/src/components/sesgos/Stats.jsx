@@ -82,7 +82,7 @@ function StatsSesgos() {
           titulo={titulo}
           descripcion={descripcion}
           valor={icon || 0}
-          valordefault={(key==='stock') ? 'Sahagún: '+stats[0]['stockS'] + ' | ' + 'Monterrey: '+stats[0]['stockM'] : stats[0][key]}
+          valordefault={(key==='stock') ? 'Sahagún: '+stats[0]['stockS'] + ' | Monterrey: '+stats[0]['stockM'] : stats[0][key]}
           bg={bg}
           ruta={null}
           grande={false}
