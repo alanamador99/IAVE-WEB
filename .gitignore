@@ -67,3 +67,4 @@ yarn-error.log*
 *.env
 *.env.*
 /iave-web/.env
+/iave-web-api/.env
