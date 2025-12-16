@@ -691,7 +691,11 @@ const ModalSelector = ({ isOpen, onClose, onSelect, valorCampo, valoresSugeridos
                 </label>
                 <select
                   value={clienteSeleccionado}
-                  onChange={(e) => setClienteSeleccionado(e.target.value)}
+                  onChange={(e) => {
+                    setClienteSeleccionado(e.target.value);
+                    console.log('Ruta seleccionada:', e.target.value);
+                    onSelect(e.target.value);
+                  }}
                   className="form-control form-control-lg border-left-primary"
                   style={{ borderLeftWidth: '4px' }}
                 >

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { ModalSelector, CustomToast, parsearMinutos, formatearDinero, RouteOption, formatearEnteros } from '../components/shared/utils';
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
 import axios from 'axios';
@@ -11,306 +11,196 @@ import markerB from 'leaflet/dist/images/B.png';
 import markerPin from 'leaflet/dist/images/pin_intermedio.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 import { Container } from 'react-bootstrap';
-import { data } from 'react-router-dom';
 
-
+// ===== CONSTANTES =====
 const API_KEY = 'Jq92BpFD-tYae-BBj2-rEMc-MnuytuOB30ST';
 const API_URL = process.env.REACT_APP_API_URL;
+const DEBOUNCE_DELAY = 500;
+const MIN_SEARCH_LENGTH = 3;
 
-const markerIconATM = L.icon({
-    iconUrl: markerATM,
-    shadowUrl: markerShadow,
-    iconSize: [25, 15], // size of the icon
-    shadowSize: [64, 40], // size of the shadow
-});
-const markerIconCaseta = L.icon({
-    iconUrl: markerCaseta,
-    shadowUrl: markerShadow,
-    iconSize: [24, 24], // size of the icon
-    shadowSize: [40, 40], // size of the shadow
-});
-const markerIconPIN = L.icon({
-    iconUrl: markerPin,
-    shadowUrl: markerShadow,
-    iconSize: [40, 40], // size of the icon
-    shadowSize: [20, 30], // size of the shadow
-});
+// Iconos de marcadores (fuera del componente para evitar recreación)
+const markerIcons = {
+    ATM: L.icon({
+        iconUrl: markerATM,
+        shadowUrl: markerShadow,
+        iconSize: [25, 15],
+        shadowSize: [64, 40],
+    }),
+    caseta: L.icon({
+        iconUrl: markerCaseta,
+        shadowUrl: markerShadow,
+        iconSize: [24, 24],
+        shadowSize: [40, 40],
+    }),
+    pin: L.icon({
+        iconUrl: markerPin,
+        shadowUrl: markerShadow,
+        iconSize: [40, 40],
+        shadowSize: [20, 30],
+    }),
+    A: L.icon({
+        iconUrl: markerA,
+        shadowUrl: markerShadow,
+        iconSize: [24, 24],
+        shadowSize: [40, 40],
+    }),
+    B: L.icon({
+        iconUrl: markerB,
+        shadowUrl: markerShadow,
+        iconSize: [24, 24],
+        shadowSize: [64, 40],
+    }),
+};
 
+// ===== UTILIDADES =====
+const normalizarNombre = (lugar) => {
+    if (!lugar?.nombre) return '';
+    const partes = lugar.nombre.split(',');
+    const tmp = partes[0]?.trim() || lugar.nombre.trim();
+    const sinAcentos = tmp.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return sinAcentos.replace(/[^a-zA-Z0-9\s]/g, '').toUpperCase();
+};
 
-const markerIconA = L.icon({
-    iconUrl: markerA,
-    shadowUrl: markerShadow,
-    iconSize: [24, 24], // size of the icon
-    shadowSize: [40, 40], // size of the shadow
-});
+const convertirCoordenadasGeoJSON = (geojsonString) => {
+    const geojson = typeof geojsonString === 'string' ? JSON.parse(geojsonString) : geojsonString;
+    
+    if (geojson.type === 'MultiLineString') {
+        return geojson.coordinates.map(lineString =>
+            lineString.map(([lng, lat]) => [lat, lng])
+        );
+    } else if (geojson.type === 'LineString') {
+        return [geojson.coordinates.map(([lng, lat]) => [lat, lng])];
+    }
+    return geojson;
+};
 
-const markerIconB = L.icon({
-    iconUrl: markerB,
-    shadowUrl: markerShadow,
-    iconSize: [24, 24], // size of the icon
-    shadowSize: [64, 40], // size of the shadow
-});
+// ===== CUSTOM HOOKS =====
+const useDebounce = (value, delay) => {
+    const [debouncedValue, setDebouncedValue] = useState(value);
 
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            setDebouncedValue(value);
+        }, delay);
+
+        return () => clearTimeout(handler);
+    }, [value, delay]);
+
+    return debouncedValue;
+};
+
+const useDestinationSearch = (searchTerm, tipo) => {
+    const [results, setResults] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const debouncedSearch = useDebounce(searchTerm, DEBOUNCE_DELAY);
+
+    useEffect(() => {
+        const searchDestinations = async () => {
+            if (!debouncedSearch || debouncedSearch.length < MIN_SEARCH_LENGTH) {
+                setResults([]);
+                return;
+            }
+
+            setLoading(true);
+            try {
+                const formData = new URLSearchParams({
+                    buscar: debouncedSearch,
+                    type: 'json',
+                    num: 10,
+                    key: API_KEY
+                });
+
+                const response = await fetch('https://gaia.inegi.org.mx/sakbe_v3.1/buscadestino', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: formData
+                });
+
+                const data = await response.json();
+                setResults(data.data || []);
+            } catch (error) {
+                console.error(`Error al buscar ${tipo}:`, error);
+                setResults([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        searchDestinations();
+    }, [debouncedSearch, tipo]);
+
+    return { results, loading };
+};
+
+// ===== COMPONENTE PRINCIPAL =====
 const RutasModule = () => {
-    // Estados principales
+    // Estados de búsqueda
     const [txtOrigen, setTxtOrigen] = useState('');
     const [txtPuntoIntermedio, setTxtPuntoIntermedio] = useState('');
     const [txtDestino, setTxtDestino] = useState('');
     const [tipoVehiculo, setTipoVehiculo] = useState(5);
 
-    // Estados, para el listado de los Origenes/Destinos/Puntos intermedios.
-    const [origenes, setOrigenes] = useState([]);
-    const [destinos, setDestinos] = useState([]);
-    const [puntosIntermedios, setPuntosIntermedios] = useState([]);
-
-
+    // Estados de selección
+    const [origen, setOrigen] = useState(null);
+    const [destino, setDestino] = useState(null);
     const [puntoIntermedio, setPuntoIntermedio] = useState(null);
-    const [origen, setOrigen] = useState([]);
-    const [destino, setDestino] = useState([]);
+
+    // Estados de rutas
     const [rutaTusa, setRutaTusa] = useState([]);
     const [casetasEnRutaTusa, setCasetasEnRutaTusa] = useState([]);
-    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [rutas_OyL, setRutas_OyL] = useState(null);
+    const [rutaSeleccionada, setRutaSeleccionada] = useState([]);
+    const [rutaTusaSelected, setRutaTusaSelected] = useState(null);
 
-    // Estados de carga
-    const [loadingOrigen, setLoadingOrigen] = useState(false);
-    const [loadingPuntoIntermedio, setLoadingPuntoIntermedio] = useState(false);
-    const [loadingDestino, setLoadingDestino] = useState(false);
+    // Estados de UI
+    const [isModalOpen, setIsModalOpen] = useState(false);
     const [loadingRutas, setLoadingRutas] = useState(false);
     const [loadingRutaSeleccionada, setLoadingRutaSeleccionada] = useState(false);
-
-    // Estados adicionales
-    const [rutas_OyL, setRutas_OyL] = useState(null); //Rutas Optima y Libre
-    const [rutaSeleccionada, setRutaSeleccionada] = useState([]); //Ruta Seleccionada, después de presentar las opciones.
     const [boolExiste, setBoolExiste] = useState('Consultando ruta');
 
-    // Refs para debouncing
-    const origenTimeoutRef = useRef(null);
-    const destinoTimeoutRef = useRef(null);
-    const intermediosTimeoutRef = useRef(null);
+    // Custom hooks para búsqueda
+    const { results: origenes, loading: loadingOrigen } = useDestinationSearch(txtOrigen, 'Origen');
+    const { results: destinos, loading: loadingDestino } = useDestinationSearch(txtDestino, 'Destino');
+    const { results: puntosIntermedios, loading: loadingPuntoIntermedio } = useDestinationSearch(txtPuntoIntermedio, 'Intermedio');
 
-    // Función genérica para buscar destinos (poblaciones)
-    const searchDestinations = async (idLocalidad, tipo) => {
-        if (!idLocalidad || idLocalidad.length < 3) {
-            // No buscar si hay menos de 3 caracteres
-            if (tipo === 'Origen') setOrigenes([]);
-            if (tipo === 'Destino') setDestinos([]);
-            if (tipo === 'Intermedio') setPuntosIntermedios([]);
-            return;
-        }
-
-        // Activar loading
-        if (tipo === 'Origen') setLoadingOrigen(true);
-        if (tipo === 'Destino') setLoadingDestino(true);
-        if (tipo === 'Intermedio') setLoadingPuntoIntermedio(true);
-
-        try {
-            const formData = new URLSearchParams({
-                buscar: idLocalidad,
-                type: 'json',
-                num: 10,
-                key: API_KEY
-            });
-
-            const response = await fetch('https://gaia.inegi.org.mx/sakbe_v3.1/buscadestino', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: formData
-            });
-
-            const data = await response.json();
-
-            if (tipo === 'Origen') {
-                setOrigenes(data.data || []);
-            }
-            if (tipo === 'Intermedio') {
-                setPuntosIntermedios(data.data || []);
-            }
-            if (tipo === 'Destino') {
-                setDestinos(data.data || []);
-            }
-        } catch (error) {
-            console.error('Error al buscar destinos:', error);
-            if (tipo === 'Origen') {
-                setOrigenes([]);
-            }
-            if (tipo === 'Destino') {
-                setDestinos([]);
-            }
-            if (tipo === 'Intermedio') {
-                setPuntosIntermedios([]);
-            }
-        } finally {
-            // Desactivar loading
-            if (tipo === 'Origen') {
-                setLoadingOrigen(false);
-            }
-            if (tipo === 'Destino') {
-                setLoadingDestino(false);
-            }
-            if (tipo === 'Intermedio') {
-                setLoadingPuntoIntermedio(false);
-            }
-        }
-    };
-
-    // Effect para buscar origen con debounce
-    useEffect(() => {
-        // Limpiar timeout anterior
-        if (origenTimeoutRef.current) {
-            clearTimeout(origenTimeoutRef.current);
-        }
-
-        // Crear nuevo timeout
-        origenTimeoutRef.current = setTimeout(() => {
-            if (txtOrigen) {
-                searchDestinations(txtOrigen, 'Origen');
-            } else {
-                setOrigenes([]);
-            }
-        }, 500); // Espera 500ms después de que el usuario deje de escribir
-
-        // Cleanup
-        return () => {
-            if (origenTimeoutRef.current) {
-                clearTimeout(origenTimeoutRef.current);
-            }
-        };
-    }, [txtOrigen]);
-
-    // Effect para buscar destino con debounce
-    useEffect(() => {
-        // Limpiar timeout anterior
-        if (destinoTimeoutRef.current) {
-            clearTimeout(destinoTimeoutRef.current);
-        }
-
-        // Crear nuevo timeout
-        destinoTimeoutRef.current = setTimeout(() => {
-            if (txtDestino) {
-                searchDestinations(txtDestino, 'Destino');
-            } else {
-                setDestinos([]);
-            }
-        }, 500); // Espera 500ms después de que el usuario deje de escribir
-
-        // Cleanup
-        return () => {
-            if (destinoTimeoutRef.current) {
-                clearTimeout(destinoTimeoutRef.current);
-            }
-        };
-    }, [txtDestino]);
-
-
-
-    // Effect para buscar punto intermedio con debounce
-    useEffect(() => {
-        // Limpiar timeout anterior
-        if (intermediosTimeoutRef.current) {
-            clearTimeout(intermediosTimeoutRef.current);
-        }
-
-        // Crear nuevo timeout
-        intermediosTimeoutRef.current = setTimeout(() => {
-            if (txtPuntoIntermedio) {
-                searchDestinations(txtPuntoIntermedio, 'Intermedio');
-            } else {
-                setPuntosIntermedios([]);
-            }
-        }, 500); // Espera 500ms después de que el usuario deje de escribir
-
-        // Cleanup
-        return () => {
-            if (intermediosTimeoutRef.current) {
-                clearTimeout(intermediosTimeoutRef.current);
-            }
-        };
-    }, [txtPuntoIntermedio]);
-
-
-
-    const convertirCoordenadasGeoJSON = (geojsonString) => {
-        const geojson = JSON.parse(geojsonString);
-        const coords = geojson.coordinates;
-        const data = typeof geojson === 'string' ? JSON.parse(geojson) : geojson;
-        // Si es MultiLineString (array de arrays de coordenadas)
-        if (geojson.type === 'MultiLineString') {
-            return coords.map(lineString =>
-                lineString.map(([lng, lat]) => [lat, lng])
-            );
-        }
-        // Si es LineString (array de coordenadas)
-        else if (geojson.type === 'LineString') {
-            return [coords.map(([lng, lat]) => [lat, lng])];
-        }
-        return data;
-    };
-
-
-
-
-    // Handler simplificado para inputs
-    const handleChange = (e) => {
+    // ===== HANDLERS MEMOIZADOS =====
+    const handleChange = useCallback((e) => {
         const { name, value } = e.target;
 
-        if (name === 'txtOrigen') setTxtOrigen(value);
-        if (name === 'txtDestino') setTxtDestino(value);
-        if (name === 'txtIntermedio') setTxtPuntoIntermedio(value);
-        if (name === 'selectTipoVehiculo') setTipoVehiculo(value);
-        if (name === 'SelectOrigen') {
-            const selectedOrigin = origenes.find(item => item.nombre === value);
-            setOrigen(selectedOrigin);
+        switch (name) {
+            case 'txtOrigen':
+                setTxtOrigen(value);
+                break;
+            case 'txtDestino':
+                setTxtDestino(value);
+                break;
+            case 'txtIntermedio':
+                setTxtPuntoIntermedio(value);
+                break;
+            case 'selectTipoVehiculo':
+                setTipoVehiculo(value);
+                break;
+            case 'SelectOrigen':
+                setOrigen(origenes.find(item => item.nombre === value) || null);
+                break;
+            case 'SelectDestino':
+                setDestino(destinos.find(item => item.nombre === value) || null);
+                break;
+            case 'SelectIntermedio':
+                setPuntoIntermedio(puntosIntermedios.find(item => item.nombre === value) || null);
+                break;
+            default:
+                break;
         }
+    }, [origenes, destinos, puntosIntermedios]);
 
-        if (name === 'SelectDestino') {
-            const selectedDestination = destinos.find(item => item.nombre === value);
-            setDestino(selectedDestination);
-        }
-
-        if (name === 'SelectIntermedio') {
-            const selectedIntermedio = puntosIntermedios.find(item => item.nombre === value);
-            setPuntoIntermedio(selectedIntermedio); // Usar el nuevo estado
-        }
-
-
-        if (name === 'selectTipoTraslado') {
-            // Aquí puedes manejar el cambio del tipo de traslado si es necesario
-        }
-    };
-
-
-
-    // Función para obtener el detalle de la ruta libre
-    async function getDetalleRuta(params) {
-        const response = await (getRouteDetails(params)).then();
-
-
-        if (params == 'detalle_o') {
-            const selectedRoute = [rutas_OyL?.optima, response.data.filter(item => (item.costo_caseta != 0))];
-            setRutaSeleccionada(selectedRoute);
-
-        }
-        if (params == 'detalle_l') {
-            const selectedRoute = [rutas_OyL?.libre, response.data.filter(item => (item.costo_caseta != 0))];
-            setRutaSeleccionada(selectedRoute);
-        }
-        setBoolExiste(boolExiste.replaceAll(', selecciona una ruta', ''))
-
-    };
-
-    // Handler testing
-    function handlerRetirarIntermedio() {
+    const handlerRetirarIntermedio = useCallback(() => {
         setPuntoIntermedio(null);
         calcularRutaHandler('SinIntermedio');
+    }, []);
 
-
-    };
-
-    async function getRouteDetails(tipoDetalleOoL) {
-
-
+    // ===== FUNCIONES DE API =====
+    const getRouteDetails = useCallback(async (tipoDetalleOoL) => {
         if (!origen?.id_dest || !destino?.id_dest) {
             alert('Por favor ingresa los IDs de origen y destino');
             return;
@@ -318,25 +208,28 @@ const RutasModule = () => {
 
         try {
             setLoadingRutaSeleccionada(true);
-            const formData = new URLSearchParams({
+            
+            // Primera petición
+            const formData1 = new URLSearchParams({
                 dest_i: origen.id_dest,
-                dest_f: (puntoIntermedio) ? puntoIntermedio.id_dest : destino.id_dest,
+                dest_f: puntoIntermedio ? puntoIntermedio.id_dest : destino.id_dest,
                 v: tipoVehiculo,
                 type: 'json',
                 key: API_KEY
             });
 
+            const response1 = await fetch(
+                `https://gaia.inegi.org.mx/sakbe_v3.1/${tipoDetalleOoL}`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: formData1
+                }
+            );
 
-            const response = await fetch(`https://gaia.inegi.org.mx/sakbe_v3.1/${tipoDetalleOoL}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: formData
-            });
+            const data1 = await response1.json();
 
-            const data = await response.json();
-
+            // Si hay punto intermedio, hacer segunda petición
             if (puntoIntermedio) {
                 const formData2 = new URLSearchParams({
                     dest_i: puntoIntermedio.id_dest,
@@ -347,11 +240,14 @@ const RutasModule = () => {
                     key: API_KEY
                 });
 
-                const response2 = await fetch(`https://gaia.inegi.org.mx/sakbe_v3.1/${tipoDetalleOoL}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: formData2
-                });
+                const response2 = await fetch(
+                    `https://gaia.inegi.org.mx/sakbe_v3.1/${tipoDetalleOoL}`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: formData2
+                    }
+                );
 
                 if (!response2.ok) {
                     throw new Error(`Error en la respuesta del servidor: ${response2.status}`);
@@ -359,77 +255,65 @@ const RutasModule = () => {
 
                 const data2 = await response2.json();
 
-                // Combinar las dos respuestas de forma robusta según su estructura
-                // Casos comunes:
-                // - Ambas respuestas son arrays -> concatenar arrays
-                // - Ambas respuestas son objetos con propiedad `data` que es array -> concatenar data arrays y mantener resto de propiedades
-                // - Ambos son objetos simples -> hacer merge shallow (props de data2 sobrescriben a data)
-                let datasCombinados;
-                if (Array.isArray(data) && Array.isArray(data2)) {
-                    datasCombinados = [...data, ...data2];
-                } else if (
-                    data && data2 &&
-                    Array.isArray(data.data) && Array.isArray(data2.data)
-                ) {
-                    datasCombinados = { ...data, data: [...data.data, ...data2.data] };
-                } else if (typeof data === 'object' && typeof data2 === 'object') {
-                    datasCombinados = { ...data, ...data2 };
-                } else {
-                    // Fallback: si uno es null/undefined, devolver el otro; si ambos son primitivos, devolverlos en un array
-                    if (data == null) datasCombinados = data2;
-                    else if (data2 == null) datasCombinados = data;
-                    else datasCombinados = [data, data2];
+                // Combinar datos
+                if (Array.isArray(data1) && Array.isArray(data2)) {
+                    return [...data1, ...data2];
+                } else if (data1?.data && data2?.data && Array.isArray(data1.data) && Array.isArray(data2.data)) {
+                    return { ...data1, data: [...data1.data, ...data2.data] };
+                } else if (typeof data1 === 'object' && typeof data2 === 'object') {
+                    return { ...data1, ...data2 };
                 }
-
-                return datasCombinados;
             }
 
-            return (data);
-
+            return data1;
         } catch (error) {
+            console.error('Error al obtener detalles de ruta:', error);
             alert('Error: ' + error.message);
-        }
-        finally {
+        } finally {
             setLoadingRutaSeleccionada(false);
         }
-    }
+    }, [origen, destino, puntoIntermedio, tipoVehiculo]);
 
+    const getDetalleRuta = useCallback(async (params) => {
+        const response = await getRouteDetails(params);
 
-    async function calcularRutaHandler(e) {
-        // Validación de inputs
+        if (params === 'detalle_o') {
+            const selectedRoute = [
+                rutas_OyL?.optima,
+                response.data?.filter(item => item.costo_caseta != 0) || []
+            ];
+            setRutaSeleccionada(selectedRoute);
+        }
+        if (params === 'detalle_l') {
+            const selectedRoute = [
+                rutas_OyL?.libre,
+                response.data?.filter(item => item.costo_caseta != 0) || []
+            ];
+            setRutaSeleccionada(selectedRoute);
+        }
+        setBoolExiste(prev => prev.replace(', selecciona una ruta', ''));
+    }, [rutas_OyL, getRouteDetails]);
+
+    const calcularRutaHandler = useCallback(async (e) => {
         if (!origen?.id_dest || !destino?.id_dest) {
             alert('Por favor selecciona un origen y destino válidos');
             return;
         }
 
-        // Inicializar estados
         setLoadingRutas(true);
         setRutaSeleccionada([]);
-        setRutas_OyL([]);
+        setRutas_OyL(null);
 
         try {
-            // Helper: normalizar nombres de lugares
-            const normalizarNombre = (lugar) => {
-                const partes = lugar?.nombre.split(',');
-                const tmp = partes?.[0]?.trim() || lugar?.nombre.trim();
-                const sinAcentos = tmp.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-                const response = sinAcentos.replace(/[^a-zA-Z0-9\s]/g, '').toUpperCase();
-                return response;
-            };
+            const crearFormDataINEGI = (idOrigen, idDestino) => new URLSearchParams({
+                dest_i: idOrigen,
+                dest_f: idDestino,
+                v: tipoVehiculo,
+                e: '0',
+                type: 'json',
+                key: API_KEY
+            });
 
-            // Helper: crear FormData para INEGI
-            const crearFormDataINEGI = (idOrigen, idDestino) => {
-                return new URLSearchParams({
-                    dest_i: idOrigen,
-                    dest_f: idDestino,
-                    v: tipoVehiculo,
-                    e: '0',
-                    type: 'json',
-                    key: API_KEY
-                });
-            };
-
-            // Helper: procesar datos de ruta
             const procesarRuta = (data) => ({
                 distancia: data?.data?.long_km || 0,
                 tiempo: data?.data?.tiempo_min || 0,
@@ -440,7 +324,6 @@ const RutasModule = () => {
                 geojson: data?.data?.geojson || null
             });
 
-            // Helper: combinar GeoJSON
             const combinarGeoJSON = (geo1, geo2) => {
                 if (!geo1) return geo2;
                 if (!geo2) return geo1;
@@ -454,7 +337,6 @@ const RutasModule = () => {
                 };
             };
 
-            // Helper: combinar dos rutas
             const combinarRutas = (ruta1, ruta2) => ({
                 distancia: ruta1.distancia + ruta2.distancia,
                 tiempo: ruta1.tiempo + ruta2.tiempo,
@@ -467,7 +349,7 @@ const RutasModule = () => {
                 geojson: combinarGeoJSON(ruta1.geojson, ruta2.geojson)
             });
 
-            // Fetch: Ruta TUSA
+            // Fetch TUSA
             const fetchRutaTUSA = async () => {
                 const formData = new URLSearchParams({
                     origen: normalizarNombre(origen),
@@ -484,20 +366,17 @@ const RutasModule = () => {
                 );
 
                 if (!response.ok) {
-                    console.error('Error TUSA:', response);
                     throw new Error(`Error en servidor TUSA: ${response.status}`);
                 }
 
                 const text = await response.text();
                 try {
-                    const json = JSON.parse(text);
-                    return json;
+                    return JSON.parse(text);
                 } catch {
                     return text;
                 }
             };
 
-            // Fetch: Ruta INEGI
             const fetchRutaINEGI = async (formData, tipoRuta) => {
                 const response = await fetch(
                     `https://gaia.inegi.org.mx/sakbe_v3.1/${tipoRuta}`,
@@ -512,25 +391,19 @@ const RutasModule = () => {
                     throw new Error(`Error INEGI (${tipoRuta}): ${response.status}`);
                 }
 
-                const text = await response.text();
-                return JSON.parse(text);
+                return response.json();
             };
 
-            // Determinar si hay punto intermedio
             const hayIntermedio = puntoIntermedio && e !== 'SinIntermedio';
             const idDestFinal = hayIntermedio ? puntoIntermedio.id_dest : destino.id_dest;
-
-            // Crear FormData para primer segmento
             const formData1 = crearFormDataINEGI(origen.id_dest, idDestFinal);
 
-            // Ejecutar todas las peticiones en paralelo
             const promesas = [
                 fetchRutaINEGI(formData1, 'optima'),
                 fetchRutaINEGI(formData1, 'libre'),
                 fetchRutaTUSA()
             ];
 
-            // Si hay punto intermedio, agregar peticiones del segundo segmento
             if (hayIntermedio) {
                 const formData2 = crearFormDataINEGI(puntoIntermedio.id_dest, destino.id_dest);
                 promesas.push(
@@ -539,44 +412,28 @@ const RutasModule = () => {
                 );
             }
 
-            // Esperar todas las respuestas
-            const resultados = await Promise.all(promesas);
-            const [rutaOptima1, rutaLibre1, dataTusa, rutaOptima2, rutaLibre2] = resultados;
-            console.dir(dataTusa);
-            // Actualizar ruta TUSA y verificar si existe
-            const rutaTUSAData = dataTusa?.data || dataTusa || [];
-            const existeEnTUSA = Array.isArray(rutaTUSAData)
-                ? rutaTUSAData.length > 0
-                : dataTusa?.enTUSA;
+            const [rutaOptima1, rutaLibre1, dataTusa, rutaOptima2, rutaLibre2] = await Promise.all(promesas);
 
+            const rutaTUSAData = dataTusa?.data || dataTusa || [];
+            const existeEnTUSA = Array.isArray(rutaTUSAData) ? rutaTUSAData.length > 0 : dataTusa?.enTUSA;
 
             setRutaTusa(rutaTUSAData);
 
             if (dataTusa.total === 1) {
-                const casetasEnTUSA = await axios.get(`${API_URL}/api/casetas/rutas/${rutaTUSAData[0]?.id_Tipo_ruta}/casetasPorRuta`);
+                const casetasEnTUSA = await axios.get(
+                    `${API_URL}/api/casetas/rutas/${rutaTUSAData[0]?.id_Tipo_ruta}/casetasPorRuta`
+                );
                 setCasetasEnRutaTusa(casetasEnTUSA.data);
             }
-            if (dataTusa.total > 1) {
-                console.dir(rutaTusa);
-                setIsModalOpen(true);
-                alert('⚠️ Se encontraron múltiples rutas en TUSA. Por favor selecciona la ruta correcta.');
-            }
             
-            console.dir(dataTusa);
-            //console.log('DATA:' , rutaTUSAData[0]?.id_Tipo_ruta)
-
-            // Mostrar alerta si la ruta no está en TUSA
-            if (!existeEnTUSA) {
-                console.warn('⚠️ Ruta no encontrada en TUSA', normalizarNombre(origen), normalizarNombre(destino));
-
-                //alert('⚠️ La ruta no existe en TUSA. Se está creando una nueva ruta.');
-                //Aqui se va a cargar el "nuevocomponente que se está desarrollando para que muestre al usuario la opción de seleccionar el cliente al que se le asignará la ruta nueva."
-
-
-
+            if (dataTusa.total > 1) {
+                setIsModalOpen(true);
             }
 
-            // Procesar rutas según si hay punto intermedio
+            if (!existeEnTUSA) {
+                console.warn('⚠️ Ruta no encontrada en TUSA');
+            }
+
             let rutaOptimaFinal, rutaLibreFinal;
 
             if (hayIntermedio) {
@@ -592,28 +449,18 @@ const RutasModule = () => {
                 rutaLibreFinal = procesarRuta(rutaLibre1);
             }
 
-            // Helper: convertir GeoJSON a string si es necesario
-            const stringifyGeoJSON = (geojson) => {
-                return typeof geojson === 'string' ? geojson : JSON.stringify(geojson);
-            };
+            const stringifyGeoJSON = (geojson) => 
+                typeof geojson === 'string' ? geojson : JSON.stringify(geojson);
 
-            // Actualizar estado con rutas procesadas
             setRutas_OyL({
                 optima: rutaOptimaFinal,
                 libre: rutaLibreFinal,
-                polilineaOptima: convertirCoordenadasGeoJSON(
-                    stringifyGeoJSON(rutaOptimaFinal.geojson)
-                ),
-                polilineaLibre: convertirCoordenadasGeoJSON(
-                    stringifyGeoJSON(rutaLibreFinal.geojson)
-                )
+                polilineaOptima: convertirCoordenadasGeoJSON(stringifyGeoJSON(rutaOptimaFinal.geojson)),
+                polilineaLibre: convertirCoordenadasGeoJSON(stringifyGeoJSON(rutaLibreFinal.geojson))
             });
 
-            // Actualizar estado de existencia
-            const mensaje = dataTusa?.[0]?.Categoria
-                ? 'Ruta existente'
-                : 'Creando ruta';
-            setBoolExiste(`${mensaje}, <selecciona una ruta>`);
+            const mensaje = dataTusa?.[0]?.Categoria ? 'Ruta existente' : 'Creando ruta';
+            setBoolExiste(`${mensaje}, selecciona una ruta`);
 
         } catch (error) {
             console.error('Error al calcular la ruta:', error);
@@ -622,31 +469,49 @@ const RutasModule = () => {
         } finally {
             setLoadingRutas(false);
         }
-    }
+    }, [origen, destino, puntoIntermedio, tipoVehiculo]);
 
+    // ===== VALORES MEMOIZADOS =====
+    const origenCoords = useMemo(() => {
+        if (!origen?.geojson) return null;
+        const coords = JSON.parse(origen.geojson).coordinates;
+        return [coords[1], coords[0]];
+    }, [origen]);
+
+    const destinoCoords = useMemo(() => {
+        if (!destino?.geojson) return null;
+        const coords = JSON.parse(destino.geojson).coordinates;
+        return [coords[1], coords[0]];
+    }, [destino]);
+
+    const intermedioCoords = useMemo(() => {
+        if (!puntoIntermedio?.geojson) return null;
+        const coords = JSON.parse(puntoIntermedio.geojson).coordinates;
+        return [coords[1], coords[0]];
+    }, [puntoIntermedio]);
+
+    // ===== RENDER =====
     return (
         <div className="container-fluid py-0">
-
-
-
-
             <div className="container-fluid py-0 rounded-top">
                 <div className="header-RC py-2 rounded-top">
                     <h1>🚛 Creador de Rutas - Propuesta IAVE-WEB</h1>
                     <div className="header-actions-RC">
-
                         <button className="btn btn-success">💾 Guardar Ruta</button>
                     </div>
                 </div>
-                <div className="container-fluid py-1  border ">
-                    <div className="alert alert-info border-left-info my-2" role="alert" close="true" >
+
+                <div className="container-fluid py-1 border">
+                    <div className="alert alert-info border-left-info my-2" role="alert">
                         <i className="fas fa-info-circle mr-2"></i>
                         <strong>Estado:</strong> {loadingRutas || loadingRutaSeleccionada ? 'Cargando rutas...' : boolExiste}
                     </div>
+
                     <div className="table-container py-0 my-2" style={{ maxHeight: '12rem' }}>
-
-
-                        <table className='table table-bordered table-scroll table-sm table-hover align-middle mt-2' style={{ display: `${(casetasEnRutaTusa && casetasEnRutaTusa.length > 0) ? 'table' : 'none'}` }}>
+                        <table 
+                            className='table table-bordered table-scroll table-sm table-hover align-middle mt-2' 
+                            style={{ display: casetasEnRutaTusa?.length > 0 ? 'table' : 'none' }}
+                        >
                             <thead>
                                 <tr>
                                     <th>ID_Caseta</th>
@@ -664,14 +529,17 @@ const RutasModule = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {loadingRutas && (
-                                    <tr>
-                                        <td>Cargando rutas...</td>
-                                    </tr>
-                                )}
-                                {(casetasEnRutaTusa) && casetasEnRutaTusa.map((caseta, index) => (
+                                {casetasEnRutaTusa?.map((caseta, index) => (
                                     <tr key={caseta.ID_Caseta || index} className='text-center'>
-                                        <td className='text-right'>{caseta.ID_Caseta} <span style={{ cursor: 'help' }} title={caseta.IAVE ? 'SI Acepta el pago con TAG' : 'NO admite el pago con TAG'}>{caseta.IAVE ? '✅' : '❌'}</span></td>
+                                        <td className='text-right'>
+                                            {caseta.ID_Caseta}{' '}
+                                            <span 
+                                                style={{ cursor: 'help' }} 
+                                                title={caseta.IAVE ? 'SI Acepta el pago con TAG' : 'NO admite el pago con TAG'}
+                                            >
+                                                {caseta.IAVE ? '✅' : '❌'}
+                                            </span>
+                                        </td>
                                         <td>{caseta.Nombre}</td>
                                         <td>{caseta.Estado}</td>
                                         <td>{caseta.latitud}</td>
@@ -681,21 +549,29 @@ const RutasModule = () => {
                                         <td>$ {formatearEnteros(caseta.Camion2Ejes)}</td>
                                         <td>$ {formatearEnteros(caseta.Camion3Ejes)}</td>
                                         <td>$ {formatearEnteros(caseta.Camion5Ejes)}</td>
-                                        <td>$ {formatearEnteros(caseta.Camion9Ejes) + ' '}</td>
-                                        <td style={{ placeItems: 'center' }}><input style={{ maxWidth: '3rem', textAlign: 'center' }} className="form-control form-control-sm" maxLength={2} type="text" name="txtCasetaConsecutivo" id={`txtCasetaConsecutivo_${caseta.ID_Caseta}`} defaultValue={caseta.consecutivo || ''} /></td>
+                                        <td>$ {formatearEnteros(caseta.Camion9Ejes)}</td>
+                                        <td style={{ placeItems: 'center' }}>
+                                            <input 
+                                                style={{ maxWidth: '3rem', textAlign: 'center' }} 
+                                                className="form-control form-control-sm" 
+                                                maxLength={2} 
+                                                type="text" 
+                                                name="txtCasetaConsecutivo" 
+                                                id={`txtCasetaConsecutivo_${caseta.ID_Caseta}`} 
+                                                defaultValue={caseta.consecutivo || ''} 
+                                            />
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
                     </div>
                 </div>
+
                 <div className="main-content-RC">
-                    {/* Sidebar donde se selecciona origen, destino y punto intermedio. */}
                     <div className="sidebar-RC px-3">
                         <div className="form-section-RC">
-                            <h3>ℹ️ Información General </h3>
-
-
+                            <h3>ℹ️ Información General</h3>
 
                             {/* ORIGEN */}
                             <div className="form-group-RC py-0">
@@ -719,7 +595,7 @@ const RutasModule = () => {
                                     {loadingOrigen && <option>Buscando...</option>}
                                     {!loadingOrigen && origenes.length === 0 && (
                                         <option value="">
-                                            {txtOrigen.length < 3
+                                            {txtOrigen.length < MIN_SEARCH_LENGTH
                                                 ? 'Escribe al menos 3 caracteres'
                                                 : 'Origen (fuente INEGI)'}
                                         </option>
@@ -728,7 +604,7 @@ const RutasModule = () => {
                                         <>
                                             <option value="">Selecciona un origen</option>
                                             {origenes.map((item, index) => (
-                                                <option key={index} value={item.id}>
+                                                <option key={index} value={item.nombre}>
                                                     {item.nombre}
                                                 </option>
                                             ))}
@@ -755,12 +631,11 @@ const RutasModule = () => {
                                     disabled={loadingDestino || destinos.length === 0}
                                     onChange={handleChange}
                                     name='SelectDestino'
-
                                 >
                                     {loadingDestino && <option>Buscando...</option>}
                                     {!loadingDestino && destinos.length === 0 && (
                                         <option value="">
-                                            {txtDestino.length < 3
+                                            {txtDestino.length < MIN_SEARCH_LENGTH
                                                 ? 'Escribe al menos 3 caracteres'
                                                 : 'Destino (fuente INEGI)'}
                                         </option>
@@ -769,7 +644,7 @@ const RutasModule = () => {
                                         <>
                                             <option value="">Selecciona un destino</option>
                                             {destinos.map((item, index) => (
-                                                <option key={index} value={item.id}>
+                                                <option key={index} value={item.nombre}>
                                                     {item.nombre}
                                                 </option>
                                             ))}
@@ -777,8 +652,9 @@ const RutasModule = () => {
                                     )}
                                 </select>
                             </div>
+
                             <div className="form-group py-0" style={{ justifySelf: 'center' }}>
-                                <label className='py-0 my-0 mr-2'>Tipo de unidad: </label>
+                                <label className='py-0 my-0 mr-2'>Tipo de unidad:</label>
                                 <select
                                     className='form-select form-select-sm custom-select'
                                     name="selectTipoVehiculo"
@@ -787,12 +663,8 @@ const RutasModule = () => {
                                     id='selectTipoVehiculo'
                                     style={{ width: 'auto', height: '2.5rem' }}
                                 >
-
-
-
                                     <option value="1">Automovil</option>
                                     <option value="2">Bus 2 Ejes</option>
-
                                     <option value="5">Camion 2 Ejes</option>
                                     <option value="6">Camion 3 Ejes</option>
                                     <option value="7">Camion 4 Ejes</option>
@@ -801,8 +673,6 @@ const RutasModule = () => {
                                     <option value="10">Camion 7 Ejes</option>
                                     <option value="11">Camion 8 Ejes</option>
                                     <option value="12">Camion 9 Ejes</option>
-
-
                                 </select>
                             </div>
 
@@ -828,7 +698,7 @@ const RutasModule = () => {
                                     {loadingPuntoIntermedio && <option>Buscando...</option>}
                                     {!loadingPuntoIntermedio && puntosIntermedios.length === 0 && (
                                         <option value="">
-                                            {txtPuntoIntermedio.length < 3
+                                            {txtPuntoIntermedio.length < MIN_SEARCH_LENGTH
                                                 ? 'Escribe al menos 3 caracteres'
                                                 : 'Fuente oficial (INEGI)'}
                                         </option>
@@ -837,7 +707,7 @@ const RutasModule = () => {
                                         <>
                                             <option value="">Selecciona el punto intermedio</option>
                                             {puntosIntermedios.map((item, index) => (
-                                                <option key={index} value={item.id}>
+                                                <option key={index} value={item.nombre}>
                                                     {item.nombre}
                                                 </option>
                                             ))}
@@ -845,8 +715,6 @@ const RutasModule = () => {
                                     )}
                                 </select>
                             </div>
-
-
                         </div>
 
                         <div className="route-points-RC">
@@ -855,9 +723,11 @@ const RutasModule = () => {
                                 <div>
                                     <strong>Origen</strong><br />
                                     <small style={{
-                                        fontWeight: `${(rutaTusa[0]?.RazonOrigen) ? 'bold' : 'normal'}`,
-                                        color: `${(rutaTusa[0]?.RazonOrigen) ? 'green' : 'black'}`,
-                                    }}>{rutaTusa[0]?.RazonOrigen || JSON.stringify(origen?.nombre)?.replaceAll('"', '') || 'Selecciona un origen valido.'}</small>
+                                        fontWeight: rutaTusa[0]?.RazonOrigen ? 'bold' : 'normal',
+                                        color: rutaTusa[0]?.RazonOrigen ? 'green' : 'black',
+                                    }}>
+                                        {rutaTusa[0]?.RazonOrigen || origen?.nombre || 'Selecciona un origen valido.'}
+                                    </small>
                                 </div>
                             </div>
                             <div className="route-point-RC py-1">
@@ -865,8 +735,7 @@ const RutasModule = () => {
                                 <div>
                                     <strong>Punto Intermedio</strong><br />
                                     <small>
-                                        {JSON.stringify(puntoIntermedio?.nombre)?.replaceAll('"', '') ||
-                                            'Selecciona un punto intermedio valido.'}
+                                        {puntoIntermedio?.nombre || 'Selecciona un punto intermedio valido.'}
                                     </small>
                                 </div>
                             </div>
@@ -875,16 +744,19 @@ const RutasModule = () => {
                                 <div>
                                     <strong>Destino</strong><br />
                                     <small style={{
-                                        fontWeight: `${(rutaTusa[0]?.RazonOrigen) ? 'bold' : 'normal'}`,
-                                        color: `${(rutaTusa[0]?.RazonOrigen) ? 'red' : 'black'}`,
-                                    }}>{rutaTusa[0]?.RazonDestino || (JSON.stringify(destino?.nombre) || 'Selecciona un destino valido.').replaceAll('"', '')}</small>
+                                        fontWeight: rutaTusa[0]?.RazonDestino ? 'bold' : 'normal',
+                                        color: rutaTusa[0]?.RazonDestino ? 'red' : 'black',
+                                    }}>
+                                        {rutaTusa[0]?.RazonDestino || destino?.nombre || 'Selecciona un destino valido.'}
+                                    </small>
                                 </div>
                             </div>
                             <div className="container text-center my-3">
-                                <button className="btn btn-success container-fluid" onClick={calcularRutaHandler}>Calcular ruta</button>
+                                <button className="btn btn-success container-fluid" onClick={calcularRutaHandler}>
+                                    Calcular ruta
+                                </button>
                             </div>
                         </div>
-
                     </div>
 
                     {/* MAPA */}
@@ -894,30 +766,26 @@ const RutasModule = () => {
                         scrollWheelZoom={true}
                         style={{ height: '100%', width: '100%' }}
                     >
-                        {/* Ventana de carga de las rutas, (superpuesta sobre el mapcontainer)*/}
+                        {/* Botón de descarga */}
                         <div className="container-fluid pb-3"
-                            style={
-                                {
-                                    zIndex: '999',
-                                    display: `${(rutas_OyL) ? 'block' : 'none'}`,
-                                    borderRadius: '0.6rem',
-                                    position: 'relative',
-                                    top: '1vh',
-                                    justifySelf: 'flex-end',
-                                    marginRight: '0px',
-                                    maxWidth: 'fit-content',
-                                    padding: '0px !important',
-                                }}>
-                            <button className="btn btn-warning"> ⬇️ Descargar indicaciones</button>
-
-
+                            style={{
+                                zIndex: 999,
+                                display: rutas_OyL ? 'block' : 'none',
+                                borderRadius: '0.6rem',
+                                position: 'relative',
+                                top: '1vh',
+                                justifySelf: 'flex-end',
+                                marginRight: '0px',
+                                maxWidth: 'fit-content',
+                                padding: '0px',
+                            }}>
+                            <button className="btn btn-warning">⬇️ Descargar indicaciones</button>
                         </div>
 
-
-                        {/* Ventana de carga de las rutas, (superpuesta sobre el mapcontainer)*/}
-                        <div className="container-fluid pb-3"
-                            style={
-                                {
+                        {/* Loading overlay */}
+                        {loadingRutas && (
+                            <div className="container-fluid pb-3"
+                                style={{
                                     zIndex: 999999,
                                     backgroundColor: '#127ddb9d',
                                     width: '40%',
@@ -925,27 +793,24 @@ const RutasModule = () => {
                                     textAlign: 'center',
                                     padding: '0px',
                                     position: 'absolute',
-                                    display: `${(loadingRutas) ? 'block' : 'none'}`,
+                                    display: 'block',
                                     alignContent: 'center',
                                     placeSelf: 'anchor-center',
                                     borderRadius: '1rem',
                                 }}>
-                            <div className='row text-center container-fluid py-1' style={{ justifyContent: 'center', color: '#083b86ff', alignContent: 'center' }}>
-                                <div className="spinner-border text-primary" role="status" style={{ width: "3rem", height: "3rem" }}>
-                                    <span className="visually-hidden">
-
-                                    </span>
+                                <div className='row text-center container-fluid py-1' style={{ justifyContent: 'center', color: '#083b86ff', alignContent: 'center' }}>
+                                    <div className="spinner-border text-primary" role="status" style={{ width: "3rem", height: "3rem" }}>
+                                        <span className="visually-hidden"></span>
+                                    </div>
+                                    <h1 className="text-center font-weight-bold ml-4">Cargando</h1>
                                 </div>
-                                <h1 className="text-center font-weight-bold ml-4">Cargando</h1>
                             </div>
+                        )}
 
-                        </div>
-
-
-                        {/* Datos sobre las rutas */}
-                        <div className="container-fluid row px-0 ml-2 text-center rounded-top pb-3"
-                            style={
-                                {
+                        {/* Selector de rutas */}
+                        {rutas_OyL && !loadingRutas && (
+                            <div className="container-fluid row px-0 ml-2 text-center rounded-top pb-3"
+                                style={{
                                     zIndex: 999,
                                     left: '0px',
                                     backgroundColor: '#f0f8ff96',
@@ -953,183 +818,219 @@ const RutasModule = () => {
                                     textAlign: 'center',
                                     bottom: '0px',
                                     position: 'absolute',
-                                    display: `${(rutas_OyL && !loadingRutas) ? 'block' : 'none'}`
                                 }}>
-                            <div className='row text-center container-fluid py-1' style={{ justifyContent: 'center', color: '#5a5c69' }}>
-                                <h6 className="text-center font-weight-bold">Selecciona la ruta </h6>
-                            </div>
+                                <div className='row text-center container-fluid py-1' style={{ justifyContent: 'center', color: '#5a5c69' }}>
+                                    <h6 className="text-center font-weight-bold">Selecciona la ruta</h6>
+                                </div>
 
-                            <div className='row container-fluid pr-0'>
-                                <div className='col-md mr-1 p-0'
-                                    style={{ cursor: 'pointer' }}
-                                    onClick={() => { getDetalleRuta('detalle_o') }}
-                                >
-                                    <RouteOption
-                                        key={1}
-                                        tipo={'Cuota'}
-                                        distance={rutas_OyL?.optima?.distancia.toFixed(2)}
-                                        time={parsearMinutos(rutas_OyL?.optima?.tiempo)}
-                                        costs={{ label: 'Casetas', value: formatearDinero(rutas_OyL?.optima?.costoCasetas) }}
-                                        advertencias={rutas_OyL?.optima?.advertencias}
-                                        color={'blue'}
-                                    />
-                                </div>
-                                <div className='col-md ml-1 p-0'
-                                    style={{ cursor: 'pointer' }}
-                                    onClick={() => { getDetalleRuta('detalle_l') }}
-                                >
-                                    <RouteOption
-                                        key={2}
-                                        tipo={'Libre'}
-                                        distance={rutas_OyL?.libre?.distancia.toFixed(2)}
-                                        time={parsearMinutos(rutas_OyL?.libre?.tiempo)}
-                                        costs={{ label: 'Casetas', value: (rutas_OyL?.libre?.costoCasetas) ? formatearDinero(rutas_OyL?.libre?.costoCasetas) : 'Sin costo' }}
-                                        advertencias={(rutas_OyL?.libre?.advertencias)}
-                                        color={'red'}
-                                    />
+                                <div className='row container-fluid pr-0'>
+                                    <div className='col-md mr-1 p-0'
+                                        style={{ cursor: 'pointer' }}
+                                        onClick={() => getDetalleRuta('detalle_o')}
+                                    >
+                                        <RouteOption
+                                            tipo={'Cuota'}
+                                            distance={rutas_OyL?.optima?.distancia.toFixed(2)}
+                                            time={parsearMinutos(rutas_OyL?.optima?.tiempo)}
+                                            costs={{ label: 'Casetas', value: formatearDinero(rutas_OyL?.optima?.costoCasetas) }}
+                                            advertencias={rutas_OyL?.optima?.advertencias}
+                                            color={'blue'}
+                                        />
+                                    </div>
+                                    <div className='col-md ml-1 p-0'
+                                        style={{ cursor: 'pointer' }}
+                                        onClick={() => getDetalleRuta('detalle_l')}
+                                    >
+                                        <RouteOption
+                                            tipo={'Libre'}
+                                            distance={rutas_OyL?.libre?.distancia.toFixed(2)}
+                                            time={parsearMinutos(rutas_OyL?.libre?.tiempo)}
+                                            costs={{ 
+                                                label: 'Casetas', 
+                                                value: rutas_OyL?.libre?.costoCasetas 
+                                                    ? formatearDinero(rutas_OyL?.libre?.costoCasetas) 
+                                                    : 'Sin costo' 
+                                            }}
+                                            advertencias={rutas_OyL?.libre?.advertencias}
+                                            color={'red'}
+                                        />
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        )}
+
                         <TileLayer
                             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                             attribution='&copy; OpenStreetMap contributors || IAVE-WEB ⭐🚌'
                         />
-                        <Marker position={[19.782283538009626, -98.58592613126075]} icon={markerIconATM}>
+
+                        <Marker position={[19.782283538009626, -98.58592613126075]} icon={markerIcons.ATM}>
                             <Popup>Base Sahagún</Popup>
                         </Marker>
 
+                        {origenCoords && (
+                            <Marker position={origenCoords} icon={markerIcons.A}>
+                                <Popup>Origen</Popup>
+                            </Marker>
+                        )}
 
-                        {(origen?.geojson) && <Marker position={[(JSON.parse(origen?.geojson)).coordinates[1], (JSON.parse(origen?.geojson)).coordinates[0]]} icon={markerIconA}>
-                            <Popup>Origen
-                            </Popup>
-                        </Marker>}
+                        {intermedioCoords && (
+                            <Marker position={intermedioCoords} icon={markerIcons.pin}>
+                                <Popup>
+                                    <span style={{ cursor: 'pointer', alignContent: 'center', textAlign: 'center' }} onClick={handlerRetirarIntermedio}>
+                                        <strong>Punto intermedio</strong>
+                                        <br />
+                                        <small>Haz clic para retirarlo</small>
+                                    </span>
+                                </Popup>
+                            </Marker>
+                        )}
 
-                        {(puntoIntermedio?.geojson) && <Marker position={[(JSON.parse(puntoIntermedio?.geojson)).coordinates[1], (JSON.parse(puntoIntermedio?.geojson)).coordinates[0]]} icon={markerIconPIN} >
-                            <Popup> <span style={{ cursor: 'pointer', alignContent: 'center', textAlign: 'center' }} onClick={handlerRetirarIntermedio}>
-                                <strong className='' >Punto intermedio</strong>
-                                <br />
-                                <small>Haz clic para retirarlo</small>
-                            </span></Popup>
-                        </Marker>}
+                        {destinoCoords && (
+                            <Marker position={destinoCoords} icon={markerIcons.B}>
+                                <Popup>Destino</Popup>
+                            </Marker>
+                        )}
 
-                        {(destino?.geojson) && <Marker position={[(JSON.parse(destino?.geojson)).coordinates[1], (JSON.parse(destino?.geojson)).coordinates[0]]} icon={markerIconB}>
-                            <Popup>Destino
-                            </Popup>
-                        </Marker>}
+                        {/* Polylines */}
+                        {rutaTusa?.polilinea && (
+                            <Polyline color='green' positions={rutaTusa.polilinea} weight={4} opacity={0.4}>
+                                <Popup>Ruta establecida en TUSA, de acuerdo a las casetas</Popup>
+                            </Polyline>
+                        )}
 
+                        {rutas_OyL?.polilineaLibre?.map((arreglo, i) => (
+                            <Polyline key={`libre-${i}`} color='red' positions={arreglo} weight={3} opacity={0.4}>
+                                <Popup>Ruta Libre</Popup>
+                            </Polyline>
+                        ))}
 
-                        {/* POLILINEA DE LA RUTA TUSA */}
-                        {rutaTusa?.polilinea && <Polyline color='green' positions={rutaTusa?.polilinea} weight={4} opacity={0.4}>
-                            <Popup> Ruta establecida en TUSA, de acuerdo a las casetas</Popup>
-                        </Polyline>
-                        }
+                        {rutas_OyL?.polilineaOptima?.map((arreglo, i) => (
+                            <Polyline key={`optima-${i}`} color='blue' positions={arreglo} weight={3} opacity={0.4}>
+                                <Popup>Ruta Cuota</Popup>
+                            </Polyline>
+                        ))}
 
-                        {/* POLILINEAS DE RUTAS */}
-                        {rutas_OyL?.polilineaLibre && rutas_OyL?.polilineaLibre.map((arreglo, i) => {
-                            return (<Polyline color='red' positions={arreglo} weight={3} opacity={0.4} key={'libre - ' + i}>
-                                <Popup> Ruta Libre</Popup>
-                            </Polyline>)
-                        })}
-
-
-                        {rutas_OyL?.polilineaOptima && rutas_OyL?.polilineaOptima.map((arreglo, i) => {
-                            return (<Polyline color='blue' positions={arreglo} weight={3} opacity={0.4} key={'optima - ' + i}>
-                                <Popup> Ruta Cuota</Popup>
-                            </Polyline>)
-                        })}
-
-                        {/* Marcadores para las casetas dentro de la ruta seleccionada */}
-                        {rutaSeleccionada[1] && rutaSeleccionada[1].map((item, index) => (
-
-                            <Marker key={item?.id || item?.cve_caseta || index} position={[(JSON.parse(item?.geojson)).coordinates[1], (JSON.parse(item?.geojson)).coordinates[0]]} icon={markerIconCaseta}>
-                                <Popup>{item?.direccion.replace('Cruce la caseta ', '')}
-                                    <br /><strong style={{ color: 'green' }}> ${item?.costo_caseta.toFixed(2)}</strong>
+                        {rutaSeleccionada[1]?.map((item, index) => (
+                            <Marker 
+                                key={item?.id || item?.cve_caseta || index} 
+                                position={[JSON.parse(item?.geojson).coordinates[1], JSON.parse(item?.geojson).coordinates[0]]} 
+                                icon={markerIcons.caseta}
+                            >
+                                <Popup>
+                                    {item?.direccion.replace('Cruce la caseta ', '')}
+                                    <br />
+                                    <strong style={{ color: 'green' }}>${item?.costo_caseta.toFixed(2)}</strong>
                                 </Popup>
                             </Marker>
                         ))}
-
-
-
                     </MapContainer>
 
-
-                    {/* PANEL DE DETALLES */}
-                    <div className="container-fluid  border border-dark mx-4 py-5"
-                        style={
-                            {
+                    {/* Panel de detalles */}
+                    {loadingRutaSeleccionada && (
+                        <div className="container-fluid border border-dark mx-4 py-5"
+                            style={{
                                 textAlign: 'center',
                                 padding: '0px',
-                                display: `${(loadingRutaSeleccionada) ? 'block' : 'none'}`,
+                                display: 'block',
                                 alignContent: 'center',
                                 placeSelf: 'anchor-center',
                                 borderRadius: '15px',
                                 height: '100%'
-
                             }}>
-                        <div className='row text-center container-fluid py-1' style={{ justifyContent: 'center', color: '#083b86ff', alignContent: 'center', }}>
-                            <div className="spinner-border text-primary" role="status" style={{ height: '3rem', width: '3rem' }}>
-                                <span className="visually-hidden">
-
-                                </span>
+                            <div className='row text-center container-fluid py-1' style={{ justifyContent: 'center', color: '#083b86ff', alignContent: 'center' }}>
+                                <div className="spinner-border text-primary" role="status" style={{ height: '3rem', width: '3rem' }}>
+                                    <span className="visually-hidden"></span>
+                                </div>
+                                <h1 className="text-center font-weight-bold ml-4">Cargando</h1>
                             </div>
-                            <h1 className="text-center font-weight-bold ml-4">Cargando</h1>
                         </div>
+                    )}
 
-                    </div>
-
-
-                    <div className="details-panel-RC py-0" style={{ display: `${(loadingRutaSeleccionada) ? 'none' : 'block'}` }}>
-
+                    <div className="details-panel-RC py-0" style={{ display: loadingRutaSeleccionada ? 'none' : 'block' }}>
                         <div className="route-summary-RC pt-2">
-                            <h3 className='pb-0 mb-0' style={{ marginBottom: '15px', color: '#2c3e50' }}>📊 Resumen de Ruta </h3>
-                            <center className='pb-3 text-primary'><small><strong>{(rutaTusa[0]?.Categoria) ? 'Esta ruta YA existe en TUSA ' + rutaTusa[0]?.Categoria : ''}</strong></small></center>
-                            <div className="form-group py-0" style={{ justifySelf: 'center', }}>
-                                <label className='py-0 my-0 mr-2'>Tipo de traslado: </label>
-                                <select className='form-select form-select-sm custom-select' name="selectTipoTraslado" id='selectTipoTraslado' style={{ width: 'auto', height: '2.5rem' }} disabled={(rutaTusa[0]?.Categoria)} value={rutaTusa[0]?.Categoria || ''} onChange={handleChange}>
-                                    <option value=""  > Selecciona </option>
-                                    <option value="Latinos"> Latinos </option>
-                                    <option value="Nacionales"> Nacionales </option>
-                                    <option value="Exportacion"> Exportación </option>
-                                    <option value="Cemex" > Cemex </option>
-                                    <option value="Otros" > Otros </option>
+                            <h3 className='pb-0 mb-0' style={{ marginBottom: '15px', color: '#2c3e50' }}>📊 Resumen de Ruta</h3>
+                            <center className='pb-3 text-primary'>
+                                <small>
+                                    <strong>
+                                        {rutaTusa[0]?.Categoria 
+                                            ? `Esta ruta YA existe en TUSA ${rutaTusa[0]?.Categoria}` 
+                                            : ''}
+                                    </strong>
+                                </small>
+                            </center>
 
+                            <div className="form-group py-0" style={{ justifySelf: 'center' }}>
+                                <label className='py-0 my-0 mr-2'>Tipo de traslado:</label>
+                                <select 
+                                    className='form-select form-select-sm custom-select' 
+                                    name="selectTipoTraslado" 
+                                    id='selectTipoTraslado' 
+                                    style={{ width: 'auto', height: '2.5rem' }} 
+                                    disabled={!!rutaTusa[0]?.Categoria} 
+                                    value={rutaTusa[0]?.Categoria || ''} 
+                                    onChange={handleChange}
+                                >
+                                    <option value="">Selecciona</option>
+                                    <option value="Latinos">Latinos</option>
+                                    <option value="Nacionales">Nacionales</option>
+                                    <option value="Exportacion">Exportación</option>
+                                    <option value="Cemex">Cemex</option>
+                                    <option value="Otros">Otros</option>
                                 </select>
                             </div>
+
                             <div className="summary-item-RC">
                                 <span className="summary-label-RC">Distancia Total:</span>
-                                <span className="summary-value-RC">{(rutaSeleccionada[0]?.distancia) ? rutaSeleccionada[0]?.distancia?.toFixed(2) + ' Km' : '-'}</span>
+                                <span className="summary-value-RC">
+                                    {rutaSeleccionada[0]?.distancia ? `${rutaSeleccionada[0].distancia.toFixed(2)} Km` : '-'}
+                                </span>
                             </div>
                             <div className="summary-item-RC">
                                 <span className="summary-label-RC">Tiempo Estimado:</span>
-                                <span className="summary-value-RC">{(rutaSeleccionada[0]?.tiempo) ? parsearMinutos(rutaSeleccionada[0]?.tiempo) : '-'}</span>
+                                <span className="summary-value-RC">
+                                    {rutaSeleccionada[0]?.tiempo ? parsearMinutos(rutaSeleccionada[0].tiempo) : '-'}
+                                </span>
                             </div>
                             <div className="summary-item-RC">
                                 <span className="summary-label-RC">Costo Estimado:</span>
-                                <span className="summary-value-RC">{(rutaSeleccionada[0]?.costoCasetas) ? '$' + formatearDinero(rutaSeleccionada[0]?.costoCasetas) : '-'}</span>
+                                <span className="summary-value-RC">
+                                    {rutaSeleccionada[0]?.costoCasetas ? `$${formatearDinero(rutaSeleccionada[0].costoCasetas)}` : '-'}
+                                </span>
                             </div>
                             <div className="summary-item-RC">
                                 <span className="summary-label-RC">Estado:</span>
                                 <span className="summary-value-RC">
-                                    {/* Sobre este SPAN se verifica la situación actual de la ruta y se pinta el circulo junto al estatus de la ruta según corresponda (si la ruta ya está creada se pone de verde)*/}
-                                    <span className={`status-indicator-RC ${(boolExiste.includes('Ruta calculada') || boolExiste.includes('Ruta existente')) ? 'status-active-RC' : 'status-pendiente-RC'}`}></span>
-                                    <span style={{
-                                        fontSize: `${(boolExiste?.length > 12) ? ' 0.8rem' : '1rem'}`
-                                    }}>{boolExiste}</span>
+                                    <span className={`status-indicator-RC ${
+                                        (boolExiste.includes('Ruta calculada') || boolExiste.includes('Ruta existente')) 
+                                            ? 'status-active-RC' 
+                                            : 'status-pendiente-RC'
+                                    }`}></span>
+                                    <span style={{ fontSize: boolExiste?.length > 12 ? '0.8rem' : '1rem' }}>
+                                        {boolExiste}
+                                    </span>
                                 </span>
                             </div>
                             <div className="summary-item-RC">
                                 <span className="summary-label-RC">ID origen:</span>
-                                <span className="summary-value-RC">{(origen?.id_dest) ? origen?.id_dest + ' IdDestino:  ' + destino?.id_dest : ''}</span>
+                                <span className="summary-value-RC">
+                                    {origen?.id_dest ? `${origen.id_dest} IdDestino: ${destino?.id_dest}` : ''}
+                                </span>
                             </div>
                             <div className="form-floating">
-                                <textarea className="form-control" placeholder="Observaciones" id="floatingTextarea2" style={{ height: '3.3rem', fontSize: '0.8rem' }}></textarea>
+                                <textarea 
+                                    className="form-control" 
+                                    placeholder="Observaciones" 
+                                    id="floatingTextarea2" 
+                                    style={{ height: '3.3rem', fontSize: '0.8rem' }}
+                                ></textarea>
                                 <label htmlFor="floatingTextarea2">Observaciones:</label>
                             </div>
                         </div>
 
                         <div className="route-table-RC">
                             <div className="table-header-RC text-center py-0" style={{ fontSize: '1.2rem', lineHeight: '2.5rem' }}>
-                                {(rutaSeleccionada[1]?.length ? rutaSeleccionada[1]?.length + ' ' : ' ')}Casetas en la ruta seleccionada:
+                                {rutaSeleccionada[1]?.length ? `${rutaSeleccionada[1].length} ` : ' '}Casetas en la ruta seleccionada:
                             </div>
                             <div className="table-container" style={{ maxHeight: '30vh' }}>
                                 <table className="table table-bordered table-scroll table-sm table-hover align-middle">
@@ -1141,8 +1042,8 @@ const RutasModule = () => {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {rutaSeleccionada[1] && rutaSeleccionada[1].map((item, index) => (
-                                            <tr key={index} className='text-center'>
+                                        {rutaSeleccionada[1]?.map((item, index) => (
+                                            <tr key={item?.id || item?.cve_caseta || index} className='text-center'>
                                                 <td>
                                                     <div className="d-flex" style={{ textAlign: 'left' }}>
                                                         {item?.direccion.replace('Cruce la caseta ', '')}
@@ -1169,30 +1070,64 @@ const RutasModule = () => {
                     </div>
                 </div>
             </div>
-            <div>
-                {/* MODAL PARA SELECCIONAR RUTA CUANDO EXISTE MÁS DE UNA DEL ORIGEN AL DESTINO SELECCIONADOS. */}
-                {(isModalOpen) && (<ModalSelector
+
+            {/* MODAL PARA SELECCIONAR RUTA */}
+            {isModalOpen && (
+                <ModalSelector
                     isOpen={isModalOpen}
                     onClose={() => setIsModalOpen(false)}
-                    onSelect={() => alert('Seleccionado')}
-                    campo="La ruta que selecciones se mostrará para poder editar o compararla con la ruta INEGI"
+                    onSelect={async (rutaSeleccionadaDelModal) => {
+                        setRutaTusaSelected(rutaSeleccionadaDelModal);
+                        console.log('✅ Ruta TUSA seleccionada:', rutaSeleccionadaDelModal);
+                        
+                        try {
+                            const casetasResponse = await axios.get(
+                                `${API_URL}/api/casetas/rutas/${rutaSeleccionadaDelModal}/casetasPorRuta`
+                            );
+                            setCasetasEnRutaTusa(casetasResponse.data);
+                            console.log('✅ Casetas cargadas:', casetasResponse.data);
+                            
+                            setIsModalOpen(false);
+                            setRutaTusa(rutaTusa.filter(ruta => ruta.id_Tipo_ruta === rutaSeleccionadaDelModal));
+                        } catch (error) {
+                            console.error('❌ Error al cargar casetas:', error);
+                        }
+                    }}
+                    campo="Se han encontrado múltiples rutas en TUSA. Por favor selecciona la ruta que deseas validar"
                     valorCampo={''}
                     valoresSugeridos={rutaTusa}
                     tituloDelSelect='Rutas'
-                    titulo={`Rutas TUSA encontradas (${rutaTusa.length})`} />
-                )}
+                    titulo={`Rutas TUSA encontradas (${rutaTusa.length})`}
+                />
+            )}
 
-
-
-                <Container style={{ position: 'fixed', bottom: 20, right: '-30px', zIndex: 99999, maxWidth: 'max-content' }}>
-                    <Container style={{ maxWidth: 'max-content' }}>
-                        {(rutas_OyL && rutaSeleccionada && !loadingRutas && rutaTusa.length === 0) && <CustomToast color={'text-warning'} mensaje={'No existe una ruta creada con las poblaciones origen y destino seleccionadas'} tiempo={5000} titulo={'⚠️ Advertencia'} onClick={() => { alert('Advertencia') }} mostrar={1} />}
-                        {(rutas_OyL && rutaSeleccionada && !loadingRutas && rutaTusa.length === 1) && <CustomToast color={'text-success'} mensaje={'Ruta TUSA encontrada y vinculada'} tiempo={5000} titulo={'✅ Éxito'} onClick={() => { alert('Advertencia') }} mostrar={1} />}
-                    </Container>
+            {/* TOASTS DE NOTIFICACIÓN */}
+            <Container style={{ position: 'fixed', bottom: 20, right: '-30px', zIndex: 99999, maxWidth: 'max-content' }}>
+                <Container style={{ maxWidth: 'max-content' }}>
+                    {rutas_OyL && rutaSeleccionada && !loadingRutas && rutaTusa.length === 0 && (
+                        <CustomToast 
+                            color={'text-warning'} 
+                            mensaje={'No existe una ruta creada con las poblaciones origen y destino seleccionadas'} 
+                            tiempo={5000} 
+                            titulo={'⚠️ Advertencia'} 
+                            onClick={() => { alert('Advertencia') }} 
+                            mostrar={1} 
+                        />
+                    )}
+                    {rutas_OyL && rutaSeleccionada && !loadingRutas && rutaTusa.length === 1 && (
+                        <CustomToast 
+                            color={'text-success'} 
+                            mensaje={'Ruta TUSA encontrada y vinculada'} 
+                            tiempo={5000} 
+                            titulo={'✅ Éxito'} 
+                            onClick={() => { alert('Advertencia') }} 
+                            mostrar={1} 
+                        />
+                    )}
                 </Container>
-            </div>
-        </div >
+            </Container>
+        </div>
     );
 };
 
-export default RutasModule;
+export default RutasModule
