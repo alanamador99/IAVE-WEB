@@ -295,6 +295,8 @@ export const getStats = async (req, res) => {
     res.send(error.message);
   }
 };
+
+
 /**
  * Actualiza el estatus y comentarios de un sesgo/reporte
  * 
@@ -346,5 +348,97 @@ export const UpdateSesgo = async (req, res) => {
   } catch (error) {
     res.status(500);
     res.send(error.message);
+  }
+};
+
+
+
+
+
+
+/**
+ * Actualiza el estatus y comentarios de un sesgo/reporte
+ * 
+ * Permite cambiar el estado de un sesgo en el flujo de investigación:
+ * - asignado → en_proceso → finalizado
+ * 
+ * Los comentarios se usan para documentar el progreso y hallazgos
+ * de la investigación del sesgo.
+ * 
+ * @async
+ * @param {Object} req - Objeto request
+ * @param {string} req.params.id - ID del sesgo a actualizar
+ * @param {Object} req.body - Body con datos a actualizar
+ * @param {string} req.body.Estatus - Nuevo estatus (asignado, en_proceso, finalizado)
+ * @param {string} req.body.Comentarios - Observaciones/hallazgos de la investigación
+ * @param {Object} res - Objeto response
+ * @returns {Promise<void>} Status 204 (No Content) si exitoso
+ * @returns {Object} error - Si ocurre un error en la BD (500)
+ * 
+ * @example
+ * PUT /api/sesgos/1
+ * Body: {
+ *   "Estatus": "en_proceso",
+ *   "Comentarios": "Se está investigando la caseta no encontrada"
+ * }
+ * Response: 200 OK 'Estatus en_proceso actualizado correctamente sobre el ID 251125_143046_1234'
+ * 
+ * @example
+ * PUT /api/sesgos/1
+ * Body: {
+ *   "Estatus": "finalizado",
+ *   "Comentarios": "Caseta encontrada: Era 'Caseta Sahagún' con nombre alternativo"
+ * }
+ * Response: 200 OK 'Estatus finalizado actualizado correctamente sobre el ID 251125_143046_1234'
+ */
+export const getNearDirectorios = async (req, res) => {
+  const { lat, lng } = req.query;
+
+  if (!lat || !lng) {
+    return res.status(400).json({ msg: 'Latitud y longitud requeridas' });
+  }
+
+  try {
+    const pool = await getConnection();
+
+    const result = await pool.request()
+      .input('latitud', sql.Float, parseFloat(lat))
+      .input('longitud', sql.Float, parseFloat(lng))
+      .query(`
+        SELECT 
+          ID_entidad,
+          Nombre,
+          Razon_social,
+          latitud,
+          longitud,
+          (
+            6371 * ACOS(
+              COS(RADIANS(@latitud)) 
+              * COS(RADIANS(TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(latitud)), CHAR(9), ''), ' ', '') AS FLOAT))) 
+              * COS(RADIANS(TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(longitud)), CHAR(9), ''), ' ', '') AS FLOAT)) - RADIANS(@longitud)) 
+              + SIN(RADIANS(@latitud)) 
+              * SIN(RADIANS(TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(latitud)), CHAR(9), ''), ' ', '') AS FLOAT)))
+            )
+          ) AS distancia_km
+        FROM Directorio
+        WHERE TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(latitud)), CHAR(9), ''), ' ', '') AS FLOAT) IS NOT NULL 
+          AND TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(longitud)), CHAR(9), ''), ' ', '') AS FLOAT) IS NOT NULL
+          AND (
+            6371 * ACOS(
+              COS(RADIANS(@latitud)) 
+              * COS(RADIANS(TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(latitud)), CHAR(9), ''), ' ', '') AS FLOAT))) 
+              * COS(RADIANS(TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(longitud)), CHAR(9), ''), ' ', '') AS FLOAT)) - RADIANS(@longitud)) 
+              + SIN(RADIANS(@latitud)) 
+              * SIN(RADIANS(TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(latitud)), CHAR(9), ''), ' ', '') AS FLOAT)))
+            )
+          ) <= 2
+        ORDER BY distancia_km
+      `);
+
+    res.json(result.recordset);
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ msg: 'Error al obtener directorio cercano' });
   }
 };

@@ -33,3 +33,7 @@ CREATE TABLE ImportacionesCruces
 SELECT * FROM cruces WHERE Estatus = 'Abuso'
 
 SELECT * FROM personal
+
+
+
+SELECT TOP(10) * FROM Directorio

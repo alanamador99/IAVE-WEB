@@ -11,6 +11,7 @@ import markerB from 'leaflet/dist/images/B.png';
 import markerPin from 'leaflet/dist/images/pin_intermedio.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 import { Container } from 'react-bootstrap';
+import { result } from 'lodash';
 
 // ===== CONSTANTES =====
 const API_KEY = 'Jq92BpFD-tYae-BBj2-rEMc-MnuytuOB30ST';
@@ -61,9 +62,50 @@ const normalizarNombre = (lugar) => {
     return sinAcentos.replace(/[^a-zA-Z0-9\s]/g, '').toUpperCase();
 };
 
+
+const switchTipoVehiculo = (tvehiculo) => {
+    let resultado;
+    switch (tvehiculo) {
+        case "1":
+            resultado = "Automovil";
+            break;
+        case "2":
+            resultado = "Autobus 2 Ejes";
+            break;
+        case "5":
+            resultado = "Camion 2 Ejes";
+            break;
+        case "6":
+            resultado = "Camion 3 Ejes";
+            break;
+        case "7":
+            resultado = "Camion 3 Ejes";
+            break;
+        case "8":
+            resultado = "Camion 5 Ejes";
+            break;
+        case "9":
+            resultado = "Camion 5 Ejes";
+            break;
+        case "10":
+            resultado = "Camion 9 Ejes";
+            break;
+        case "11":
+            resultado = "Camion 9 Ejes";
+            break;
+        case "12":
+            resultado = "Camion 9 Ejes";
+            break;
+        default:
+            resultado = "Error";
+            break;
+    }
+    return resultado;
+}
+
 const convertirCoordenadasGeoJSON = (geojsonString) => {
     const geojson = typeof geojsonString === 'string' ? JSON.parse(geojsonString) : geojsonString;
-    
+
     if (geojson.type === 'MultiLineString') {
         return geojson.coordinates.map(lineString =>
             lineString.map(([lng, lat]) => [lat, lng])
@@ -134,11 +176,13 @@ const useDestinationSearch = (searchTerm, tipo) => {
 
 // ===== COMPONENTE PRINCIPAL =====
 const RutasModule = () => {
+    // Referencia a la combinación ctrl + enter para atajo de teclado
+    const buttonRef = useRef(null);
     // Estados de búsqueda
     const [txtOrigen, setTxtOrigen] = useState('');
     const [txtPuntoIntermedio, setTxtPuntoIntermedio] = useState('');
     const [txtDestino, setTxtDestino] = useState('');
-    const [tipoVehiculo, setTipoVehiculo] = useState(5);
+    const [tipoVehiculo, setTipoVehiculo] = useState("5");
 
     // Estados de selección
     const [origen, setOrigen] = useState(null);
@@ -199,6 +243,18 @@ const RutasModule = () => {
         calcularRutaHandler('SinIntermedio');
     }, []);
 
+    // ===== MANEJADOR DEL KEYDOWN =====
+    const handleKeyDown = (event) => {
+        // Verificar si se presionó Ctrl y Enter
+        if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+            event.preventDefault(); // Evitar el comportamiento predeterminado (ej. salto de línea en un textarea)
+            // Simular un clic en el botón referenciado
+            if (buttonRef.current) {
+                buttonRef.current.click();
+            }
+        }
+    };
+
     // ===== FUNCIONES DE API =====
     const getRouteDetails = useCallback(async (tipoDetalleOoL) => {
         if (!origen?.id_dest || !destino?.id_dest) {
@@ -208,7 +264,7 @@ const RutasModule = () => {
 
         try {
             setLoadingRutaSeleccionada(true);
-            
+
             // Primera petición
             const formData1 = new URLSearchParams({
                 dest_i: origen.id_dest,
@@ -416,7 +472,8 @@ const RutasModule = () => {
 
             const rutaTUSAData = dataTusa?.data || dataTusa || [];
             const existeEnTUSA = Array.isArray(rutaTUSAData) ? rutaTUSAData.length > 0 : dataTusa?.enTUSA;
-
+            alert("aquí");
+            console.log(rutaTUSAData);
             setRutaTusa(rutaTUSAData);
 
             if (dataTusa.total === 1) {
@@ -425,7 +482,7 @@ const RutasModule = () => {
                 );
                 setCasetasEnRutaTusa(casetasEnTUSA.data);
             }
-            
+
             if (dataTusa.total > 0) {
                 setIsModalOpen(true);
             }
@@ -449,7 +506,7 @@ const RutasModule = () => {
                 rutaLibreFinal = procesarRuta(rutaLibre1);
             }
 
-            const stringifyGeoJSON = (geojson) => 
+            const stringifyGeoJSON = (geojson) =>
                 typeof geojson === 'string' ? geojson : JSON.stringify(geojson);
 
             setRutas_OyL({
@@ -470,7 +527,14 @@ const RutasModule = () => {
             setLoadingRutas(false);
         }
     }, [origen, destino, puntoIntermedio, tipoVehiculo]);
+    useEffect(() => {
+        document.addEventListener('keydown', handleKeyDown);
 
+        // Función de limpieza que se ejecuta al desmontar el componente
+        return () => {
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, []);
     // ===== VALORES MEMOIZADOS =====
     const origenCoords = useMemo(() => {
         if (!origen?.geojson) return null;
@@ -507,8 +571,8 @@ const RutasModule = () => {
                     </div>
 
                     <div className="table-container py-0 my-2" style={{ maxHeight: '12rem' }}>
-                        <table 
-                            className='table table-bordered table-scroll table-sm table-hover align-middle mt-2' 
+                        <table
+                            className='table table-bordered table-scroll table-sm table-hover align-middle mt-2'
                             style={{ display: casetasEnRutaTusa?.length > 0 ? 'table' : 'none' }}
                         >
                             <thead>
@@ -518,12 +582,8 @@ const RutasModule = () => {
                                     <th>Estado</th>
                                     <th>Latitud</th>
                                     <th>Longitud</th>
-                                    <th>Auto</th>
-                                    <th>Bus 2 Ejes</th>
-                                    <th>C 2 Ejes</th>
-                                    <th>C 3 Ejes</th>
-                                    <th>C 5 Ejes</th>
-                                    <th>C 9 Ejes</th>
+                                    <th>{switchTipoVehiculo(tipoVehiculo)}</th>
+
                                     <th>Consecutivo</th>
                                 </tr>
                             </thead>
@@ -532,8 +592,8 @@ const RutasModule = () => {
                                     <tr key={caseta.ID_Caseta || index} className='text-center'>
                                         <td className='text-right'>
                                             {caseta.ID_Caseta}{' '}
-                                            <span 
-                                                style={{ cursor: 'help' }} 
+                                            <span
+                                                style={{ cursor: 'help' }}
                                                 title={caseta.IAVE ? 'SI Acepta el pago con TAG' : 'NO admite el pago con TAG'}
                                             >
                                                 {caseta.IAVE ? '✅' : '❌'}
@@ -543,21 +603,16 @@ const RutasModule = () => {
                                         <td>{caseta.Estado}</td>
                                         <td>{caseta.latitud}</td>
                                         <td>{caseta.longitud}</td>
-                                        <td>$ {formatearEnteros(caseta.Automovil)}</td>
-                                        <td>$ {formatearEnteros(caseta.Autobus2Ejes)}</td>
-                                        <td>$ {formatearEnteros(caseta.Camion2Ejes)}</td>
-                                        <td>$ {formatearEnteros(caseta.Camion3Ejes)}</td>
-                                        <td>$ {formatearEnteros(caseta.Camion5Ejes)}</td>
-                                        <td>$ {formatearEnteros(caseta.Camion9Ejes)}</td>
+                                        <td>$ {formatearEnteros(caseta[switchTipoVehiculo(tipoVehiculo).replaceAll(" ", "")])}</td>
                                         <td style={{ placeItems: 'center' }}>
-                                            <input 
-                                                style={{ maxWidth: '3rem', textAlign: 'center' }} 
-                                                className="form-control form-control-sm" 
-                                                maxLength={2} 
-                                                type="text" 
-                                                name="txtCasetaConsecutivo" 
-                                                id={`txtCasetaConsecutivo_${caseta.ID_Caseta}`} 
-                                                defaultValue={caseta.consecutivo || ''} 
+                                            <input
+                                                style={{ maxWidth: '3rem', textAlign: 'center' }}
+                                                className="form-control form-control-sm"
+                                                maxLength={2}
+                                                type="text"
+                                                name="txtCasetaConsecutivo"
+                                                id={`txtCasetaConsecutivo_${caseta.ID_Caseta}`}
+                                                defaultValue={caseta.consecutivo || ''}
                                             />
                                         </td>
                                     </tr>
@@ -751,7 +806,7 @@ const RutasModule = () => {
                                 </div>
                             </div>
                             <div className="container text-center my-3">
-                                <button className="btn btn-success container-fluid" onClick={calcularRutaHandler}>
+                                <button className="btn btn-success container-fluid" ref={buttonRef} onClick={calcularRutaHandler}>
                                     Calcular ruta
                                 </button>
                             </div>
@@ -833,7 +888,7 @@ const RutasModule = () => {
                                             time={parsearMinutos(rutas_OyL?.optima?.tiempo)}
                                             costs={{ label: 'Casetas', value: formatearDinero(rutas_OyL?.optima?.costoCasetas) }}
                                             advertencias={rutas_OyL?.optima?.advertencias}
-                                            color={'blue'}
+                                            color={'green'}
                                         />
                                     </div>
                                     <div className='col-md ml-1 p-0'
@@ -844,11 +899,11 @@ const RutasModule = () => {
                                             tipo={'Libre'}
                                             distance={rutas_OyL?.libre?.distancia.toFixed(2)}
                                             time={parsearMinutos(rutas_OyL?.libre?.tiempo)}
-                                            costs={{ 
-                                                label: 'Casetas', 
-                                                value: rutas_OyL?.libre?.costoCasetas 
-                                                    ? formatearDinero(rutas_OyL?.libre?.costoCasetas) 
-                                                    : 'Sin costo' 
+                                            costs={{
+                                                label: 'Casetas',
+                                                value: rutas_OyL?.libre?.costoCasetas
+                                                    ? formatearDinero(rutas_OyL?.libre?.costoCasetas)
+                                                    : 'Sin costo'
                                             }}
                                             advertencias={rutas_OyL?.libre?.advertencias}
                                             color={'red'}
@@ -892,11 +947,6 @@ const RutasModule = () => {
                         )}
 
                         {/* Polylines */}
-                        {rutaTusa?.polilinea && (
-                            <Polyline color='green' positions={rutaTusa.polilinea} weight={4} opacity={0.4}>
-                                <Popup>Ruta establecida en TUSA, de acuerdo a las casetas</Popup>
-                            </Polyline>
-                        )}
 
                         {rutas_OyL?.polilineaLibre?.map((arreglo, i) => (
                             <Polyline key={`libre-${i}`} color='red' positions={arreglo} weight={3} opacity={0.4}>
@@ -905,15 +955,15 @@ const RutasModule = () => {
                         ))}
 
                         {rutas_OyL?.polilineaOptima?.map((arreglo, i) => (
-                            <Polyline key={`optima-${i}`} color='blue' positions={arreglo} weight={3} opacity={0.4}>
+                            <Polyline key={`optima-${i}`} color='green' positions={arreglo} weight={3} opacity={0.4}>
                                 <Popup>Ruta Cuota</Popup>
                             </Polyline>
                         ))}
 
-                        {rutaSeleccionada[0]?.map((item, index) => (
-                            <Marker 
-                                key={item?.id || item?.cve_caseta || index} 
-                                position={[JSON.parse(item?.geojson).coordinates[1], JSON.parse(item?.geojson).coordinates[0]]} 
+                        {rutaSeleccionada[1]?.map((item, index) => (
+                            <Marker
+                                key={item?.id || item?.cve_caseta || index}
+                                position={[JSON.parse(item?.geojson).coordinates[1], JSON.parse(item?.geojson).coordinates[0]]}
                                 icon={markerIcons.caseta}
                             >
                                 <Popup>
@@ -923,6 +973,21 @@ const RutasModule = () => {
                                 </Popup>
                             </Marker>
                         ))}
+                        {casetasEnRutaTusa?.map((caseta, index) => (
+                            <Marker key={caseta.ID_Caseta || index} className='text-center'
+                                position={[caseta.latitud, caseta.longitud]}
+
+                            >
+                                <Popup>
+                                    Caseta TUSA:
+                                    <br />
+                                    {caseta.Nombre_IAVE}
+                                    <br />
+                                    <strong style={{ color: 'green' }}>${caseta[switchTipoVehiculo(tipoVehiculo).replaceAll(" ", "")]}</strong>
+                                </Popup>
+                            </Marker>
+                        ))}
+
                     </MapContainer>
 
                     {/* Panel de detalles */}
@@ -952,8 +1017,8 @@ const RutasModule = () => {
                             <center className='pb-3 text-primary'>
                                 <small>
                                     <strong>
-                                        {rutaTusa[0]?.Categoria 
-                                            ? `Esta ruta YA existe en TUSA ${rutaTusa[0]?.Categoria}` 
+                                        {rutaTusa[0]?.Categoria
+                                            ? `Esta ruta YA existe en TUSA ${rutaTusa[0]?.Categoria}`
                                             : ''}
                                     </strong>
                                 </small>
@@ -961,13 +1026,13 @@ const RutasModule = () => {
 
                             <div className="form-group py-0" style={{ justifySelf: 'center' }}>
                                 <label className='py-0 my-0 mr-2'>Tipo de traslado:</label>
-                                <select 
-                                    className='form-select form-select-sm custom-select' 
-                                    name="selectTipoTraslado" 
-                                    id='selectTipoTraslado' 
-                                    style={{ width: 'auto', height: '2.5rem' }} 
-                                    disabled={!!rutaTusa[0]?.Categoria} 
-                                    value={rutaTusa[0]?.Categoria || ''} 
+                                <select
+                                    className='form-select form-select-sm custom-select'
+                                    name="selectTipoTraslado"
+                                    id='selectTipoTraslado'
+                                    style={{ width: 'auto', height: '2.5rem' }}
+                                    disabled={!!rutaTusa[0]?.Categoria}
+                                    value={rutaTusa[0]?.Categoria || ''}
                                     onChange={handleChange}
                                 >
                                     <option value="">Selecciona</option>
@@ -982,29 +1047,28 @@ const RutasModule = () => {
                             <div className="summary-item-RC">
                                 <span className="summary-label-RC">Distancia Total:</span>
                                 <span className="summary-value-RC">
-                                    {rutaSeleccionada[0]?.distancia ? `${rutaSeleccionada[0].distancia.toFixed(2)} Km` : '-'}
+                                    {rutaSeleccionada[1]?.distancia ? `${rutaSeleccionada[1].distancia.toFixed(2)} Km` : '-'}
                                 </span>
                             </div>
                             <div className="summary-item-RC">
                                 <span className="summary-label-RC">Tiempo Estimado:</span>
                                 <span className="summary-value-RC">
-                                    {rutaSeleccionada[0]?.tiempo ? parsearMinutos(rutaSeleccionada[0].tiempo) : '-'}
+                                    {rutaSeleccionada[1]?.tiempo ? parsearMinutos(rutaSeleccionada[1].tiempo) : '-'}
                                 </span>
                             </div>
                             <div className="summary-item-RC">
                                 <span className="summary-label-RC">Costo Estimado:</span>
                                 <span className="summary-value-RC">
-                                    {rutaSeleccionada[0]?.costoCasetas ? `$${formatearDinero(rutaSeleccionada[0].costoCasetas)}` : '-'}
+                                    {rutaSeleccionada[1]?.costoCasetas ? `$${formatearDinero(rutaSeleccionada[1].costoCasetas)}` : '-'}
                                 </span>
                             </div>
                             <div className="summary-item-RC">
                                 <span className="summary-label-RC">Estado:</span>
                                 <span className="summary-value-RC">
-                                    <span className={`status-indicator-RC ${
-                                        (boolExiste.includes('Ruta calculada') || boolExiste.includes('Ruta existente')) 
-                                            ? 'status-active-RC' 
-                                            : 'status-pendiente-RC'
-                                    }`}></span>
+                                    <span className={`status-indicator-RC ${(boolExiste.includes('Ruta calculada') || boolExiste.includes('Ruta existente'))
+                                        ? 'status-active-RC'
+                                        : 'status-pendiente-RC'
+                                        }`}></span>
                                     <span style={{ fontSize: boolExiste?.length > 12 ? '0.8rem' : '1rem' }}>
                                         {boolExiste}
                                     </span>
@@ -1017,10 +1081,10 @@ const RutasModule = () => {
                                 </span>
                             </div>
                             <div className="form-floating">
-                                <textarea 
-                                    className="form-control" 
-                                    placeholder="Observaciones" 
-                                    id="floatingTextarea2" 
+                                <textarea
+                                    className="form-control"
+                                    placeholder="Observaciones"
+                                    id="floatingTextarea2"
                                     style={{ height: '3.3rem', fontSize: '0.8rem' }}
                                 ></textarea>
                                 <label htmlFor="floatingTextarea2">Observaciones:</label>
@@ -1078,16 +1142,17 @@ const RutasModule = () => {
                     onSelect={async (rutaSeleccionadaDelModal) => {
                         setRutaTusaSelected(rutaSeleccionadaDelModal);
                         console.log('✅ Ruta TUSA seleccionada:', rutaSeleccionadaDelModal);
-                        
+
                         try {
                             const casetasResponse = await axios.get(
                                 `${API_URL}/api/casetas/rutas/${rutaSeleccionadaDelModal}/casetasPorRuta`
                             );
                             setCasetasEnRutaTusa(casetasResponse.data);
                             console.log('✅ Casetas cargadas:', casetasResponse.data);
-                            
+
                             setIsModalOpen(false);
                             setRutaTusa(rutaTusa.filter(ruta => ruta.id_Tipo_ruta === rutaSeleccionadaDelModal));
+                            console.log('✅ Ruta TUSA actualizada:', rutaTusa);
                         } catch (error) {
                             console.error('❌ Error al cargar casetas:', error);
                         }
@@ -1104,23 +1169,23 @@ const RutasModule = () => {
             <Container style={{ position: 'fixed', bottom: 20, right: '-30px', zIndex: 99999, maxWidth: 'max-content' }}>
                 <Container style={{ maxWidth: 'max-content' }}>
                     {rutas_OyL && rutaSeleccionada && !loadingRutas && rutaTusa.length === 0 && (
-                        <CustomToast 
-                            color={'text-warning'} 
-                            mensaje={'No existe una ruta creada con las poblaciones origen y destino seleccionadas'} 
-                            tiempo={5000} 
-                            titulo={'⚠️ Advertencia'} 
-                            onClick={() => { alert('Advertencia') }} 
-                            mostrar={1} 
+                        <CustomToast
+                            color={'text-warning'}
+                            mensaje={'No existe una ruta creada con las poblaciones origen y destino seleccionadas'}
+                            tiempo={5000}
+                            titulo={'⚠️ Advertencia'}
+                            onClick={() => { alert('Advertencia') }}
+                            mostrar={1}
                         />
                     )}
                     {rutas_OyL && rutaSeleccionada && !loadingRutas && rutaTusa.length === 1 && (
-                        <CustomToast 
-                            color={'text-success'} 
-                            mensaje={'Ruta TUSA encontrada y vinculada'} 
-                            tiempo={5000} 
-                            titulo={'✅ Éxito'} 
-                            onClick={() => { alert('Advertencia') }} 
-                            mostrar={1} 
+                        <CustomToast
+                            color={'text-success'}
+                            mensaje={'Ruta TUSA encontrada y vinculada'}
+                            tiempo={5000}
+                            titulo={'✅ Éxito'}
+                            onClick={() => { alert('Advertencia') }}
+                            mostrar={1}
                         />
                     )}
                 </Container>

@@ -6,7 +6,7 @@ import crucesRoutes from "./routes/cruces.routes.js";
 import abusosRoutes from "./routes/abusos.routes.js";
 import aclaracionesRoutes from "./routes/aclaraciones.routes.js";
 import sesgosRoutes from "./routes/sesgos.routes.js";
-import casetasRoutes from "./routes/casetas.routes.js";
+import casetasRoutes from "./routes/rutas_casetas.routes.js";
 import tagsRoutes from "./routes/tags.routes.js";
 
 

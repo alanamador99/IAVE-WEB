@@ -1042,3 +1042,100 @@ export const getRutaPorOrigen_Destino = async (req, res) => {
 };
 
 
+
+
+
+/**
+ * Obtiene todas las casetas en una ruta específica del sistema TUSA.
+ * @async
+ * @function getCasetas_por_RutaTUSA_TRN
+ * @param {Object} req - Objeto de solicitud
+ * @param {number} req.params.IDTipoRuta - ID del tipo de ruta en TUSA
+ * @param {Object} res - Objeto de respuesta
+ * @returns {Promise<void>} Responde con array de casetas en orden de aparición
+ * @throws {Error} 404 si no hay casetas para la ruta; 500 si falla BD
+ * @description
+ * Retorna casetas ordenadas por consecutivo (orden en la ruta).
+ * Incluye:
+ * - Tarifas por tipo de vehículo
+ * - Ubicación (latitud/longitud redondeada a 4 decimales)
+ * - Validación del uso del dispositivo IAVE en la caseta
+ * @example
+ * // GET /api/casetas/ruta/3
+ * // Response
+ * [
+ *     {
+ *    "ID_Caseta": 223,
+ *    "Nombre": "Costa Rica",
+ *    "Carretera": "Mex 015D",
+ *    "Estado": "Sinaloa",
+ *    "Automovil": 218,
+ *    "Autobus2Ejes": 355,
+ *    "Camion2Ejes": 368,
+ *    "Camion3Ejes": 368,
+ *    "Camion5Ejes": 418,
+ *    "Camion9Ejes": 525,
+ *    "IAVE": true,
+ *    "latitud": "24.5703",
+ *    "longitud": "-107.4302",
+ *    "Nombre_IAVE": "Costa Rica I",
+ *    "Notas": "Ent. La Cruz - Costa Rica",
+ *    "consecutivo": 1
+ *  },
+ *   {...}
+ * ]
+ */
+export const getCoincidenciasPoblacion = async (req, res) => {
+  const { Poblacion } = req.params;
+  try {
+    const pool = await getConnection();
+    const result = await pool.request()
+      .input("IDTipoRuta", sql.Int, IDTipoRuta)
+      .query(`
+              SELECT DISTINCT 
+                  CP.ID_Caseta,
+                  CP.Nombre,
+                  CP.Carretera,
+                  CP.Estado,
+                  CP.Automovil,
+                  CP.Autobus2Ejes,
+                  CP.Camion2Ejes,
+                  CP.Camion3Ejes,
+                  CP.Camion5Ejes,
+                  CP.Camion9Ejes,
+                  CP.IAVE, -- Campo booleano
+                  CP.latitud,
+                  CP.longitud,
+                  CP.Nombre_IAVE,
+                  CP.Notas,
+                  PCR.consecutivo
+
+              FROM
+                  Tipo_de_ruta_N TRN
+                  INNER JOIN
+                  PCasetasporruta PCR ON TRN.Id_Ruta = PCR.Id_Ruta AND TRN.id_Tipo_ruta = PCR.id_Tipo_ruta
+                  INNER JOIN
+                  casetas_Plantillas CP ON PCR.Id_Caseta = CP.ID_Caseta
+              WHERE TRN.id_Tipo_ruta = @IDTipoRuta 
+              ORDER BY PCR.consecutivo;
+        `);
+
+    result.recordset.forEach(row => {
+      try {
+        row.latitud = parseFloat(row.latitud).toFixed(4)
+        row.longitud = parseFloat(row.longitud).toFixed(4)
+      } catch (error) {
+        console.log(error);
+      }
+    });
+    if (result.recordset.length === 0) {
+      return res.status(404).json({ message: "No se encontraron casetas para la ruta proporcionada." });
+    }
+    res.status(200).json(result.recordset);
+  } catch (error) {
+    res.status(500);
+    res.send(error.message);
+  }
+};
+
+
