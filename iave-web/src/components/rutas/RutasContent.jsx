@@ -145,7 +145,7 @@ const RutasContent = ({ onRutaSeleccionada, onOrigenDestino }) => {
             setPaginaActual(numeroPagina);
         }
     };
-
+    
     const handleRegistrosPorPaginaChange = (e) => {
         setRegistrosPorPagina(Number(e.target.value));
         setPaginaActual(1);

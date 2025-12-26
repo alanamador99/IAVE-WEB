@@ -82,8 +82,6 @@ const AclaracionesTable = () => {
   const [aclaraciones, setAclaraciones] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filtros, setFiltros] = useState(FILTROS_INICIALES);
-  const [paginaActual, setPaginaActual] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(250);
 
   // Estados del modal principal
   const [showModal, setShowModal] = useState(false);
@@ -97,6 +95,10 @@ const AclaracionesTable = () => {
   // Estados del modal de mapa
   const [modalAbierto, setModalAbierto] = useState(false);
   const [caseta, setCaseta] = useState(null);
+
+  // Estados para paginación
+  const [paginaActual, setPaginaActual] = useState(1);
+  const [registrosPorPagina, setRegistrosPorPagina] = useState(10);
 
   // ✅ FIX: useEffect sin dependencias circulares
   useEffect(() => {
@@ -116,8 +118,8 @@ const AclaracionesTable = () => {
   // ✅ Memorizar aclaraciones filtradas
   const aclaracionesFiltrados = useMemo(() => {
     return aclaraciones.filter(c => {
-      const fechaOK = (!filtros.fechaInicio || c.Fecha >= filtros.fechaInicio) && 
-                      (!filtros.fechaFin || c.Fecha <= filtros.fechaFin);
+      const fechaOK = (!filtros.fechaInicio || c.Fecha >= filtros.fechaInicio) &&
+        (!filtros.fechaFin || c.Fecha <= filtros.fechaFin);
       const opOK = !filtros.operador || c.No_Economico.toLowerCase().includes(filtros.operador.toLowerCase());
       const casOK = !filtros.caseta || c.Caseta.toLowerCase().includes(filtros.caseta.toLowerCase());
       const estOK = filtros.estatus === 'todos' || c.Estatus_Secundario === filtros.estatus;
@@ -127,13 +129,55 @@ const AclaracionesTable = () => {
     });
   }, [aclaraciones, filtros]);
 
-  // ✅ Memorizar datos paginados
-  const { paginaDatos, totalPaginas } = useMemo(() => {
-    const total = Math.ceil(aclaracionesFiltrados.length / rowsPerPage);
-    const indiceInicio = (paginaActual - 1) * rowsPerPage;
-    const datos = aclaracionesFiltrados.slice(indiceInicio, indiceInicio + rowsPerPage);
-    return { paginaDatos: datos, totalPaginas: total };
-  }, [aclaracionesFiltrados, paginaActual, rowsPerPage]);
+
+
+  // ✅ Calcular datos de paginación
+  const totalPaginas = Math.ceil(aclaracionesFiltrados.length / registrosPorPagina);
+  const indiceInicio = (paginaActual - 1) * registrosPorPagina;
+  const indiceFin = indiceInicio + registrosPorPagina;
+  const paginaDatos = aclaracionesFiltrados.slice(indiceInicio, indiceFin);
+
+  // ✅ Generar array de números de página para mostrar
+  const obtenerNumerosPagina = useCallback(() => {
+    const paginas = [];
+    const maxPaginasVisibles = 5;
+    
+    if (totalPaginas <= maxPaginasVisibles) {
+      for (let i = 1; i <= totalPaginas; i++) {
+        paginas.push(i);
+      }
+    } else {
+      if (paginaActual <= 3) {
+        for (let i = 1; i <= 4; i++) {
+          paginas.push(i);
+        }
+        paginas.push('...');
+        paginas.push(totalPaginas);
+      } else if (paginaActual >= totalPaginas - 2) {
+        paginas.push(1);
+        paginas.push('...');
+        for (let i = totalPaginas - 3; i <= totalPaginas; i++) {
+          paginas.push(i);
+        }
+      } else {
+        paginas.push(1);
+        paginas.push('...');
+        for (let i = paginaActual - 1; i <= paginaActual + 1; i++) {
+          paginas.push(i);
+        }
+        paginas.push('...');
+        paginas.push(totalPaginas);
+      }
+    }
+    
+    return paginas;
+  }, [paginaActual, totalPaginas]);
+
+  const cambiarPagina = useCallback((numeroPagina) => {
+    if (numeroPagina >= 1 && numeroPagina <= totalPaginas) {
+      setPaginaActual(numeroPagina);
+    }
+  }, [totalPaginas]);
 
   // ✅ Callbacks optimizados
   const handleFiltroChange = useCallback((campo, valor) => {
@@ -141,16 +185,17 @@ const AclaracionesTable = () => {
     setPaginaActual(1); // Reset a página 1 al filtrar
   }, []);
 
+
+  const handleRegistrosPorPaginaChange = (e) => {
+    setRegistrosPorPagina(Number(e.target.value));
+    setPaginaActual(1);
+  };
+
   const resetFiltros = useCallback(() => {
     setFiltros(FILTROS_INICIALES);
     setPaginaActual(1);
   }, []);
 
-  const cambiarPagina = useCallback((nuevaPagina) => {
-    if (nuevaPagina >= 1 && nuevaPagina <= totalPaginas) {
-      setPaginaActual(nuevaPagina);
-    }
-  }, [totalPaginas]);
 
   // ✅ Debounce para actualizaciones de API
   const actualizarAclaracionAPI = useCallback(async (id, payload) => {
@@ -167,18 +212,19 @@ const AclaracionesTable = () => {
   // ✅ Handler optimizado para NoAclaracion (con debounce manual)
   const handleNoAclaracionChange = useCallback((aclaracion, nuevoValor) => {
     // Actualizar UI inmediatamente
-    setAclaraciones(prev => prev.map(c => 
-      c.ID === aclaracion.ID 
-        ? { ...c, NoAclaracion: nuevoValor, Estatus_Secundario: 'aclaracion_levantada' } 
+    setAclaraciones(prev => prev.map(c =>
+      c.ID === aclaracion.ID
+        ? { ...c, NoAclaracion: nuevoValor, Estatus_Secundario: 'aclaracion_levantada' }
         : c
     ));
 
+
     // Actualizar API (considera implementar debounce real aquí)
     const nuevoEstatus = 'aclaracion_levantada';
-    actualizarAclaracionAPI(aclaracion.ID, { 
-      noAclaracion: nuevoValor, 
-      FechaDictamen: fechaDictamen, 
-      estatusSecundario: nuevoEstatus 
+    actualizarAclaracionAPI(aclaracion.ID, {
+      noAclaracion: nuevoValor,
+      FechaDictamen: fechaDictamen,
+      estatusSecundario: nuevoEstatus
     });
   }, [actualizarAclaracionAPI, fechaDictamen]);
 
@@ -189,27 +235,27 @@ const AclaracionesTable = () => {
       return;
     }
 
-    setAclaraciones(prev => prev.map(c => 
-      c.ID === aclaracion.ID 
-        ? { ...c, montoDictaminado: nuevoValor, Estatus_Secundario: 'dictaminado' } 
+    setAclaraciones(prev => prev.map(c =>
+      c.ID === aclaracion.ID
+        ? { ...c, montoDictaminado: nuevoValor, Estatus_Secundario: 'dictaminado' }
         : c
     ));
 
-    await actualizarAclaracionAPI(aclaracion.ID, { 
-      montoDictaminado: nuevoValor, 
-      estatusSecundario: 'dictaminado' 
+    await actualizarAclaracionAPI(aclaracion.ID, {
+      montoDictaminado: nuevoValor,
+      estatusSecundario: 'dictaminado'
     });
   }, [actualizarAclaracionAPI]);
 
   // ✅ Aplicar dictamen al hacer blur
   const handleMontoBlur = useCallback(async (aclaracion) => {
     if (aclaracion.montoDictaminado) {
-      setAclaraciones(prev => prev.map(c => 
+      setAclaraciones(prev => prev.map(c =>
         c.ID === aclaracion.ID ? { ...c, Aplicado: 1 } : c
       ));
-      await actualizarAclaracionAPI(aclaracion.ID, { 
-        estatusSecundario: 'dictaminado', 
-        Aplicado: 1 
+      await actualizarAclaracionAPI(aclaracion.ID, {
+        estatusSecundario: 'dictaminado',
+        Aplicado: 1
       });
     }
   }, [actualizarAclaracionAPI]);
@@ -235,20 +281,20 @@ const AclaracionesTable = () => {
 
     const id = aclaracionSeleccionado.ID;
     const nuevoEstatus = isDictaminado ? 'dictaminado' : 'aclaracion_levantada';
-    const payload = { 
-      noAclaracion: vNoAclaracion, 
-      FechaDictamen: fechaDictamen, 
-      estatusSecundario: nuevoEstatus, 
-      observaciones: vComentarios, 
-      dictaminado: isDictaminado ? 1 : 0, 
-      montoDictaminado: vMontoAclaracion || 0 
+    const payload = {
+      noAclaracion: vNoAclaracion,
+      FechaDictamen: fechaDictamen,
+      estatusSecundario: nuevoEstatus,
+      observaciones: vComentarios,
+      dictaminado: isDictaminado ? 1 : 0,
+      montoDictaminado: vMontoAclaracion || 0
     };
 
     const exito = await actualizarAclaracionAPI(id, payload);
     if (exito) {
-      setAclaraciones(prev => prev.map(c => 
-        c.ID === id 
-          ? { ...c, ...payload, Estatus_Secundario: nuevoEstatus, Aplicado: payload.dictaminado } 
+      setAclaraciones(prev => prev.map(c =>
+        c.ID === id
+          ? { ...c, ...payload, Estatus_Secundario: nuevoEstatus, Aplicado: payload.dictaminado }
           : c
       ));
     }
@@ -290,23 +336,22 @@ const AclaracionesTable = () => {
       <div className="wrapper">
         <div className="card shadow">
           <div className="card-header py-3 d-flex flex-column flex-md-row align-items-md-center justify-content-between">
-            <div className="d-flex align-items-center gap-2">
-              <label htmlFor="rowsSelect" className="input-group-text mb-0 mr-2">Registros por página:</label>
-              <select
-                id="rowsSelect"
-                className="form-select form-select-sm custom-select"
-                value={rowsPerPage}
-                onChange={(e) => {
-                  setRowsPerPage(parseInt(e.target.value));
-                  setPaginaActual(1);
-                }}
-                style={{ width: 'auto' }}
-              >
-                <option value={20}>20</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-                <option value={250}>250</option>
-              </select>
+            <div className="card-header py-3 d-flex flex-column flex-md-row align-items-md-center justify-content-between">
+              <div className="d-flex align-items-center gap-2">
+                <label htmlFor="rowsSelect" className="input-group-text mb-0 mr-2">Registros por página:</label>
+                <select
+                  id="rowsSelect"
+                  className="form-select form-select-sm custom-select"
+                  style={{ width: 'auto' }}
+                  value={registrosPorPagina}
+                  onChange={handleRegistrosPorPaginaChange}
+                >
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
             </div>
             <h6 className="m-0 font-weight-bold text-primary ml-3" style={{ flex: 'auto' }}>
               Aclaraciones que aplican según los parámetros seleccionados - (
@@ -340,14 +385,14 @@ const AclaracionesTable = () => {
               </div>
 
               <div className="form-floating pr-2">
-                <input 
-                  className="form-control form-control-sm" 
+                <input
+                  className="form-control form-control-sm"
                   type="text"
                   placeholder="Buscar operador..."
                   value={filtros.operador}
                   id="MatriculaOP"
                   autoComplete="off"
-                  onChange={(e) => handleFiltroChange('operador', e.target.value)} 
+                  onChange={(e) => handleFiltroChange('operador', e.target.value)}
                 />
                 <label htmlFor="MatriculaOP">Matricula / Operador</label>
               </div>
@@ -367,11 +412,11 @@ const AclaracionesTable = () => {
 
               <div className="col-md-2 pr-2 input-group-text mb-0">
                 <label className='form-label' htmlFor='inEstatus'>Estatus:</label>
-                <select 
-                  className='mx-3 p-2' 
-                  id='inEstatus' 
-                  name="Estatus" 
-                  onChange={(e) => handleFiltroChange('estatus', e.target.value)} 
+                <select
+                  className='mx-3 p-2'
+                  id='inEstatus'
+                  name="Estatus"
+                  onChange={(e) => handleFiltroChange('estatus', e.target.value)}
                   value={filtros.estatus}
                 >
                   <option value="todos">Todos</option>
@@ -382,27 +427,27 @@ const AclaracionesTable = () => {
               </div>
 
               <div className="form-floating pr-2">
-                <input 
-                  className="form-control form-control-sm" 
+                <input
+                  className="form-control form-control-sm"
                   type="text"
                   placeholder="Ejes..."
                   value={filtros.ejes}
                   id="Ejes"
                   autoComplete="off"
-                  onChange={(e) => handleFiltroChange('ejes', e.target.value)} 
+                  onChange={(e) => handleFiltroChange('ejes', e.target.value)}
                 />
                 <label htmlFor="Ejes">Ejes</label>
               </div>
 
               <div className="form-floating pr-2">
-                <input 
-                  className="form-control form-control-sm" 
+                <input
+                  className="form-control form-control-sm"
                   type="text"
                   placeholder="Ejes cobrados..."
                   value={filtros.ejesCobrados}
                   id="ejesCobrados"
                   autoComplete="off"
-                  onChange={(e) => handleFiltroChange('ejesCobrados', e.target.value)} 
+                  onChange={(e) => handleFiltroChange('ejesCobrados', e.target.value)}
                 />
                 <label htmlFor="ejesCobrados">Ejes cobrados</label>
               </div>
@@ -462,9 +507,9 @@ const AclaracionesTable = () => {
                           </div>
                         </td>
                         <td className='pr-0 pl-0'>
-                          <span 
-                            className="d-inline-flex align-items-center" 
-                            style={{ cursor: 'pointer' }} 
+                          <span
+                            className="d-inline-flex align-items-center"
+                            style={{ cursor: 'pointer' }}
                             onClick={() => abrirMapaCaseta(aclaracion)}
                           >
                             <div className="d-flex align-items-center">
@@ -484,10 +529,9 @@ const AclaracionesTable = () => {
                           </div>
                         </td>
                         <td>
-                          <span className={`bg-danger-subtle fw-semibold ${
-                            aclaracion?.diferencia > 0 ? 'text-success' : 
+                          <span className={`bg-danger-subtle fw-semibold ${aclaracion?.diferencia > 0 ? 'text-success' :
                             aclaracion?.diferencia === 0 ? 'text-black' : 'text-danger'
-                          }`}>
+                            }`}>
                             ${aclaracion?.diferencia?.toFixed(2)}
                           </span>
                         </td>
@@ -510,26 +554,26 @@ const AclaracionesTable = () => {
                           </span>
                         </td>
                         <td>
-                          <input 
-                            id={`inputNoAclaracion-${aclaracion.ID}`} 
-                            maxLength={20} 
-                            style={{ fontWeight: 'normal', padding: 0 }} 
-                            type='text' 
-                            className={`pl-2 form-control-sm d-inline-flex align-items-center ${estatusInfo.color}`} 
-                            value={aclaracion?.NoAclaracion || ''} 
-                            disabled={!!aclaracion.Aplicado} 
+                          <input
+                            id={`inputNoAclaracion-${aclaracion.ID}`}
+                            maxLength={20}
+                            style={{ fontWeight: 'normal', padding: 0 }}
+                            type='text'
+                            className={`pl-2 form-control-sm d-inline-flex align-items-center ${estatusInfo.color}`}
+                            value={aclaracion?.NoAclaracion || ''}
+                            disabled={!!aclaracion.Aplicado}
                             onChange={(e) => handleNoAclaracionChange(aclaracion, e.target.value)}
                           />
                         </td>
                         <td>
                           <span className='text-secondary'>$</span>
-                          <input 
-                            type='number' 
-                            id={`inputMontoDictaminado-${aclaracion.ID}`} 
-                            disabled={!aclaracion.NoAclaracion || !!aclaracion.Aplicado} 
-                            style={{ fontWeight: 'normal', width: '5rem', padding: 0 }} 
-                            className={`pl-2 form-control-sm d-inline-flex align-items-center ${estatusInfo.color}`} 
-                            value={aclaracion?.montoDictaminado || ''} 
+                          <input
+                            type='number'
+                            id={`inputMontoDictaminado-${aclaracion.ID}`}
+                            disabled={!aclaracion.NoAclaracion || !!aclaracion.Aplicado}
+                            style={{ fontWeight: 'normal', width: '5rem', padding: 0 }}
+                            className={`pl-2 form-control-sm d-inline-flex align-items-center ${estatusInfo.color}`}
+                            value={aclaracion?.montoDictaminado || ''}
                             onChange={(e) => handleMontoDictaminadoChange(aclaracion, parseFloat(e.target.value))}
                             onBlur={() => handleMontoBlur(aclaracion)}
                           />
@@ -553,27 +597,64 @@ const AclaracionesTable = () => {
               </table>
             </div>
 
-            {/* Paginación */}
-            <nav className="mt-3">
-              <ul className="pagination pagination-sm justify-content-center d-flex flex-wrap">
-                <li className={`page-item ${paginaActual === 1 ? 'disabled' : ''}`}>
-                  <button className="page-link" onClick={() => cambiarPagina(paginaActual - 1)}>Anterior</button>
-                </li>
-                {[...Array(totalPaginas)].map((_, index) => (
-                  <li key={index} className={`page-item ${paginaActual === index + 1 ? 'active' : ''}`}>
-                    <button className="page-link" onClick={() => cambiarPagina(index + 1)}>
-                      {index + 1}
-                    </button>
-                  </li>
-                ))}
-                <li className={`page-item ${paginaActual === totalPaginas ? 'disabled' : ''}`}>
-                  <button className="page-link" onClick={() => cambiarPagina(paginaActual + 1)}>Siguiente</button>
-                </li>
-              </ul>
-            </nav>
+                {/* Paginación */}
+                <div className='assignMe'>
+                    <nav className="mt-3">
+                        <div className="d-flex justify-content-between align-items-center mb-2 px-2">
+                            <span className="text-muted small">
+                                Mostrando {aclaracionesFiltrados.length > 0 ? indiceInicio + 1 : 0} - {Math.min(indiceFin, aclaracionesFiltrados.length)} de {aclaracionesFiltrados.length} registros
+                            </span>
+                            <span className="text-muted small">
+                                Página {totalPaginas > 0 ? paginaActual : 0} de {totalPaginas}
+                            </span>
+                        </div>
+
+                        <ul className="pagination pagination-sm justify-content-center d-flex flex-wrap" style={{ overflow: 'auto', }}>
+                            <li className={`flex-wrap page-item ${paginaActual === 1 ? 'disabled' : ''}`}>
+                                <button 
+                                    className="page-link" 
+                                    onClick={() => cambiarPagina(paginaActual - 1)}
+                                    disabled={paginaActual === 1}
+                                >
+                                    Anterior
+                                </button>
+                            </li>
+
+                            {obtenerNumerosPagina().map((numero, index) => (
+                                numero === '...' ? (
+                                    <li key={`ellipsis-${index}`} className="flex-wrap page-item disabled">
+                                        <span className="page-link">...</span>
+                                    </li>
+                                ) : (
+                                    <li key={`page-${numero}`} className={`flex-wrap page-item ${paginaActual === numero ? 'active' : ''}`}>
+                                        <button 
+                                            className="page-link" 
+                                            onClick={() => cambiarPagina(numero)}
+                                        >
+                                            {numero}
+                                        </button>
+                                    </li>
+                                )
+                            ))}
+
+                            <li className={`flex-wrap page-item ${paginaActual === totalPaginas || totalPaginas === 0 ? 'disabled' : ''}`}>
+                                <button 
+                                    className="page-link"
+                                    onClick={() => cambiarPagina(paginaActual + 1)}
+                                    disabled={paginaActual === totalPaginas || totalPaginas === 0}
+                                >
+                                    Siguiente
+                                </button>
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
           </div>
         </div>
       </div>
+
+
+
 
       {/* Modal de gestión */}
       <Modal show={showModal} onHide={cerrarModal} size="lg">
@@ -584,10 +665,10 @@ const AclaracionesTable = () => {
             </span>
             <FileUser size={35} className="me-1" /> Gestión de Aclaración
             <br />
-            <a 
-              href={`https://apps.pase.com.mx/uc/detalletag/IMDM/${aclaracionSeleccionado?.Tag?.replace("IMDM", "")}`} 
-              style={{ fontSize: '.9rem' }} 
-              target='_blank' 
+            <a
+              href={`https://apps.pase.com.mx/uc/detalletag/IMDM/${aclaracionSeleccionado?.Tag?.replace("IMDM", "")}`}
+              style={{ fontSize: '.9rem' }}
+              target='_blank'
               rel="noreferrer"
             >
               <ReceiptText size={23} className="me-1 ml-2 mr-3" />
@@ -606,7 +687,7 @@ const AclaracionesTable = () => {
               <div className='form-row align-items-center'>
                 <div className="form-floating pr-2 col">
                   Fecha: <span className='ml-1 text-secondary font-weight-bolder'>
-                    <span 
+                    <span
                       style={{ cursor: 'pointer', fontSize: '0.85rem' }}
                       title="Copiar FECHA al portapapeles"
                       onClick={() => {
@@ -625,9 +706,9 @@ const AclaracionesTable = () => {
                     {aclaracionSeleccionado?.["No_Economico"]}
                   </span>
                   <br />
-                  Caseta: <span 
-                    className='ml-1 text-secondary font-weight-bolder' 
-                    style={{ cursor: 'pointer', fontSize: '0.85rem' }} 
+                  Caseta: <span
+                    className='ml-1 text-secondary font-weight-bolder'
+                    style={{ cursor: 'pointer', fontSize: '0.85rem' }}
                     title="Copiar CASETA al portapapeles"
                     onClick={() => {
                       if (aclaracionSeleccionado?.Caseta) {
@@ -649,13 +730,13 @@ const AclaracionesTable = () => {
                 <div className="col">
                   <div className="form-group mb-4">
                     <label htmlFor='inObservaciones'>Observaciones</label>
-                    <textarea 
-                      name="inComentarios" 
-                      className="form-control" 
-                      rows="3" 
-                      id="inObservaciones" 
-                      placeholder="Notas adicionales..." 
-                      value={vComentarios} 
+                    <textarea
+                      name="inComentarios"
+                      className="form-control"
+                      rows="3"
+                      id="inObservaciones"
+                      placeholder="Notas adicionales..."
+                      value={vComentarios}
                       onChange={handleModalChange}
                     />
                   </div>
@@ -668,40 +749,39 @@ const AclaracionesTable = () => {
             <div className='card-header text-center'>
               <ChartNoAxesGantt size={15} className="me-1" />
               <span className='text-primary font-weight-bolder py-3 my-2 ml-2 mr-3'>Gestión de la aclaración</span>
-              (<span className={`ml-1 font-weight-bolder text-uppercase py-2 ${
-                aclaracionSeleccionado?.Estatus_Secundario === 'dictaminado' ? 'text-info' : 
+              (<span className={`ml-1 font-weight-bolder text-uppercase py-2 ${aclaracionSeleccionado?.Estatus_Secundario === 'dictaminado' ? 'text-info' :
                 aclaracionSeleccionado?.Estatus_Secundario === 'aclaracion_levantada' ? 'text-success' : 'text-danger'
-              }`}>
+                }`}>
                 {aclaracionSeleccionado?.Estatus_Secundario || "Solicitud pendiente"}
               </span>)
             </div>
             <div className="card-body border" style={{ background: 'whitesmoke' }}>
               <div className='form-row'>
                 <div className="form-floating pr-2 col">
-                  <input 
-                    type="text" 
-                    placeholder='' 
-                    id='inAclaracionN' 
-                    disabled={isDictaminado} 
-                    className={`form-control ${vNoAclaracion ? 'is-valid' : 'is-invalid'}`} 
-                    name='inAclaracionN' 
-                    value={vNoAclaracion || ''} 
-                    onChange={handleModalChange} 
-                    maxLength={20} 
+                  <input
+                    type="text"
+                    placeholder=''
+                    id='inAclaracionN'
+                    disabled={isDictaminado}
+                    className={`form-control ${vNoAclaracion ? 'is-valid' : 'is-invalid'}`}
+                    name='inAclaracionN'
+                    value={vNoAclaracion || ''}
+                    onChange={handleModalChange}
+                    maxLength={20}
                   />
                   <label className="form-label" htmlFor='inAclaracionN'>Número de aclaración</label>
                   <small className="ml-1 form-text text-muted">Proporcionado al crear la aclaración en el portal PASE</small>
                 </div>
                 <div className="form-floating pr-2 col">
-                  <input 
-                    type="date" 
-                    placeholder='' 
-                    id='inFechaCreacion' 
-                    name='inFechaCreacion' 
-                    className="form-control" 
-                    disabled={isDictaminado} 
-                    value={fechaDictamen} 
-                    onChange={handleModalChange} 
+                  <input
+                    type="date"
+                    placeholder=''
+                    id='inFechaCreacion'
+                    name='inFechaCreacion'
+                    className="form-control"
+                    disabled={isDictaminado}
+                    value={fechaDictamen}
+                    onChange={handleModalChange}
                   />
                   <label className="form-label" htmlFor='inFechaCreacion'>Fecha de creación</label>
                   <small className="ml-1 form-text text-muted">Cuando se carga en el portal PASE.</small>
@@ -725,8 +805,8 @@ const AclaracionesTable = () => {
                 <div className="form-floating pr-2 col">
                   <input
                     type="number"
-                    min="0.00" 
-                    max="100000.00" 
+                    min="0.00"
+                    max="100000.00"
                     step="0.01"
                     id='inMontoAclaracion'
                     placeholder=''
@@ -740,13 +820,13 @@ const AclaracionesTable = () => {
                 </div>
                 <div className="pl-4 col">
                   <div className="form-check form-switch row" style={{ textAlign: 'center', height: '2rem' }}>
-                    <input 
-                      className="form-check-input" 
-                      type="checkbox" 
-                      id="CheckDictaminado" 
-                      name='inDictaminado' 
-                      onChange={handleModalChange} 
-                      checked={isDictaminado} 
+                    <input
+                      className="form-check-input"
+                      type="checkbox"
+                      id="CheckDictaminado"
+                      name='inDictaminado'
+                      onChange={handleModalChange}
+                      checked={isDictaminado}
                     />
                     <label className="form-check-label" htmlFor="CheckDictaminado">Dictaminado</label>
                   </div>
