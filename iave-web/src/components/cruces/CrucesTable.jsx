@@ -1,6 +1,6 @@
 // src/components/CrucesTable.js
 import Papa from 'papaparse';
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import axios from 'axios';
 import dayjs from 'dayjs';
 import { FunnelX, Grid2X2Check } from 'lucide-react';
@@ -52,7 +52,7 @@ function CrucesTable() {
   const [eventSource, setEventSource] = useState(null);
 
   const [paginaActual, setPaginaActual] = useState(1); //Pagúna act ual, obviamente inicia en la primer página
-  const [rowsPerPage, setRowsPerPage] = useState(250); //Filas por página.
+  const [registrosPorPagina, setRegistrosPorPagina] = useState(250); //Filas por página.
 
 
 
@@ -177,9 +177,9 @@ function CrucesTable() {
             setProgreso(null);
             break;
 
-            default:
-              console.warn('❓ Evento desconocido en SSE:', data);
-              break;
+          default:
+            console.warn('❓ Evento desconocido en SSE:', data);
+            break;
         }
       } catch (error) {
         console.error('Error parsing SSE data:', error);
@@ -261,25 +261,70 @@ function CrucesTable() {
 
 
 
+  // ✅ Calcular datos de paginación
+  const totalPaginas = Math.ceil(sorted.length / registrosPorPagina);
+  const indiceInicio = (paginaActual - 1) * registrosPorPagina;
+  const indiceFin = indiceInicio + registrosPorPagina;
+  const paginaDatos = sorted.slice(indiceInicio, indiceFin);
 
-  const totalPaginas = Math.ceil(sorted.length / rowsPerPage);
-  const indiceInicio = (paginaActual - 1) * rowsPerPage;
-  const paginaDatos = sorted.slice(indiceInicio, indiceInicio + rowsPerPage);
-
-
-  const cambiarPagina = (nuevaPagina) => {
-    if (nuevaPagina >= 1 && nuevaPagina <= totalPaginas) {
-      setPaginaActual(nuevaPagina);
+  // ✅ Generar array de números de página para mostrar
+  const obtenerNumerosPagina = useCallback(() => {
+    const paginas = [];
+    const maxPaginasVisibles = 5;
+    
+    if (totalPaginas <= maxPaginasVisibles) {
+      for (let i = 1; i <= totalPaginas; i++) {
+        paginas.push(i);
+      }
+    } else {
+      if (paginaActual <= 3) {
+        for (let i = 1; i <= 4; i++) {
+          paginas.push(i);
+        }
+        paginas.push('...');
+        paginas.push(totalPaginas);
+      } else if (paginaActual >= totalPaginas - 2) {
+        paginas.push(1);
+        paginas.push('...');
+        for (let i = totalPaginas - 3; i <= totalPaginas; i++) {
+          paginas.push(i);
+        }
+      } else {
+        paginas.push(1);
+        paginas.push('...');
+        for (let i = paginaActual - 1; i <= paginaActual + 1; i++) {
+          paginas.push(i);
+        }
+        paginas.push('...');
+        paginas.push(totalPaginas);
+      }
     }
+    
+    return paginas;
+  }, [paginaActual, totalPaginas]);
+
+  const cambiarPagina = useCallback((numeroPagina) => {
+    if (numeroPagina >= 1 && numeroPagina <= totalPaginas) {
+      setPaginaActual(numeroPagina);
+    }
+  }, [totalPaginas]);
+
+  // ✅ Callbacks optimizados
+  const handleFiltroChange = useCallback((campo, valor) => {
+    setFiltros(prev => ({ ...prev, [campo]: valor }));
+    setPaginaActual(1); // Reset a página 1 al filtrar
+  }, []);
+
+
+  const handleRegistrosPorPaginaChange = (e) => {
+    setRegistrosPorPagina(Number(e.target.value));
+    setPaginaActual(1);
   };
   const handleCheckboxChange = (id) => {
     setSelectedCruces(prev =>
       prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
     );
   };
-
-
-
 
 
 
@@ -492,17 +537,17 @@ function CrucesTable() {
         nuevoEstatus: status
       });
 
-          // Actualizar la lista de cruces después de cambiar el estatus
-    setFiltered(prevFiltered =>
-      prevFiltered.map(cruce =>
-        selectedCruces.includes(cruce.ID) ? { ...cruce, Estatus: status } : cruce
-      )
-    );
-    setSelectedCruces([]); // Limpiar selección después de la acción masiva
+      // Actualizar la lista de cruces después de cambiar el estatus
+      setFiltered(prevFiltered =>
+        prevFiltered.map(cruce =>
+          selectedCruces.includes(cruce.ID) ? { ...cruce, Estatus: status } : cruce
+        )
+      );
+      setSelectedCruces([]); // Limpiar selección después de la acción masiva
     } catch (error) {
       console.error(`Error al cambiar el estatus de los cruces ${selectedCruces}:`, error);
       alert("❌ Error al cambiar el estatus de los cruces seleccionados.");
-    } 
+    }
 
 
 
@@ -510,7 +555,7 @@ function CrucesTable() {
 
   };
   const handleSelectAllVisible = () => {
-    const visibleIds = sorted.slice((paginaActual - 1) * rowsPerPage, paginaActual * rowsPerPage).map(c => c.ID); // sólo los de la página actual
+    const visibleIds = sorted.slice((paginaActual - 1) * registrosPorPagina, paginaActual * registrosPorPagina).map(c => c.ID); // sólo los de la página actual
     const allSelected = visibleIds.every(ID => selectedCruces.includes(ID));
 
     if (allSelected) {
@@ -526,7 +571,7 @@ function CrucesTable() {
   };
 
   const areAllVisibleSelected = () => {
-    const visibleIds = sorted.slice((paginaActual - 1) * rowsPerPage, paginaActual * rowsPerPage).map(c => c.ID);
+    const visibleIds = sorted.slice((paginaActual - 1) * registrosPorPagina, paginaActual * registrosPorPagina).map(c => c.ID);
     return visibleIds.every(id => selectedCruces.includes(id));
   };
 
@@ -601,8 +646,8 @@ function CrucesTable() {
             <select
               id="rowsSelect"
               className="form-select form-select-sm custom-select"
-              value={rowsPerPage}
-              onChange={(e) => setRowsPerPage(parseInt(e.target.value))}
+              value={registrosPorPagina}
+              onChange={(e) => registrosPorPagina(parseInt(e.target.value))}
               style={{ width: 'auto' }}
             >
               <option value={20}>20</option>
@@ -930,28 +975,57 @@ function CrucesTable() {
 
           </div>
           {/* Paginación */}
-          <div className='assignMe'>
-            <nav className="mt-3">
+                <div className='assignMe'>
+                    <nav className="mt-3">
+                        <div className="d-flex justify-content-between align-items-center mb-2 px-2">
+                            <span className="text-muted small">
+                                Mostrando {paginaDatos.length > 0 ? indiceInicio + 1 : 0} - {Math.min(indiceFin, paginaDatos.length)} de {paginaDatos.length} registros
+                            </span>
+                            <span className="text-muted small">
+                                Página {totalPaginas > 0 ? paginaActual : 0} de {totalPaginas}
+                            </span>
+                        </div>
 
-              <ul className="pagination pagination-sm justify-content-center d-flex flex-wrap" style={{ overflow: 'auto', }}>
-                <li className={`flex-wrap page-item ${paginaActual === 1 ? 'disabled' : ''}`}>
-                  <button className="page-link" onClick={() => cambiarPagina(paginaActual - 1)}>Anterior</button>
-                </li>
+                        <ul className="pagination pagination-sm justify-content-center d-flex flex-wrap" style={{ overflow: 'auto', }}>
+                            <li className={`flex-wrap page-item ${paginaActual === 1 ? 'disabled' : ''}`}>
+                                <button 
+                                    className="page-link" 
+                                    onClick={() => cambiarPagina(paginaActual - 1)}
+                                    disabled={paginaActual === 1}
+                                >
+                                    Anterior
+                                </button>
+                            </li>
 
-                {[...Array(totalPaginas)].map((_, index) => (
-                  <li key={index} className={`flex-wrap page-item ${paginaActual === index + 1 ? 'active' : ''}`}>
-                    <button className="page-link" onClick={() => cambiarPagina(index + 1)}>
-                      {index + 1}
-                    </button>
-                  </li>
-                ))}
+                            {obtenerNumerosPagina().map((numero, index) => (
+                                numero === '...' ? (
+                                    <li key={`ellipsis-${index}`} className="flex-wrap page-item disabled">
+                                        <span className="page-link">...</span>
+                                    </li>
+                                ) : (
+                                    <li key={`page-${numero}`} className={`flex-wrap page-item ${paginaActual === numero ? 'active' : ''}`}>
+                                        <button 
+                                            className="page-link" 
+                                            onClick={() => cambiarPagina(numero)}
+                                        >
+                                            {numero}
+                                        </button>
+                                    </li>
+                                )
+                            ))}
 
-                <li className={`flex-wrap page-item ${paginaActual === totalPaginas ? 'disabled' : ''}`}>
-                  <button className="page-link" onClick={() => cambiarPagina(paginaActual + 1)}>Siguiente</button>
-                </li>
-              </ul>
-            </nav>
-          </div>
+                            <li className={`flex-wrap page-item ${paginaActual === totalPaginas || totalPaginas === 0 ? 'disabled' : ''}`}>
+                                <button 
+                                    className="page-link"
+                                    onClick={() => cambiarPagina(paginaActual + 1)}
+                                    disabled={paginaActual === totalPaginas || totalPaginas === 0}
+                                >
+                                    Siguiente
+                                </button>
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
 
 
 
