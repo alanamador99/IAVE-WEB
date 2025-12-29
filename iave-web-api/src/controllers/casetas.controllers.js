@@ -1090,7 +1090,7 @@ export const getCoincidenciasPoblacion = async (req, res) => {
   try {
     const pool = await getConnection();
     const result = await pool.request()
-      .input("IDTipoRuta", sql.Int, IDTipoRuta)
+      .input("Poblacion", sql.VarChar, Poblacion)
       .query(`
               SELECT DISTINCT 
                   CP.ID_Caseta,
@@ -1116,7 +1116,8 @@ export const getCoincidenciasPoblacion = async (req, res) => {
                   PCasetasporruta PCR ON TRN.Id_Ruta = PCR.Id_Ruta AND TRN.id_Tipo_ruta = PCR.id_Tipo_ruta
                   INNER JOIN
                   casetas_Plantillas CP ON PCR.Id_Caseta = CP.ID_Caseta
-              WHERE TRN.id_Tipo_ruta = @IDTipoRuta 
+              WHERE TRN.id_origen = (SELECT ID_poblacion FROM Poblaciones WHERE Ciudad_SCT = @Poblacion)
+                 OR TRN.id_destino = (SELECT ID_poblacion FROM Poblaciones WHERE Ciudad_SCT = @Poblacion) 
               ORDER BY PCR.consecutivo;
         `);
 

@@ -908,7 +908,7 @@ function CrucesTable() {
                       checked={selectedCruces.includes(cruce.ID)}
                       onChange={() => handleCheckboxChange(cruce.ID)}
                     /></td>
-                    <td className='px-0 py-1 align-middle ' style={{ textAlign: 'center' }}>{i + 1}</td>
+                    <td className='px-0 py-1 align-middle ' style={{ textAlign: 'center' }}>{((paginaActual - 1) * registrosPorPagina) + i + 1}</td>
                     <td className='py-1 align-middle '>{cruce.Tag}</td>
                     <td className='py-1 align-middle '>{cruce["No_Economico"]}</td>
 
@@ -979,7 +979,7 @@ function CrucesTable() {
                     <nav className="mt-3">
                         <div className="d-flex justify-content-between align-items-center mb-2 px-2">
                             <span className="text-muted small">
-                                Mostrando {paginaDatos.length > 0 ? indiceInicio + 1 : 0} - {Math.min(indiceFin, paginaDatos.length)} de {paginaDatos.length} registros
+                                Mostrando {paginaDatos.length > 0 ? indiceInicio + 1 : 0} - {Math.min(indiceFin, paginaDatos.length)} de {sorted.length} registros
                             </span>
                             <span className="text-muted small">
                                 Página {totalPaginas > 0 ? paginaActual : 0} de {totalPaginas}

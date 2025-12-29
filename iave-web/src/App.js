@@ -29,7 +29,7 @@ function App() {
           <Topbar />
           <div id="content" className="main-content pb-0">
             <Routes>
-              <Route path="/" element={<Cruces />} />
+              <Route path="/" element={<Home />} />
               <Route path="/Home" element={<Home />} />
               <Route path="/aclaraciones" element={<Aclaraciones />} />
               <Route path="/abusos" element={<AbusosModule />} />
@@ -37,7 +37,6 @@ function App() {
               <Route path="/rutas" element={<RutasModule />} />
               <Route path="/rutas-testing" element={<RutasModule />} />
               <Route path="/mapas-testing" element={<MapaContent />} />
-              <Route path="/dashboard" element={<Cruces />} />
               <Route path="/casetas" element={<Casetas />} />
               <Route path="/tags" element={<Tags />} />
               <Route path="/sesgos" element={<Sesgos />} />

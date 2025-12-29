@@ -33,13 +33,15 @@ function Sidebar() {
       </li>
       <hr className="sidebar-divider d-none d-md-block" />
 
+      
       <li className="nav-item active">
-        <a className="nav-link" href="/dashboard">
-          <i className="fas fa-fw fa-tachometer-alt pr-3"></i>
-          <span className="ml-1">Dashboard</span>
+        <a className="nav-link" href="/cruces">
+          <i className="fas fa-fw fa-clipboard pr-3"></i>
+          <span className="ml-1">Registros</span>
         </a>
       </li>
       <hr className="sidebar-divider d-none d-md-block" />
+
       <li className="nav-item active">
         <a className="nav-link" href="/facturacion">
           {/* Icono de Facturación */}
@@ -71,13 +73,6 @@ function Sidebar() {
       </li>
       <hr className="sidebar-divider d-none d-md-block" />
 
-      <li className="nav-item active">
-        <a className="nav-link" href="/cruces">
-          <i className="fas fa-fw fa-clipboard pr-3"></i>
-          <span className="ml-1">Registros</span>
-        </a>
-      </li>
-      <hr className="sidebar-divider d-none d-md-block" />
       <li className="nav-item active">
         <a className="nav-link" href="/sesgos">
           <SearchCode size={23} className="me-1 mr-3" />
