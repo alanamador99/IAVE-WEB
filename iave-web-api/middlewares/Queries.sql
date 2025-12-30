@@ -30,10 +30,24 @@ CREATE TABLE ImportacionesCruces
 )
 
 
-SELECT * FROM cruces WHERE Estatus = 'Abuso'
+SELECT *
+FROM cruces
+WHERE Estatus = 'Abuso'
 
-SELECT * FROM personal
+SELECT *
+FROM personal
 
 
 
-SELECT TOP(10) * FROM Directorio
+SELECT TOP(10)
+    *
+FROM Poblaciones
+
+
+DECLARE @Poblacion NVARCHAR(100) = '%Tepeapulco%'; 
+SELECT
+    Dir.*, Pob.Poblacion as ID_poblacion
+    FROM Directorio as Dir
+    INNER JOIN
+    Poblaciones Pob ON Pob.ID_poblacion = Dir.ID_poblacion
+    WHERE Dir.Direccion LIKE @Poblacion or Pob.Poblacion LIKE @Poblacion

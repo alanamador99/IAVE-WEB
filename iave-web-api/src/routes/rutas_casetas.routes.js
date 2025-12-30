@@ -10,7 +10,8 @@ import {
   getCoordenadasOrigenDestino,
   getNombresOrigenDestino,
   getRutaPorOrigen_Destino,
-  getCoincidenciasPoblacion
+  getCoincidenciasPoblacion,
+  getNearDirectorios
 } from "../controllers/casetas.controllers.js";
 
 const router = Router();
@@ -24,7 +25,8 @@ router.post("/rutas/BuscarRutaPorOrigen_Destino", getRutaPorOrigen_Destino);
 router.get("/stats", getStatsCasetas);
 router.get("/:id", getCasetasByID);
 router.get("/cas/:id", getCasetasDetails);
-router.patch("/:id", setCasetasByID);
 router.get("/rutas/:Poblacion/RutasConCoincidencia", getCoincidenciasPoblacion);
+router.get("/rutas/near-directorio", getNearDirectorios);
+router.patch("/:id", setCasetasByID);
 
 export default router;

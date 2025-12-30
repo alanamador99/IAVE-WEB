@@ -4,14 +4,13 @@ import {
   getSesgosByOT,
   getStats,
   UpdateSesgo,
-  getSesgos, getNearDirectorios
+  getSesgos
 } from "../controllers/sesgos.controllers.js";
 
 
 const router = Router();
 
 router.get("/stats", getStats);
-router.get("/near-directorio", getNearDirectorios);
 router.get("/rutas", getSesgosPorCasetas);
 router.get("/:IDOrden/OT", getSesgosByOT);
 // Se actualiza el estatus de un cruce, se envía el status mediante el body y el ID_Cruce por params

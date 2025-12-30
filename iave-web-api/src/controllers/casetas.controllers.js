@@ -886,7 +886,7 @@ SELECT
   }
 };
 /**
- * Busca una ruta en el sistema TUSA por ciudades origen y destino.
+ * Busca una ruta en el sistema TUSA por ciudades origen y destino, contemplandolas como string (cadenas de texto).
  * @async
  * @function getRutaPorOrigen_Destino
  * @param {Object} req - Objeto de solicitud
@@ -1010,8 +1010,10 @@ export const getRutaPorOrigen_Destino = async (req, res) => {
         INNER JOIN
           Directorio DirD ON DirD.ID_entidad = TRN.PoblacionDestino
         WHERE 
-          PB.Ciudad_SCT LIKE @Origen 
-          AND PBD.Ciudad_SCT LIKE @Destino
+          (PB.Ciudad_SCT LIKE @Origen 
+          AND PBD.Ciudad_SCT LIKE @Destino) OR
+          (PB.Ciudad_SCT LIKE @Destino 
+          AND PBD.Ciudad_SCT LIKE @Origen)
       `);
 
     // Siempre responder con 200, incluso si no hay resultados
@@ -1027,7 +1029,7 @@ export const getRutaPorOrigen_Destino = async (req, res) => {
       total: result.recordset.length,
       mensaje: hayResultados
         ? 'Ruta encontrada en TUSA'
-        : 'Ruta no encontrada en TUSA. Mostrando solo información de INEGI',
+        : 'Ruta no encontrada en TUSA. Mostrando solo información de INEGI  '+ "origen:" + origen + "destino:" + destino,
       enTUSA: hayResultados // Flag para que el frontend sepa si está en TUSA
     });
 
@@ -1090,35 +1092,28 @@ export const getCoincidenciasPoblacion = async (req, res) => {
   try {
     const pool = await getConnection();
     const result = await pool.request()
-      .input("Poblacion", sql.VarChar, Poblacion)
+      .input("Poblacion", sql.VarChar, "%" + Poblacion + "%")
       .query(`
-              SELECT DISTINCT 
-                  CP.ID_Caseta,
-                  CP.Nombre,
-                  CP.Carretera,
-                  CP.Estado,
-                  CP.Automovil,
-                  CP.Autobus2Ejes,
-                  CP.Camion2Ejes,
-                  CP.Camion3Ejes,
-                  CP.Camion5Ejes,
-                  CP.Camion9Ejes,
-                  CP.IAVE, -- Campo booleano
-                  CP.latitud,
-                  CP.longitud,
-                  CP.Nombre_IAVE,
-                  CP.Notas,
-                  PCR.consecutivo
+    SELECT
+      Dir.ID_entidad,
+      Dir.Grupo,
+      Dir.Nombre,
+      Dir.Razon_social,
+      Dir.Direccion,
 
-              FROM
-                  Tipo_de_ruta_N TRN
-                  INNER JOIN
-                  PCasetasporruta PCR ON TRN.Id_Ruta = PCR.Id_Ruta AND TRN.id_Tipo_ruta = PCR.id_Tipo_ruta
-                  INNER JOIN
-                  casetas_Plantillas CP ON PCR.Id_Caseta = CP.ID_Caseta
-              WHERE TRN.id_origen = (SELECT ID_poblacion FROM Poblaciones WHERE Ciudad_SCT = @Poblacion)
-                 OR TRN.id_destino = (SELECT ID_poblacion FROM Poblaciones WHERE Ciudad_SCT = @Poblacion) 
-              ORDER BY PCR.consecutivo;
+      Dir.Correo_electronico,
+      Dir.Fecha_captura,
+      Dir.ID_Usuario,
+      Pob.Poblacion as ID_poblacion,
+      Dir.Contacto,
+      Dir.Celular,
+      Dir.latitud,
+      Dir.longitud
+    FROM Directorio as Dir
+    INNER JOIN
+    Poblaciones Pob ON Pob.ID_poblacion = Dir.ID_poblacion
+    WHERE Dir.Direccion LIKE @Poblacion or Pob.Poblacion LIKE @Poblacion
+    Order BY Dir.ID_entidad ASC
         `);
 
     result.recordset.forEach(row => {
@@ -1130,7 +1125,7 @@ export const getCoincidenciasPoblacion = async (req, res) => {
       }
     });
     if (result.recordset.length === 0) {
-      return res.status(404).json({ message: "No se encontraron casetas para la ruta proporcionada." });
+      return res.status(404).json({ message: "No se encontraron casetas para la ruta proporcionada. → " + Poblacion });
     }
     res.status(200).json(result.recordset);
   } catch (error) {
@@ -1140,3 +1135,66 @@ export const getCoincidenciasPoblacion = async (req, res) => {
 };
 
 
+
+
+export const getNearDirectorios = async (req, res) => {
+  const { lat, lng } = req.query;
+
+  if (!lat || !lng) {
+    return res.status(400).json({ msg: 'Latitud y longitud requeridas' });
+  }
+
+  try {
+    const pool = await getConnection();
+
+    const result = await pool.request()
+      .input('latitud', sql.Float, parseFloat(lat))
+      .input('longitud', sql.Float, parseFloat(lng))
+      .query(`
+        SELECT 
+          Dir.ID_entidad,
+      Dir.Grupo,
+      Dir.Nombre,
+      Dir.Razon_social,
+      Dir.Direccion,
+
+      Dir.Correo_electronico,
+      Dir.Fecha_captura,
+      Dir.ID_Usuario,
+      Pob.Poblacion as ID_poblacion,
+      Dir.Contacto,
+      Dir.Celular,
+      Dir.latitud,
+      Dir.longitud,
+          (
+            6371 * ACOS(
+              COS(RADIANS(@latitud)) 
+              * COS(RADIANS(TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(latitud)), CHAR(9), ''), ' ', '') AS FLOAT))) 
+              * COS(RADIANS(TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(longitud)), CHAR(9), ''), ' ', '') AS FLOAT)) - RADIANS(@longitud)) 
+              + SIN(RADIANS(@latitud)) 
+              * SIN(RADIANS(TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(latitud)), CHAR(9), ''), ' ', '') AS FLOAT)))
+            )
+          ) AS distancia_km
+        FROM Directorio as Dir
+        INNER JOIN Poblaciones Pob ON Pob.ID_poblacion = Dir.ID_poblacion
+        WHERE TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(latitud)), CHAR(9), ''), ' ', '') AS FLOAT) IS NOT NULL 
+          AND TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(longitud)), CHAR(9), ''), ' ', '') AS FLOAT) IS NOT NULL
+          AND (
+            6371 * ACOS(
+              COS(RADIANS(@latitud)) 
+              * COS(RADIANS(TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(latitud)), CHAR(9), ''), ' ', '') AS FLOAT))) 
+              * COS(RADIANS(TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(longitud)), CHAR(9), ''), ' ', '') AS FLOAT)) - RADIANS(@longitud)) 
+              + SIN(RADIANS(@latitud)) 
+              * SIN(RADIANS(TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(latitud)), CHAR(9), ''), ' ', '') AS FLOAT)))
+            )
+          ) <= 3
+        ORDER BY distancia_km
+      `);
+
+    res.json(result.recordset);
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ msg: 'Error al obtener directorio cercano' });
+  }
+};

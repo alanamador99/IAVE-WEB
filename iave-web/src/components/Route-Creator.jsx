@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { ModalSelector, CustomToast, parsearMinutos, formatearDinero, RouteOption, formatearEnteros } from '../components/shared/utils';
+import { ModalSelector, ModalSelectorOrigenDestino, CustomToast, parsearMinutos, formatearDinero, RouteOption, formatearEnteros } from '../components/shared/utils';
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
 import axios from 'axios';
 import 'leaflet/dist/leaflet.css';
@@ -11,7 +11,7 @@ import markerB from 'leaflet/dist/images/B.png';
 import markerPin from 'leaflet/dist/images/pin_intermedio.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 import { Container } from 'react-bootstrap';
-import { result } from 'lodash';
+import { result, set } from 'lodash';
 
 // ===== CONSTANTES =====
 const API_KEY = 'Jq92BpFD-tYae-BBj2-rEMc-MnuytuOB30ST';
@@ -59,7 +59,9 @@ const normalizarNombre = (lugar) => {
     const partes = lugar.nombre.split(',');
     const tmp = partes[0]?.trim() || lugar.nombre.trim();
     const sinAcentos = tmp.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    return sinAcentos.replace(/[^a-zA-Z0-9\s]/g, '').toUpperCase();
+    const mayusculas = sinAcentos.replace(/[^a-zA-Z0-9\s]/g, '').toUpperCase();
+    if (mayusculas === 'FRAY BERNARDINO DE SAHAGUN') return 'Cd Sahagún';
+    return mayusculas;
 };
 
 
@@ -195,9 +197,11 @@ const RutasModule = () => {
     const [rutas_OyL, setRutas_OyL] = useState(null);
     const [rutaSeleccionada, setRutaSeleccionada] = useState([]);
     const [rutaTusaSelected, setRutaTusaSelected] = useState(null);
+    const [directoriosCoincidentes, setDirectoriosCoincidentes] = useState([]);
 
     // Estados de UI
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isModalSeleccionOrigenDestinoOpen, setIsModalSeleccionOrigenDestinoOpen] = useState(false);
     const [loadingRutas, setLoadingRutas] = useState(false);
     const [loadingRutaSeleccionada, setLoadingRutaSeleccionada] = useState(false);
     const [boolExiste, setBoolExiste] = useState('Consultando ruta');
@@ -254,6 +258,70 @@ const RutasModule = () => {
             }
         }
     };
+
+
+    //Ayudame a generar una funcion llamada getRouteDetails que reciba un parametro origenOdestino y que haga lo siguiente:
+    //al mandarla a llamar desde cualquiera de las pildoras de origen/destino, haga una petición a la API de TUSA para obtener los directorios que coincidan con el origen o destino seleccionado
+    // la API está sobre /api/casetas/rutas/<origenOdestino>/RutasConCoincidencia. (TEPEAPULCO por ejemplo)
+    const changeOrigenDestinoHandler = useCallback(async (tipo,origenOdestino) => {
+        origenOdestino = (origenOdestino==='Fray Bernardino de Sahagún') ? 'Sahagun' : origenOdestino;
+        
+        if (tipo==='Origen' && !origen?.id_dest) {
+            alert('Por favor primero selecciona un origen');
+            return;
+        }
+        if(tipo==='Destino' && !destino?.id_dest) {
+            alert('Por favor primero selecciona un destino');
+            return;
+        }
+        const coordenadas = (tipo==='Origen') ? origenCoords : destinoCoords;
+        try {
+            setLoadingRutaSeleccionada(true);
+
+            // Petición a la API de TUSA para obtener directorios coincidentes
+            const responseDirectoriosCoincidentes = await fetch(
+                `${API_URL}/api/casetas/rutas/${origenOdestino}/RutasConCoincidencia`,
+                {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                }
+            );
+            // Petición a la API de TUSA para obtener directorios CERCANOS
+            //http://localhost:3001/api/casetas/rutas/near-directorio?lat=21.46086089975&lng=-104.82778
+            const responseDirectoriosCercanos = await fetch(
+                `${API_URL}/api/casetas/rutas/near-directorio?lat=${coordenadas[0]}&lng=${coordenadas[1]}`,
+                {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                }
+            );
+
+            if (!responseDirectoriosCoincidentes.ok) {
+                throw new Error(`Error en la respuesta del servidor: ${responseDirectoriosCoincidentes.status}`);
+            }
+            if (!responseDirectoriosCercanos.ok) {
+                throw new Error(`Error en la respuesta del servidor: ${responseDirectoriosCercanos.status}`);
+            }
+
+            
+            const data = await responseDirectoriosCoincidentes.json();
+            //data1 tiene un campo adicional a data que es: "distancia": 1234 (en kms), vamos a unir ambos arreglos en uno solo
+            const data1 = await responseDirectoriosCercanos.json();
+
+            // Unir ambos arreglos en uno solo
+            data1.push(...data);
+
+            setDirectoriosCoincidentes(data1);
+            setIsModalSeleccionOrigenDestinoOpen(true);
+
+        } catch (error) {
+            console.error('Error al obtener directorios coincidentes:', error);
+        } finally {
+            setLoadingRutaSeleccionada(false);
+        }
+    }, [origen, destino]);
+
+
 
     // ===== FUNCIONES DE API =====
     const getRouteDetails = useCallback(async (tipoDetalleOoL) => {
@@ -469,7 +537,6 @@ const RutasModule = () => {
             }
 
             const [rutaOptima1, rutaLibre1, dataTusa, rutaOptima2, rutaLibre2] = await Promise.all(promesas);
-
             const rutaTUSAData = dataTusa?.data || dataTusa || [];
             const existeEnTUSA = Array.isArray(rutaTUSAData) ? rutaTUSAData.length > 0 : dataTusa?.enTUSA;
             alert("aquí");
@@ -565,12 +632,12 @@ const RutasModule = () => {
                 </div>
 
                 <div className="container-fluid py-1 border">
-                    <div className="alert alert-info border-left-info my-2" role="alert">
+                    <div className="alert alert-info border-left-info" role="alert">
                         <i className="fas fa-info-circle mr-2"></i>
                         <strong>Estado:</strong> {loadingRutas || loadingRutaSeleccionada ? 'Cargando rutas...' : boolExiste}
                     </div>
 
-                    <div className="table-container py-0 my-2" style={{ maxHeight: '12rem' }}>
+                    <div className="table-container py-0 my-0" style={{ maxHeight: '12rem' }}>
                         <table
                             className='table table-bordered table-scroll table-sm table-hover align-middle mt-2'
                             style={{ display: casetasEnRutaTusa?.length > 0 ? 'table' : 'none' }}
@@ -622,7 +689,7 @@ const RutasModule = () => {
                     </div>
                 </div>
 
-                <div className="main-content-RC">
+                <div className="main-content-RC mt-2">
                     <div className="sidebar-RC px-3">
                         <div className="form-section-RC">
                             <h3>ℹ️ Información General</h3>
@@ -771,8 +838,10 @@ const RutasModule = () => {
                             </div>
                         </div>
 
+                        {/* Se manda a llamar un modal que nos permita seleccionar un origen conforme al directorio. */}
+
                         <div className="route-points-RC">
-                            <div className="route-point-RC origin-RC py-1">
+                            <div className="route-point-RC origin-RC py-1" style={{ cursor: (rutaTusa[0]?.RazonOrigen || origen?.nombre) ? 'pointer': 'not-allowed'  }} onClick={() => changeOrigenDestinoHandler('Origen',origen?.nombre.split(',')[0].trim())}>
                                 <div className="route-icon-RC origin-RC"></div>
                                 <div>
                                     <strong>Origen</strong><br />
@@ -793,7 +862,7 @@ const RutasModule = () => {
                                     </small>
                                 </div>
                             </div>
-                            <div className="route-point-RC destination-RC py-1">
+                            <div className="route-point-RC destination-RC py-1"style={{ cursor: (rutaTusa[0]?.RazonDestino || destino?.nombre) ? 'pointer': 'not-allowed'  }} onClick={() => changeOrigenDestinoHandler('Destino',destino?.nombre.split(',')[0].trim())}>
                                 <div className="route-icon-RC destination-RC"></div>
                                 <div>
                                     <strong>Destino</strong><br />
@@ -816,7 +885,7 @@ const RutasModule = () => {
                     {/* MAPA */}
                     <MapContainer
                         center={[19.4326, -99.1332]}
-                        zoom={9}
+                        zoom={5}
                         scrollWheelZoom={true}
                         style={{ height: '100%', width: '100%' }}
                     >
@@ -1142,6 +1211,7 @@ const RutasModule = () => {
                     onSelect={async (rutaSeleccionadaDelModal) => {
                         setRutaTusaSelected(rutaSeleccionadaDelModal);
                         console.log('✅ Ruta TUSA seleccionada:', rutaSeleccionadaDelModal);
+                        alert("rutaSeleccionadaDelModal: " + rutaSeleccionadaDelModal);
 
                         try {
                             const casetasResponse = await axios.get(
@@ -1151,8 +1221,8 @@ const RutasModule = () => {
                             console.log('✅ Casetas cargadas:', casetasResponse.data);
 
                             setIsModalOpen(false);
-                            setRutaTusa(rutaTusa.filter(ruta => ruta.id_Tipo_ruta === rutaSeleccionadaDelModal));
-                            console.log('✅ Ruta TUSA actualizada:', rutaTusa);
+                            console.log('✅ Ruta TUSA actualizada:', rutaTusa.filter(ruta => ruta.id_Tipo_ruta == rutaSeleccionadaDelModal));
+                            setRutaTusa(rutaTusa.filter(ruta => ruta.id_Tipo_ruta == rutaSeleccionadaDelModal));
                         } catch (error) {
                             console.error('❌ Error al cargar casetas:', error);
                         }
@@ -1162,6 +1232,19 @@ const RutasModule = () => {
                     valoresSugeridos={rutaTusa}
                     tituloDelSelect='Rutas'
                     titulo={`Rutas TUSA encontradas (${rutaTusa.length})`}
+                />
+            )}
+
+
+
+
+            {/* MODAL PARA SELECCIONAR Origen o destino */}
+            {isModalSeleccionOrigenDestinoOpen && (
+                <ModalSelectorOrigenDestino
+                    isOpen={isModalSeleccionOrigenDestinoOpen}
+                    onClose={() => setIsModalSeleccionOrigenDestinoOpen(false)}
+                    objeto={directoriosCoincidentes[0]}
+                    valoresSugeridos={directoriosCoincidentes}
                 />
             )}
 
