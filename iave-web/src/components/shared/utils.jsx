@@ -15,7 +15,7 @@
  * @requires leaflet
  */
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Toast } from 'react-bootstrap';
 
 import { MapPin, Mail, Phone, User, Calendar, Building, Clipboard, LocateFixed } from 'lucide-react';
@@ -819,6 +819,129 @@ const ModalSelectorOrigenDestino = ({ isOpen, onClose, onSelect, objeto, valores
 
 
 
+/**
+ * Modal de selección con dropdown para el origen/destino del directorio en el creador de rutas.
+ * @component
+ * @param {Object} props - Props del componente
+ * @param {boolean} props.isOpen - Controla visibilidad del modal
+ * @param {Function} props.onClose - Callback al cerrar
+ * @param {Function} props.onSelect - Callback con valor seleccionado
+ * @param {string} props.valorCampo - Valor actual del campo (mostrado en alerta)
+ * @param {Array<Object>} props.valoresSugeridos - Array de opciones
+ * @param {string} props.valoresSugeridos[].id_Tipo_ruta - ID de la ruta
+
+ * @param {string} [props.titulo=""] - Título del modal
+ * @param {string} [props.campo=""] - Nombre del campo
+ * @param {string} [props.tituloDelSelect="Opciones"] - Etiqueta del select
+ * @returns {React.ReactElement|null} Modal o null si no está abierto
+ * 
+ * @example
+ * const [modalOpen, setModalOpen] = useState(false);
+ * const [selected, setSelected] = useState(null);
+ * 
+ * <ModalSelector
+ *   isOpen={modalOpen}
+ *   onClose={() => setModalOpen(false)}
+ *   onSelect={(value) => setSelected(value)}
+ *   valorCampo="Guadalajara"
+ *   valoresSugeridos={rutasData}
+ *   titulo="Seleccionar Ruta"
+ *   campo="Origen"
+ *   tituloDelSelect="Rutas disponibles"
+ * />
+ * 
+ * @description
+ * - Modal centrado con backdrop
+ * - Select dropdown con opciones
+ * - Formatea razones sociales automáticamente
+ * - Botones Cancelar y Confirmar
+ * - Botón confirmar deshabilitado si nada seleccionado
+ * - Estilos Bootstrap SB Admin
+ */
+const ModalConfirmacion = ({ isOpen, onClose, onSelect, mensaje }) => {
+  const cancelButtonRef = useRef(null);
+
+  useEffect(() => {
+    if (isOpen && cancelButtonRef.current) {
+      cancelButtonRef.current.focus();
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  const handleConfirmar = () => {
+    onSelect(true);
+    onClose();
+  };
+
+  const handleCancelar = () => {
+    onClose();
+  };
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        className="modal-backdrop fade show"
+        onClick={handleCancelar}
+        style={{ zIndex: 1040 }}
+      ></div>
+
+      {/* Modal */}
+      <div
+        className="modal fade show"
+        style={{ display: 'block', zIndex: 1050 }}
+        tabIndex="-1"
+        role="dialog"
+      >
+        <div className="modal-dialog modal-dialog-centered" role="document">
+          <div className="modal-content shadow-lg">
+            <div className="form-group pt-3 px-4">
+              <label className="font-weight-bold text-gray-800">
+                ¿Confirmas que <span className="text-danger"> {mensaje}</span> ?
+              </label>
+            </div>
+
+            {/* Footer */}
+            <div className="modal-footer bg-light">
+              <button
+                ref={cancelButtonRef}
+                type="button"
+                onClick={handleCancelar}
+                className="btn btn-secondary"
+                tabIndex={1}
+              >
+                <i className="fas fa-times mr-2"></i>
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmar}
+                className="btn btn-success"
+                tabIndex={2}
+              >
+                <i className="fas fa-check mr-2"></i>
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
+
 
 
 /**
@@ -928,8 +1051,6 @@ const ModalSelector = ({ isOpen, onClose, onSelect, valorCampo, valoresSugeridos
                   value={clienteSeleccionado}
                   onChange={(e) => {
                     setClienteSeleccionado(e.target.value);
-                    console.log('Ruta seleccionada:', e.target.value);
-                    onSelect(e.target.value);
                   }}
                   className="form-control form-control-lg border-left-primary"
                   style={{ borderLeftWidth: '4px' }}
@@ -998,6 +1119,8 @@ const ModalSelector = ({ isOpen, onClose, onSelect, valorCampo, valoresSugeridos
  * @exports parsearMinutos - Función parsear minutos
  * @exports RouteOption - Componente opción de ruta
  * @exports ModalSelector - Componente modal selector
+ * @exports ModalSelectorOrigenDestino - Componente modal selector origen/destino
+ * @exports modalConfirmacion - Componente modal de ventana de confirmación
  */
 
 export default CopiarTag;
@@ -1015,5 +1138,6 @@ export {
   parsearMinutos,
   RouteOption,
   ModalSelector,
-  ModalSelectorOrigenDestino
+  ModalSelectorOrigenDestino,
+  ModalConfirmacion
 };

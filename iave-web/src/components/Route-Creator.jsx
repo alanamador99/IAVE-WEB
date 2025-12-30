@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { ModalSelector, ModalSelectorOrigenDestino, CustomToast, parsearMinutos, formatearDinero, RouteOption, formatearEnteros } from '../components/shared/utils';
+import { ModalConfirmacion, ModalSelector, ModalSelectorOrigenDestino, CustomToast, parsearMinutos, formatearDinero, RouteOption, formatearEnteros } from '../components/shared/utils';
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
 import axios from 'axios';
 import 'leaflet/dist/leaflet.css';
@@ -52,6 +52,13 @@ const markerIcons = {
         shadowSize: [64, 40],
     }),
 };
+
+var numIcon = L.divIcon({
+    className: 'custom-div-icon', // Usamos la clase CSS que definimos
+    html: '<span id="custom-number" >1</span>',      // Contenido HTML (el número o texto)
+    iconSize: [30, 30],          // Tamaño total del icono (ancho, alto)
+    iconAnchor: [15, 15]         // Punto de anclaje (la mitad del tamaño para centrar)
+});
 
 // ===== UTILIDADES =====
 const normalizarNombre = (lugar) => {
@@ -133,6 +140,8 @@ const useDebounce = (value, delay) => {
     return debouncedValue;
 };
 
+
+
 const useDestinationSearch = (searchTerm, tipo) => {
     const [results, setResults] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -190,17 +199,19 @@ const RutasModule = () => {
     const [origen, setOrigen] = useState(null);
     const [destino, setDestino] = useState(null);
     const [puntoIntermedio, setPuntoIntermedio] = useState(null);
+    const [casetaAEliminar, setCasetaAEliminar] = useState(null);
+
 
     // Estados de rutas
     const [rutaTusa, setRutaTusa] = useState([]);
     const [casetasEnRutaTusa, setCasetasEnRutaTusa] = useState([]);
     const [rutas_OyL, setRutas_OyL] = useState(null);
     const [rutaSeleccionada, setRutaSeleccionada] = useState([]);
-    const [rutaTusaSelected, setRutaTusaSelected] = useState(null);
     const [directoriosCoincidentes, setDirectoriosCoincidentes] = useState([]);
 
     // Estados de UI
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isModalConfirmacionOpen, setIsModalConfirmacionOpen] = useState(false);
     const [isModalSeleccionOrigenDestinoOpen, setIsModalSeleccionOrigenDestinoOpen] = useState(false);
     const [loadingRutas, setLoadingRutas] = useState(false);
     const [loadingRutaSeleccionada, setLoadingRutaSeleccionada] = useState(false);
@@ -263,18 +274,18 @@ const RutasModule = () => {
     //Ayudame a generar una funcion llamada getRouteDetails que reciba un parametro origenOdestino y que haga lo siguiente:
     //al mandarla a llamar desde cualquiera de las pildoras de origen/destino, haga una petición a la API de TUSA para obtener los directorios que coincidan con el origen o destino seleccionado
     // la API está sobre /api/casetas/rutas/<origenOdestino>/RutasConCoincidencia. (TEPEAPULCO por ejemplo)
-    const changeOrigenDestinoHandler = useCallback(async (tipo,origenOdestino) => {
-        origenOdestino = (origenOdestino==='Fray Bernardino de Sahagún') ? 'Sahagun' : origenOdestino;
-        
-        if (tipo==='Origen' && !origen?.id_dest) {
+    const changeOrigenDestinoHandler = useCallback(async (tipo, origenOdestino) => {
+        origenOdestino = (origenOdestino === 'Fray Bernardino de Sahagún') ? 'Sahagun' : origenOdestino;
+
+        if (tipo === 'Origen' && !origen?.id_dest) {
             alert('Por favor primero selecciona un origen');
             return;
         }
-        if(tipo==='Destino' && !destino?.id_dest) {
+        if (tipo === 'Destino' && !destino?.id_dest) {
             alert('Por favor primero selecciona un destino');
             return;
         }
-        const coordenadas = (tipo==='Origen') ? origenCoords : destinoCoords;
+        const coordenadas = (tipo === 'Origen') ? origenCoords : destinoCoords;
         try {
             setLoadingRutaSeleccionada(true);
 
@@ -303,7 +314,7 @@ const RutasModule = () => {
                 throw new Error(`Error en la respuesta del servidor: ${responseDirectoriosCercanos.status}`);
             }
 
-            
+
             const data = await responseDirectoriosCoincidentes.json();
             //data1 tiene un campo adicional a data que es: "distancia": 1234 (en kms), vamos a unir ambos arreglos en uno solo
             const data1 = await responseDirectoriosCercanos.json();
@@ -321,8 +332,10 @@ const RutasModule = () => {
         }
     }, [origen, destino]);
 
-
-
+    const handleDeleteCaseta = (idCaseta) => {
+        setCasetaAEliminar(idCaseta); // Guardamos el ID de la caseta a eliminar
+        setIsModalConfirmacionOpen(true);
+    };
     // ===== FUNCIONES DE API =====
     const getRouteDetails = useCallback(async (tipoDetalleOoL) => {
         if (!origen?.id_dest || !destino?.id_dest) {
@@ -406,14 +419,14 @@ const RutasModule = () => {
                 rutas_OyL?.optima,
                 response.data?.filter(item => item.costo_caseta != 0) || []
             ];
-            setRutaSeleccionada(selectedRoute);
+            setRutaSeleccionada(rutas_OyL ? selectedRoute : []);
         }
         if (params === 'detalle_l') {
             const selectedRoute = [
                 rutas_OyL?.libre,
                 response.data?.filter(item => item.costo_caseta != 0) || []
             ];
-            setRutaSeleccionada(selectedRoute);
+            setRutaSeleccionada(rutas_OyL ? selectedRoute : []);
         }
         setBoolExiste(prev => prev.replace(', selecciona una ruta', ''));
     }, [rutas_OyL, getRouteDetails]);
@@ -425,8 +438,9 @@ const RutasModule = () => {
         }
 
         setLoadingRutas(true);
-        setRutaSeleccionada([]);
+        setRutaTusa([]);
         setRutas_OyL(null);
+        setCasetasEnRutaTusa([]);
 
         try {
             const crearFormDataINEGI = (idOrigen, idDestino) => new URLSearchParams({
@@ -539,7 +553,6 @@ const RutasModule = () => {
             const [rutaOptima1, rutaLibre1, dataTusa, rutaOptima2, rutaLibre2] = await Promise.all(promesas);
             const rutaTUSAData = dataTusa?.data || dataTusa || [];
             const existeEnTUSA = Array.isArray(rutaTUSAData) ? rutaTUSAData.length > 0 : dataTusa?.enTUSA;
-            alert("aquí");
             console.log(rutaTUSAData);
             setRutaTusa(rutaTUSAData);
 
@@ -671,9 +684,17 @@ const RutasModule = () => {
                                         <td>{caseta.latitud}</td>
                                         <td>{caseta.longitud}</td>
                                         <td>$ {formatearEnteros(caseta[switchTipoVehiculo(tipoVehiculo).replaceAll(" ", "")])}</td>
-                                        <td style={{ placeItems: 'center' }}>
+                                        <td className='d-flex flex-row-reverse'>
+                                            
+                                            <button
+                                                className="btn btn-sm btn-outline-danger"
+                                                style={{ float: 'right' }}
+                                                onClick={() => handleDeleteCaseta(caseta.ID_Caseta)}
+                                            >
+                                                <i className="fas fa-trash"></i>
+                                            </button>
                                             <input
-                                                style={{ maxWidth: '3rem', textAlign: 'center' }}
+                                                style={{ maxWidth: '3rem', textAlign: 'center', marginRight: '0.5rem' }}
                                                 className="form-control form-control-sm"
                                                 maxLength={2}
                                                 type="text"
@@ -841,7 +862,7 @@ const RutasModule = () => {
                         {/* Se manda a llamar un modal que nos permita seleccionar un origen conforme al directorio. */}
 
                         <div className="route-points-RC">
-                            <div className="route-point-RC origin-RC py-1" style={{ cursor: (rutaTusa[0]?.RazonOrigen || origen?.nombre) ? 'pointer': 'not-allowed'  }} onClick={() => changeOrigenDestinoHandler('Origen',origen?.nombre.split(',')[0].trim())}>
+                            <div className="route-point-RC origin-RC py-1" style={{ cursor: (rutaTusa[0]?.RazonOrigen || origen?.nombre) ? 'pointer' : 'not-allowed' }} onClick={() => changeOrigenDestinoHandler('Origen', origen?.nombre.split(',')[0].trim())}>
                                 <div className="route-icon-RC origin-RC"></div>
                                 <div>
                                     <strong>Origen</strong><br />
@@ -862,7 +883,7 @@ const RutasModule = () => {
                                     </small>
                                 </div>
                             </div>
-                            <div className="route-point-RC destination-RC py-1"style={{ cursor: (rutaTusa[0]?.RazonDestino || destino?.nombre) ? 'pointer': 'not-allowed'  }} onClick={() => changeOrigenDestinoHandler('Destino',destino?.nombre.split(',')[0].trim())}>
+                            <div className="route-point-RC destination-RC py-1" style={{ cursor: (rutaTusa[0]?.RazonDestino || destino?.nombre) ? 'pointer' : 'not-allowed' }} onClick={() => changeOrigenDestinoHandler('Destino', destino?.nombre.split(',')[0].trim())}>
                                 <div className="route-icon-RC destination-RC"></div>
                                 <div>
                                     <strong>Destino</strong><br />
@@ -987,7 +1008,7 @@ const RutasModule = () => {
                             attribution='&copy; OpenStreetMap contributors || IAVE-WEB ⭐🚌'
                         />
 
-                        <Marker position={[19.782283538009626, -98.58592613126075]} icon={markerIcons.ATM}>
+                        <Marker position={[19.782283538009626, -98.58592613126075]} icon={numIcon}>
                             <Popup>Base Sahagún</Popup>
                         </Marker>
 
@@ -1116,19 +1137,19 @@ const RutasModule = () => {
                             <div className="summary-item-RC">
                                 <span className="summary-label-RC">Distancia Total:</span>
                                 <span className="summary-value-RC">
-                                    {rutaSeleccionada[1]?.distancia ? `${rutaSeleccionada[1].distancia.toFixed(2)} Km` : '-'}
+                                    {rutaSeleccionada[0]?.distancia ? `${rutaSeleccionada[0].distancia.toFixed(2)} Km` : '-'}
                                 </span>
                             </div>
                             <div className="summary-item-RC">
                                 <span className="summary-label-RC">Tiempo Estimado:</span>
                                 <span className="summary-value-RC">
-                                    {rutaSeleccionada[1]?.tiempo ? parsearMinutos(rutaSeleccionada[1].tiempo) : '-'}
+                                    {rutaSeleccionada[0]?.tiempo ? parsearMinutos(rutaSeleccionada[0].tiempo) : '-'}
                                 </span>
                             </div>
                             <div className="summary-item-RC">
                                 <span className="summary-label-RC">Costo Estimado:</span>
                                 <span className="summary-value-RC">
-                                    {rutaSeleccionada[1]?.costoCasetas ? `$${formatearDinero(rutaSeleccionada[1].costoCasetas)}` : '-'}
+                                    {rutaSeleccionada[0]?.costoCasetas ? `$${formatearDinero(rutaSeleccionada[0].costoCasetas)}` : '-'}
                                 </span>
                             </div>
                             <div className="summary-item-RC">
@@ -1209,10 +1230,7 @@ const RutasModule = () => {
                     isOpen={isModalOpen}
                     onClose={() => setIsModalOpen(false)}
                     onSelect={async (rutaSeleccionadaDelModal) => {
-                        setRutaTusaSelected(rutaSeleccionadaDelModal);
                         console.log('✅ Ruta TUSA seleccionada:', rutaSeleccionadaDelModal);
-                        alert("rutaSeleccionadaDelModal: " + rutaSeleccionadaDelModal);
-
                         try {
                             const casetasResponse = await axios.get(
                                 `${API_URL}/api/casetas/rutas/${rutaSeleccionadaDelModal}/casetasPorRuta`
@@ -1245,6 +1263,28 @@ const RutasModule = () => {
                     onClose={() => setIsModalSeleccionOrigenDestinoOpen(false)}
                     objeto={directoriosCoincidentes[0]}
                     valoresSugeridos={directoriosCoincidentes}
+                />
+            )}
+
+            {/* MODAL de confirmación PARA confirmar eliminación de la caseta en la ruta*/}
+            {isModalConfirmacionOpen && (
+                <ModalConfirmacion
+                    isOpen={isModalConfirmacionOpen}
+                    onClose={() => {
+                        setIsModalConfirmacionOpen(false);
+                        setCasetaAEliminar(null); // Limpiamos al cerrar
+                    }}
+                    mensaje={`¿Deseas eliminar la caseta de la ruta seleccionada?`}
+                    onSelect={() => {
+                        // Aquí ejecutamos la eliminación
+                        if (casetaAEliminar) {
+                            setCasetasEnRutaTusa(prev =>
+                                prev.filter(caseta => caseta.ID_Caseta !== casetaAEliminar)
+                            );
+                        }
+                        setIsModalConfirmacionOpen(false);
+                        setCasetaAEliminar(null); // Limpiamos
+                    }}
                 />
             )}
 
