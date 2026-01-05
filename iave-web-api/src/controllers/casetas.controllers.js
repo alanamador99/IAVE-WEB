@@ -34,6 +34,46 @@ const claveToImporteField = {
   'C-9 ': 'Camion9Ejes'
 };
 
+const switchTipoVehiculo = (tvehiculo) => {
+    let resultado;
+    switch (tvehiculo) {
+        case "1":
+            resultado = "Automovil";
+            break;
+        case "2":
+            resultado = "Autobus2Ejes";
+            break;
+        case "5":
+            resultado = "Camion2Ejes";
+            break;
+        case "6":
+            resultado = "Camion3Ejes";
+            break;
+        case "7":
+            resultado = "Camion3Ejes";
+            break;
+        case "8":
+            resultado = "Camion5Ejes";
+            break;
+        case "9":
+            resultado = "Camion5Ejes";
+            break;
+        case "10":
+            resultado = "Camion9Ejes";
+            break;
+        case "11":
+            resultado = "Camion9Ejes";
+            break;
+        case "12":
+            resultado = "Camion9Ejes";
+            break;
+        default:
+            resultado = "Error";
+            break;
+    }
+    return resultado;
+}
+
 /**
  * Normaliza nombres de ciudades para comparación.
  * Convierte a mayúsculas y remueve caracteres especiales y acentos.
@@ -1135,6 +1175,24 @@ export const getCoincidenciasPoblacion = async (req, res) => {
 };
 
 
+
+export const updateCasetasEnRuta = async (req, res) => {
+  const { ID } = req.params;
+  const { nuevoComentario } = req.body;
+
+  try {
+    const pool = await getConnection();
+
+    const result = await pool.request()
+      .input("nuevoComentario", sql.VarChar, nuevoComentario)
+      .input("ID", sql.VarChar, ID)
+      .query(`UPDATE cruces SET observaciones = @nuevoComentario WHERE ID = @ID`);
+    res.status(200).json({ message: 'Comentario actualizado correctamente' });
+  } catch (error) {
+    console.error('Error actualizando estatus:', error);
+    res.status(500).json({ error: 'Error en el servidor' });
+  }
+};
 
 
 export const getNearDirectorios = async (req, res) => {

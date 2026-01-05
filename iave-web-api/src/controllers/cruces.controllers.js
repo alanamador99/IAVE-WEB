@@ -445,6 +445,43 @@ export const getCruces = async (req, res) => {
   }
 };
 
+
+/**
+ * Obtiene los distintos años de los cruces que se han registrado en la base de datos.
+ * 
+ * - Solo devuelve los años.
+ * 
+ * @async
+ * @param {Object} req - Objeto request
+ * @param {Object} res - Objeto response
+ * @returns {Promise<Object[]>} Array de todos los cruces con información enriquecida
+ * 
+ * @example
+ * GET /api/cruces
+ * Response: [
+ *   {
+ *     ID: "251125_143045_1234",
+ *     Caseta: "Caseta Sahagún",
+ *     Importe: 150,
+ *   }
+ * ]
+ */
+export const getYearsFromCruces = async (req, res) => {
+  try {
+    const pool = await getConnection();
+    const result = await pool.request().query("SELECT DISTINCT YEAR(Fecha) as 'AÑO' FROM cruces ORDER BY AÑO ASC");
+
+
+    res.json(result.recordset);
+  } catch (error) {
+    res.status(500);
+    res.send(error.message);
+  }
+};
+
+
+
+
 /**
  * Obtiene estadísticas de cruces agrupadas por estatus
  * 

@@ -9,6 +9,9 @@ const meses = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
 ];
+const años = [
+  2024, 2025, 2026
+];
 
 const bases = ["Base Monterrey", "Base Cd. Sahagún", "Administrativos"];
 
@@ -31,6 +34,8 @@ function CrucesTable() {
   const [sortColumn, setSortColumn] = useState(null); //Columna mandante para el ordenamiento
   const [sortDirection, setSortDirection] = useState('asc'); // Tipo de ordenamiento
   const [cruces, setCruces] = useState([]); // Se almacenan los cruces que están aplicados además del filtro
+  const [years, setYears] = useState([]); // Se almacenan los años disponibles
+  const [selectedYear, setSelectedYear] = useState(null); // Se almacena el año seleccionado
   const [filtered, setFiltered] = useState([]); //Cruces filtrados
   const [filtros, setFiltros] = useState({ fecha: '', mat_OP: '', tagID: '', Caseta: '', vOT: '', Estatus: '' }); //Se almacena el valor de los filtros. Pueden ser Fecha, no. economico y nombre de la caseta
   const [vCaseta, setvCaseta] = useState(''); //Para limpiar el valor del textbox de la Caseta
@@ -65,6 +70,11 @@ function CrucesTable() {
           setFiltered(res.data);
         })
         .catch(err => console.error('Error al cargar cruces:', err));
+      axios.get(`${API_URL}/api/cruces/years`)
+        .then(res => {
+          setYears(res.data);
+        })
+        .catch(err => console.error('Error al cargar años:', err));
     } catch (error) {
       console.log("Error al cargar los cruces:", error)
     }
@@ -86,8 +96,10 @@ function CrucesTable() {
     const filtrado = cruces.filter(c => {
       const fechaCruce = dayjs(c.Fecha);
       const mesCruce = fechaCruce.month(); // 0 = Enero, 11 = Diciembre
+      const yearCruce = fechaCruce.year();
       const matchMes = mesSeleccionado === null || mesCruce === mesSeleccionado;
       const matchBase = baseSeleccionada === null || c.Base?.toLowerCase().includes(baseSeleccionada.toLowerCase());
+      const matchYear = selectedYear === null || yearCruce === selectedYear?.AÑO;
 
       const matchmat_OP = filtros.mat_OP === '' || c["No_Economico"]?.toLowerCase().includes(filtros.mat_OP.toLowerCase());
       const matchtagID = filtros.tagID === '' || c.Tag?.toLowerCase().includes(filtros.tagID?.toLowerCase());
@@ -97,11 +109,10 @@ function CrucesTable() {
       const matchFecha = filtros.fecha === '' || dayjs(c.Fecha).format('YYYY-MM-DD') === filtros.fecha;
 
 
-
-      return matchFecha && matchmat_OP && matchtagID && matchOT && matchCaseta && matchEstatus && matchMes && matchBase;
+      return matchFecha && matchmat_OP && matchtagID && matchOT && matchCaseta && matchEstatus && matchMes && matchBase && matchYear;
     });
     setFiltered(filtrado);
-  }, [filtros, cruces, mesSeleccionado, baseSeleccionada]);
+  }, [filtros, cruces, mesSeleccionado, baseSeleccionada, selectedYear]);
 
   const connectToProgressStream = () => {
     const es = new EventSource(`${API_URL}/api/cruces/progress`);
@@ -271,7 +282,7 @@ function CrucesTable() {
   const obtenerNumerosPagina = useCallback(() => {
     const paginas = [];
     const maxPaginasVisibles = 5;
-    
+
     if (totalPaginas <= maxPaginasVisibles) {
       for (let i = 1; i <= totalPaginas; i++) {
         paginas.push(i);
@@ -299,7 +310,7 @@ function CrucesTable() {
         paginas.push(totalPaginas);
       }
     }
-    
+
     return paginas;
   }, [paginaActual, totalPaginas]);
 
@@ -826,7 +837,7 @@ function CrucesTable() {
 
 
 
-            <div className="mb-4">
+            <div className="mb-4 d-flex flex-column">
               <h5 className="mb-2">Filtrar por Mes:</h5>
               <div className="d-flex flex-wrap gap-2 mb-3">
                 {meses.map((mes, i) => (
@@ -841,6 +852,24 @@ function CrucesTable() {
                 <button
                   className={`btn btn-sm ${mesSeleccionado === null ? "btn-secondary" : "btn-outline-secondary"}`}
                   onClick={() => setMesSeleccionado(null)}
+                >
+                  Todos
+                </button>
+              </div>
+              <h5 className="mb-2">Filtrar por Año:</h5>
+              <div className="d-flex flex-wrap gap-2 mb-3">
+                {years.map((year, i) => (
+                  <button
+                    key={i}
+                    className={`btn btn-sm ${selectedYear === year ? "btn-primary" : "btn-outline-primary"}`}
+                    onClick={() => setSelectedYear(selectedYear === year ? null : year)}
+                  >
+                    {year['AÑO']}
+                  </button>
+                ))}
+                <button
+                  className={`btn btn-sm ${selectedYear === null ? "btn-secondary" : "btn-outline-secondary"}`}
+                  onClick={() => setSelectedYear(null)}
                 >
                   Todos
                 </button>
@@ -975,57 +1004,57 @@ function CrucesTable() {
 
           </div>
           {/* Paginación */}
-                <div className='assignMe'>
-                    <nav className="mt-3">
-                        <div className="d-flex justify-content-between align-items-center mb-2 px-2">
-                            <span className="text-muted small">
-                                Mostrando {paginaDatos.length > 0 ? indiceInicio + 1 : 0} - {Math.min(indiceFin, paginaDatos.length)} de {sorted.length} registros
-                            </span>
-                            <span className="text-muted small">
-                                Página {totalPaginas > 0 ? paginaActual : 0} de {totalPaginas}
-                            </span>
-                        </div>
+          <div className='assignMe'>
+            <nav className="mt-3">
+              <div className="d-flex justify-content-between align-items-center mb-2 px-2">
+                <span className="text-muted small">
+                  Mostrando {paginaDatos.length > 0 ? indiceInicio + 1 : 0} - {Math.min(indiceFin, paginaDatos.length)} de {sorted.length} registros
+                </span>
+                <span className="text-muted small">
+                  Página {totalPaginas > 0 ? paginaActual : 0} de {totalPaginas}
+                </span>
+              </div>
 
-                        <ul className="pagination pagination-sm justify-content-center d-flex flex-wrap" style={{ overflow: 'auto', }}>
-                            <li className={`flex-wrap page-item ${paginaActual === 1 ? 'disabled' : ''}`}>
-                                <button 
-                                    className="page-link" 
-                                    onClick={() => cambiarPagina(paginaActual - 1)}
-                                    disabled={paginaActual === 1}
-                                >
-                                    Anterior
-                                </button>
-                            </li>
+              <ul className="pagination pagination-sm justify-content-center d-flex flex-wrap" style={{ overflow: 'auto', }}>
+                <li className={`flex-wrap page-item ${paginaActual === 1 ? 'disabled' : ''}`}>
+                  <button
+                    className="page-link"
+                    onClick={() => cambiarPagina(paginaActual - 1)}
+                    disabled={paginaActual === 1}
+                  >
+                    Anterior
+                  </button>
+                </li>
 
-                            {obtenerNumerosPagina().map((numero, index) => (
-                                numero === '...' ? (
-                                    <li key={`ellipsis-${index}`} className="flex-wrap page-item disabled">
-                                        <span className="page-link">...</span>
-                                    </li>
-                                ) : (
-                                    <li key={`page-${numero}`} className={`flex-wrap page-item ${paginaActual === numero ? 'active' : ''}`}>
-                                        <button 
-                                            className="page-link" 
-                                            onClick={() => cambiarPagina(numero)}
-                                        >
-                                            {numero}
-                                        </button>
-                                    </li>
-                                )
-                            ))}
+                {obtenerNumerosPagina().map((numero, index) => (
+                  numero === '...' ? (
+                    <li key={`ellipsis-${index}`} className="flex-wrap page-item disabled">
+                      <span className="page-link">...</span>
+                    </li>
+                  ) : (
+                    <li key={`page-${numero}`} className={`flex-wrap page-item ${paginaActual === numero ? 'active' : ''}`}>
+                      <button
+                        className="page-link"
+                        onClick={() => cambiarPagina(numero)}
+                      >
+                        {numero}
+                      </button>
+                    </li>
+                  )
+                ))}
 
-                            <li className={`flex-wrap page-item ${paginaActual === totalPaginas || totalPaginas === 0 ? 'disabled' : ''}`}>
-                                <button 
-                                    className="page-link"
-                                    onClick={() => cambiarPagina(paginaActual + 1)}
-                                    disabled={paginaActual === totalPaginas || totalPaginas === 0}
-                                >
-                                    Siguiente
-                                </button>
-                            </li>
-                        </ul>
-                    </nav>
-                </div>
+                <li className={`flex-wrap page-item ${paginaActual === totalPaginas || totalPaginas === 0 ? 'disabled' : ''}`}>
+                  <button
+                    className="page-link"
+                    onClick={() => cambiarPagina(paginaActual + 1)}
+                    disabled={paginaActual === totalPaginas || totalPaginas === 0}
+                  >
+                    Siguiente
+                  </button>
+                </li>
+              </ul>
+            </nav>
+          </div>
 
 
 

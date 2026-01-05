@@ -17,6 +17,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Toast } from 'react-bootstrap';
+import axios from 'axios';
 
 import { MapPin, Mail, Phone, User, Calendar, Building, Clipboard, LocateFixed } from 'lucide-react';
 
@@ -24,6 +25,7 @@ import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
+const API_URL = process.env.REACT_APP_API_URL;
 /**
  * Componente para copiar el TAG de un cruce al portapapeles
  * @component
@@ -245,7 +247,7 @@ const CasetaMapModal = ({ isOpen, onClose, nombreCaseta, lat, lng }) => {
  */
 const formatearRazonesSociales = (RazonSocial) => {
   if (!RazonSocial) return '';
-  const response = RazonSocial.replaceAll('S.A. de C.V.', '').replaceAll('SA. de C.V.', '').replaceAll('SA de CV.', '').replaceAll('S.A. de CV', '').replaceAll('SA de CV', '');
+  const response = RazonSocial.replaceAll('S.A. de C.V.', '').replaceAll('SA. de C.V.', '').replaceAll('SA de CV.', '').replaceAll('S.A. de CV', '').replaceAll('SA de CV', '').replaceAll('S.A. de C.V', '');
   return response;
 
 };
@@ -630,6 +632,30 @@ const RouteOption = ({ tipo, distance, time, distanceUnit = ' KM', costs, advert
 const ModalSelectorOrigenDestino = ({ isOpen, onClose, onSelect, objeto, valoresSugeridos }) => {
   const [clienteSeleccionado, setClienteSeleccionado] = useState('');
   const [objetoMostrado, setObjetoMostrado] = useState(objeto);
+  const focusRef = useRef(null);
+
+  useEffect(() => {
+    if (isOpen && focusRef.current) {
+      requestAnimationFrame(() => {
+        focusRef.current.focus();
+      });
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+
+
+
 
   if (!isOpen) return null;
 
@@ -692,12 +718,14 @@ const ModalSelectorOrigenDestino = ({ isOpen, onClose, onSelect, objeto, valores
                 value={clienteSeleccionado}
                 onChange={handleSeleccionChange}
                 className="form-control form-control-lg border-left-primary"
+                ref={focusRef}
                 style={{ borderLeftWidth: '4px' }}
+                tabIndex={1}
               >
                 <option value="">-- Selecciona una opción --</option>
                 {valoresSugeridos.map((valor) => (
                   <option key={valor.ID_entidad + '_' + (valor.distancia_km || '')} value={valor.ID_entidad}>
-                    {((valor.distancia_km) ? `*C*` : '')} ID: {valor.ID_entidad} | {formatearRazonesSociales(valor.Nombre)} | {formatearRazonesSociales(valor.ID_poblacion)}
+                    {((valor.distancia_km) ? `*C*` : '')} ID: {valor.ID_entidad} | {formatearRazonesSociales(valor.Nombre)} | {valor.ID_poblacion}
                   </option>
                 ))}
               </select>
@@ -858,7 +886,7 @@ const ModalSelectorOrigenDestino = ({ isOpen, onClose, onSelect, objeto, valores
  * - Botón confirmar deshabilitado si nada seleccionado
  * - Estilos Bootstrap SB Admin
  */
-const ModalConfirmacion = ({ isOpen, onClose, onSelect, mensaje }) => {
+const ModalConfirmacion = ({ isOpen, onClose, onSelect, mensaje, color }) => {
   const cancelButtonRef = useRef(null);
 
   useEffect(() => {
@@ -909,7 +937,7 @@ const ModalConfirmacion = ({ isOpen, onClose, onSelect, mensaje }) => {
           <div className="modal-content shadow-lg">
             <div className="form-group pt-3 px-4">
               <label className="font-weight-bold text-gray-800">
-                ¿Confirmas que <span className="text-danger"> {mensaje}</span> ?
+                Confirmas que, <span className={`text-${color}`}> {mensaje}</span>
               </label>
             </div>
 
@@ -987,6 +1015,26 @@ const ModalConfirmacion = ({ isOpen, onClose, onSelect, mensaje }) => {
  */
 const ModalSelector = ({ isOpen, onClose, onSelect, valorCampo, valoresSugeridos, titulo = '', campo = '', tituloDelSelect = 'Opciones' }) => {
   const [clienteSeleccionado, setClienteSeleccionado] = useState('');
+  const focusRef = useRef(null);
+
+  useEffect(() => {
+    if (isOpen && focusRef.current) {
+      requestAnimationFrame(() => {
+        focusRef.current.focus();
+      });
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -1049,6 +1097,8 @@ const ModalSelector = ({ isOpen, onClose, onSelect, valorCampo, valoresSugeridos
                 </label>
                 <select
                   value={clienteSeleccionado}
+                  ref={focusRef}
+                  autoFocus={isOpen}
                   onChange={(e) => {
                     setClienteSeleccionado(e.target.value);
                   }}
@@ -1085,6 +1135,173 @@ const ModalSelector = ({ isOpen, onClose, onSelect, valorCampo, valoresSugeridos
                 type="button"
                 onClick={handleConfirmar}
                 disabled={!clienteSeleccionado}
+                className="btn btn-success"
+              >
+                <i className="fas fa-check mr-2"></i>
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
+
+
+
+
+
+const ModalSelectorCasetas = ({ isOpen, onClose, onSelect, valorCampo, valoresSugeridos, titulo = '', campo = '', tituloDelSelect = 'Opciones' }) => {
+  const [casetaSeleccionada, setCasetaSeleccionada] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [casetasOpcion, setCasetasOpcion] = useState([]);
+  const focusRef = useRef(null);
+
+  useEffect(() => {
+    if (isOpen && focusRef.current) {
+      requestAnimationFrame(() => {
+        focusRef.current.focus();
+      });
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  useEffect(() => {
+    try {
+      axios.get(`${API_URL}/api/cruces`)
+        .then(res => {
+          setCasetasOpcion(res.data);
+        })
+        .catch(err => console.error('Error al cargar las casetas TUSA coincidentes, :', err));
+    } catch (error) {
+      console.log("Error al cargar los cruces:", error)
+    }
+    finally {
+      setLoading(false);
+    }
+
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const handleConfirmar = () => {
+    if (casetaSeleccionada) {
+      onSelect(casetaSeleccionada);
+      setCasetaSeleccionada('');
+      onClose();
+    }
+  };
+
+  const handleCancelar = () => {
+    setCasetaSeleccionada('');
+    onClose();
+  };
+  if (loading) {
+    return (
+      <div className="d-flex justify-content-center align-items-center" style={{ height: "5vh" }}>
+        <div className="spinner-border text-primary" role="status" style={{ width: "4rem", height: "4rem" }}>
+          <span className="visually-hidden">.</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+    
+      {/* Backdrop */}
+      <div
+        className="modal-backdrop fade show"
+        onClick={handleCancelar}
+        style={{ zIndex: 1040 }}
+      ></div>
+
+      {/* Modal */}
+      <div
+        className="modal fade show"
+        style={{ display: 'block', zIndex: 1050 }}
+        tabIndex="-1"
+        role="dialog"
+      >
+        <div className="modal-dialog modal-dialog-centered" role="document">
+          <div className="modal-content shadow-lg">
+            {/* Header */}
+            <div className="modal-header bg-gradient-primary">
+              <h5 className="modal-title text-white">
+                <i className="fas fa-user-tie mr-2"></i>
+                {titulo || 'Seleccionar Cliente para la Población'}
+              </h5>
+              <button
+                type="button"
+                className="close text-white"
+                onClick={handleCancelar}
+                style={{ opacity: 0.8 }}
+              >
+                <span aria-hidden="true">&times;</span>
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="modal-body">
+              <div className="alert alert-info border-left-info" role="alert">
+                <i className="fas fa-map-marker-alt mr-2"></i>
+                <strong>{campo}:</strong> {valorCampo}
+              </div>
+              <div className="form-group">
+                <label className="font-weight-bold text-gray-800">
+                  {tituloDelSelect} <span className="text-danger">*</span>
+                </label>
+                <select
+                  value={casetaSeleccionada}
+                  ref={focusRef}
+                  autoFocus={isOpen}
+                  onChange={(e) => {
+                    setCasetaSeleccionada(e.target.value);
+                  }}
+                  className="form-control form-control-lg border-left-primary"
+                  style={{ borderLeftWidth: '4px' }}
+                >
+                  <option value="">-- Selecciona una opción --</option>
+                  {valoresSugeridos.map((valor) => (
+                    <option key={valor.id_Tipo_ruta} value={valor.id_Tipo_ruta}>
+                      ID: {valor.id_Tipo_ruta} | {formatearRazonesSociales(valor.RazonOrigen)} → {formatearRazonesSociales(valor.RazonDestino)} __ ({valor.Categoria})
+                    </option>
+                  ))}
+                </select>
+                {!casetaSeleccionada && (
+                  <small className="form-text text-muted">
+                    <i className="fas fa-info-circle mr-1"></i>
+                    Por favor selecciona una opción para ver la ruta asociada en TUSA.
+                  </small>
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="modal-footer bg-light">
+              <button
+                type="button"
+                onClick={handleCancelar}
+                className="btn btn-secondary"
+              >
+                <i className="fas fa-times mr-2"></i>
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmar}
+                disabled={!casetaSeleccionada}
                 className="btn btn-success"
               >
                 <i className="fas fa-check mr-2"></i>

@@ -9,7 +9,8 @@ import {
   setOTSbyIDCruce,
   getCasetaMatch,
   getImportProgress,
-  actualizarEstatusMasivoCruces
+  actualizarEstatusMasivoCruces,
+  getYearsFromCruces
 } from "../controllers/cruces.controllers.js";
 
 
@@ -18,6 +19,7 @@ const router = Router();
 
 
 router.get("/", getCruces);
+router.get("/years", getYearsFromCruces);
 router.get("/stats", getStats);
 router.get('/progress', getImportProgress);
 router.get("/statusPersonal/:ID_Cruce", getStatusPersonal);

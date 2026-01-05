@@ -1,4 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+// Importaciones necesarias (agregar al inicio del archivo)
+import { DndContext, closestCenter, DragOverlay } from '@dnd-kit/core';
+import { arrayMove, SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+
+import Ordenamiento from './route-creator/Sortable';
 import { ModalConfirmacion, ModalSelector, ModalSelectorOrigenDestino, CustomToast, parsearMinutos, formatearDinero, RouteOption, formatearEnteros } from '../components/shared/utils';
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
 import axios from 'axios';
@@ -12,6 +17,8 @@ import markerPin from 'leaflet/dist/images/pin_intermedio.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 import { Container } from 'react-bootstrap';
 import { result, set } from 'lodash';
+import { AlertTriangle, MapPinPlus, GripVertical } from 'lucide-react';
+
 
 // ===== CONSTANTES =====
 const API_KEY = 'Jq92BpFD-tYae-BBj2-rEMc-MnuytuOB30ST';
@@ -19,7 +26,7 @@ const API_URL = process.env.REACT_APP_API_URL;
 const DEBOUNCE_DELAY = 500;
 const MIN_SEARCH_LENGTH = 3;
 
-// Iconos de marcadores (fuera del componente para evitar recreación)
+// Iconos de marcadores (fuera del componente para evitar re-creación)
 const markerIcons = {
     ATM: L.icon({
         iconUrl: markerATM,
@@ -187,6 +194,14 @@ const useDestinationSearch = (searchTerm, tipo) => {
 
 // ===== COMPONENTE PRINCIPAL =====
 const RutasModule = () => {
+
+    const focusRef = useRef(null);
+
+    useEffect(() => {
+        if (focusRef.current) {
+            focusRef.current.focus();
+        }
+    }, []);
     // Referencia a la combinación ctrl + enter para atajo de teclado
     const buttonRef = useRef(null);
     // Estados de búsqueda
@@ -200,6 +215,8 @@ const RutasModule = () => {
     const [destino, setDestino] = useState(null);
     const [puntoIntermedio, setPuntoIntermedio] = useState(null);
     const [casetaAEliminar, setCasetaAEliminar] = useState(null);
+    const [casetaAAgregar, setCasetaAAgregar] = useState(null);
+
 
 
     // Estados de rutas
@@ -210,8 +227,11 @@ const RutasModule = () => {
     const [directoriosCoincidentes, setDirectoriosCoincidentes] = useState([]);
 
     // Estados de UI
-    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [activeId, setActiveId] = useState(null);
     const [isModalConfirmacionOpen, setIsModalConfirmacionOpen] = useState(false);
+    const [colorModalConfirmacion, setColorModalConfirmacion] = useState(null);
+    const [mensajeModal, setMensajeModal] = useState(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
     const [isModalSeleccionOrigenDestinoOpen, setIsModalSeleccionOrigenDestinoOpen] = useState(false);
     const [loadingRutas, setLoadingRutas] = useState(false);
     const [loadingRutaSeleccionada, setLoadingRutaSeleccionada] = useState(false);
@@ -334,7 +354,57 @@ const RutasModule = () => {
 
     const handleDeleteCaseta = (idCaseta) => {
         setCasetaAEliminar(idCaseta); // Guardamos el ID de la caseta a eliminar
+        setColorModalConfirmacion('danger');
         setIsModalConfirmacionOpen(true);
+    };
+    const handleDragStart = (event) => {
+        setActiveId(event.active.id);
+    }
+
+    // NUEVA FUNCIÓN: Actualizar consecutivo manual
+    const handleConsecutivoChange = (idCaseta, nuevoValor) => {
+        setCasetasEnRutaTusa((prev) =>
+            prev.map(caseta =>
+                caseta.ID_Caseta === idCaseta
+                    ? { ...caseta, consecutivo: nuevoValor }
+                    : caseta
+            )
+        );
+    }
+
+    const handleDragEnd = (event) => {
+        const { active, over } = event;
+
+        setActiveId(null); // Limpiar el activeId
+
+        if (!over) return;
+
+        setCasetasEnRutaTusa((casetasEnRutaTusa) => {
+            const oldIndex = casetasEnRutaTusa.findIndex((caseta) => caseta.ID_Caseta === active.id);
+            const newIndex = casetasEnRutaTusa.findIndex((caseta) => caseta.ID_Caseta === over.id);
+
+            if (oldIndex === -1 || newIndex === -1) return casetasEnRutaTusa;
+
+            // Reordenar el array
+            const reordenado = arrayMove(casetasEnRutaTusa, oldIndex, newIndex);
+
+            // Actualizar consecutivos basados en la nueva posición
+            const conConsecutivosActualizados = reordenado.map((caseta, index) => ({
+                ...caseta,
+                consecutivo: index + 1 // Consecutivo basado en posición (1, 2, 3, ...)
+            }));
+
+            return conConsecutivosActualizados;
+        })
+    }
+
+    const handleAddCaseta = (casetaINEGI) => {
+        setCasetaAAgregar(casetaINEGI); // Aquí no solo guardamos el ID de la caseta a agregar en la ruta, sino que mandamos toda la caseta al componente hijo para que se consulten las casetas cercanas a la ubicación INEGI y también el costo.
+        setColorModalConfirmacion('success');
+        setMensajeModal('¿Desea agregar la caseta de ' + casetaINEGI?.direccion.replace('Cruce la caseta ', '') + ' sobre la ruta TUSA actual? ')
+        setIsModalConfirmacionOpen(true);
+        console.log(JSON.parse(casetaINEGI.geojson)?.coordinates);
+        console.log(tipoVehiculo);
     };
     // ===== FUNCIONES DE API =====
     const getRouteDetails = useCallback(async (tipoDetalleOoL) => {
@@ -428,7 +498,7 @@ const RutasModule = () => {
             ];
             setRutaSeleccionada(rutas_OyL ? selectedRoute : []);
         }
-        setBoolExiste(prev => prev.replace(', selecciona una ruta', ''));
+        setBoolExiste(prev => prev.replace(', selecciona una ruta', ', recuerda guardar'));
     }, [rutas_OyL, getRouteDetails]);
 
     const calcularRutaHandler = useCallback(async (e) => {
@@ -440,6 +510,7 @@ const RutasModule = () => {
         setLoadingRutas(true);
         setRutaTusa([]);
         setRutas_OyL(null);
+        setRutaSeleccionada([])
         setCasetasEnRutaTusa([]);
 
         try {
@@ -586,8 +657,7 @@ const RutasModule = () => {
                 rutaLibreFinal = procesarRuta(rutaLibre1);
             }
 
-            const stringifyGeoJSON = (geojson) =>
-                typeof geojson === 'string' ? geojson : JSON.stringify(geojson);
+            const stringifyGeoJSON = (geojson) => typeof geojson === 'string' ? geojson : JSON.stringify(geojson);
 
             setRutas_OyL({
                 optima: rutaOptimaFinal,
@@ -640,74 +710,111 @@ const RutasModule = () => {
                 <div className="header-RC py-2 rounded-top">
                     <h1>🚛 Creador de Rutas - Propuesta IAVE-WEB</h1>
                     <div className="header-actions-RC">
-                        <button className="btn btn-success">💾 Guardar Ruta</button>
+                        <button className="btn btn-success" onClick={() => { alert("Ruta seleccionada " + rutaTusa[0].id_Tipo_ruta) }}>💾 Guardar Ruta</button>
                     </div>
                 </div>
 
                 <div className="container-fluid py-1 border">
                     <div className="alert alert-info border-left-info" role="alert">
                         <i className="fas fa-info-circle mr-2"></i>
-                        <strong>Estado:</strong> {loadingRutas || loadingRutaSeleccionada ? 'Cargando rutas...' : boolExiste}
+                        <strong>Estado de :</strong> {loadingRutas || loadingRutaSeleccionada ? 'Cargando rutas...' : boolExiste} {(casetasEnRutaTusa) ? `(${casetasEnRutaTusa.length} casetas en la ruta)` : ''}
                     </div>
 
-                    <div className="table-container py-0 my-0" style={{ maxHeight: '12rem' }}>
-                        <table
-                            className='table table-bordered table-scroll table-sm table-hover align-middle mt-2'
-                            style={{ display: casetasEnRutaTusa?.length > 0 ? 'table' : 'none' }}
-                        >
-                            <thead>
-                                <tr>
-                                    <th>ID_Caseta</th>
-                                    <th>Nombre</th>
-                                    <th>Estado</th>
-                                    <th>Latitud</th>
-                                    <th>Longitud</th>
-                                    <th>{switchTipoVehiculo(tipoVehiculo)}</th>
-
-                                    <th>Consecutivo</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {casetasEnRutaTusa?.map((caseta, index) => (
-                                    <tr key={caseta.ID_Caseta || index} className='text-center'>
-                                        <td className='text-right'>
-                                            {caseta.ID_Caseta}{' '}
-                                            <span
-                                                style={{ cursor: 'help' }}
-                                                title={caseta.IAVE ? 'SI Acepta el pago con TAG' : 'NO admite el pago con TAG'}
-                                            >
-                                                {caseta.IAVE ? '✅' : '❌'}
-                                            </span>
-                                        </td>
-                                        <td>{caseta.Nombre}</td>
-                                        <td>{caseta.Estado}</td>
-                                        <td>{caseta.latitud}</td>
-                                        <td>{caseta.longitud}</td>
-                                        <td>$ {formatearEnteros(caseta[switchTipoVehiculo(tipoVehiculo).replaceAll(" ", "")])}</td>
-                                        <td className='d-flex flex-row-reverse'>
-                                            
-                                            <button
-                                                className="btn btn-sm btn-outline-danger"
-                                                style={{ float: 'right' }}
-                                                onClick={() => handleDeleteCaseta(caseta.ID_Caseta)}
-                                            >
-                                                <i className="fas fa-trash"></i>
-                                            </button>
-                                            <input
-                                                style={{ maxWidth: '3rem', textAlign: 'center', marginRight: '0.5rem' }}
-                                                className="form-control form-control-sm"
-                                                maxLength={2}
-                                                type="text"
-                                                name="txtCasetaConsecutivo"
-                                                id={`txtCasetaConsecutivo_${caseta.ID_Caseta}`}
-                                                defaultValue={caseta.consecutivo || ''}
-                                            />
-                                        </td>
+                    <DndContext
+                        collisionDetection={closestCenter}
+                        onDragStart={handleDragStart}
+                        onDragEnd={handleDragEnd}
+                    >
+                        <div className="table-container py-0 my-0" style={{ maxHeight: '12rem' }}>
+                            <table
+                                className='table table-bordered table-scroll table-sm table-hover align-middle mt-2'
+                                style={{ display: casetasEnRutaTusa?.length > 0 ? 'table' : 'none' }}
+                            >
+                                <thead>
+                                    <tr>
+                                        <th style={{ width: '40px' }}></th>
+                                        <th>ID_Caseta</th>
+                                        <th>Nombre</th>
+                                        <th>Estado</th>
+                                        <th>Latitud</th>
+                                        <th>Longitud</th>
+                                        <th>{switchTipoVehiculo(tipoVehiculo)}</th>
+                                        <th>Consecutivo</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                                </thead>
+                                <tbody>
+                                    <SortableContext
+                                        items={casetasEnRutaTusa}
+                                        strategy={verticalListSortingStrategy}
+                                    >
+                                        {casetasEnRutaTusa?.map((caseta, index) => (
+                                            <Ordenamiento
+                                                key={caseta.ID_Caseta}
+                                                caseta={caseta}
+                                                index={index}
+                                                rutaSeleccionada={rutaSeleccionada}
+                                                tipoVehiculo={tipoVehiculo}
+                                                handleDeleteCaseta={handleDeleteCaseta}
+                                                handleConsecutivoChange={handleConsecutivoChange}
+                                                formatearEnteros={formatearEnteros}
+                                                switchTipoVehiculo={switchTipoVehiculo}
+                                            />
+                                        ))}
+                                    </SortableContext>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <DragOverlay>
+                            {activeId ? (
+                                <table className="table table-bordered table-sm" style={{
+                                    width: 'auto',
+                                    margin: 0,
+                                    boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
+                                    borderRadius: '4px',
+                                    background: 'white'
+                                }}>
+                                    <tbody>
+                                        {(() => {
+                                            const caseta = casetasEnRutaTusa.find(c => c.ID_Caseta === activeId);
+                                            if (!caseta) return null;
+
+                                            return (
+                                                <tr className="text-center table-primary">
+                                                    <td style={{ padding: '0.5rem', width: '40px' }}>
+                                                        <GripVertical size={18} className="text-muted" />
+                                                    </td>
+                                                    <td className='text-right'>
+                                                        {caseta.ID_Caseta}{' '}
+                                                        <span>{caseta.IAVE ? '✅' : '❌'}</span>
+                                                    </td>
+                                                    <td>{caseta.Nombre}</td>
+                                                    <td>{caseta.Estado}</td>
+                                                    <td>{caseta.latitud}</td>
+                                                    <td>{caseta.longitud}</td>
+                                                    <td>
+                                                        $ {formatearEnteros(caseta[switchTipoVehiculo(tipoVehiculo).replaceAll(" ", "")])}
+                                                    </td>
+                                                    <td>
+                                                        <input
+                                                            style={{
+                                                                maxWidth: '3rem',
+                                                                textAlign: 'center'
+                                                            }}
+                                                            className="form-control form-control-sm"
+                                                            type="text"
+                                                            value={caseta.consecutivo || ''}
+                                                            readOnly
+                                                        />
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })()}
+                                    </tbody>
+                                </table>
+                            ) : null}
+                        </DragOverlay>
+                    </DndContext>
                 </div>
 
                 <div className="main-content-RC mt-2">
@@ -723,6 +830,7 @@ const RutasModule = () => {
                                     className="form-control-RC pt-1 pb-2"
                                     name='txtOrigen'
                                     placeholder="Huehuetoca, Huehuetoca"
+                                    ref={focusRef}
                                     value={txtOrigen}
                                     onChange={handleChange}
                                 />
@@ -809,12 +917,9 @@ const RutasModule = () => {
                                     <option value="2">Bus 2 Ejes</option>
                                     <option value="5">Camion 2 Ejes</option>
                                     <option value="6">Camion 3 Ejes</option>
-                                    <option value="7">Camion 4 Ejes</option>
                                     <option value="8">Camion 5 Ejes</option>
-                                    <option value="9">Camion 6 Ejes</option>
-                                    <option value="10">Camion 7 Ejes</option>
-                                    <option value="11">Camion 8 Ejes</option>
                                     <option value="12">Camion 9 Ejes</option>
+
                                 </select>
                             </div>
 
@@ -923,7 +1028,9 @@ const RutasModule = () => {
                                 maxWidth: 'fit-content',
                                 padding: '0px',
                             }}>
-                            <button className="btn btn-warning">⬇️ Descargar indicaciones</button>
+                            <span className='btn btn-primary mr-2'>
+                                Se han cargado las casetas que se encuentran en la ruta TUSA.
+                            </span>
                         </div>
 
                         {/* Loading overlay */}
@@ -1008,7 +1115,7 @@ const RutasModule = () => {
                             attribution='&copy; OpenStreetMap contributors || IAVE-WEB ⭐🚌'
                         />
 
-                        <Marker position={[19.782283538009626, -98.58592613126075]} icon={numIcon}>
+                        <Marker position={[19.782283538009626, -98.58592613126075]} icon={markerIcons.ATM}>
                             <Popup>Base Sahagún</Popup>
                         </Marker>
 
@@ -1064,7 +1171,7 @@ const RutasModule = () => {
                             </Marker>
                         ))}
                         {casetasEnRutaTusa?.map((caseta, index) => (
-                            <Marker key={caseta.ID_Caseta || index} className='text-center'
+                            <Marker key={caseta.ID_Caseta + ' _ ' + index} className='text-center'
                                 position={[caseta.latitud, caseta.longitud]}
 
                             >
@@ -1196,21 +1303,21 @@ const RutasModule = () => {
                                     </thead>
                                     <tbody>
                                         {rutaSeleccionada[1]?.map((item, index) => (
-                                            <tr key={item?.id || item?.cve_caseta || index} className='text-center'>
-                                                <td>
+                                            <tr key={item?.id || item?.cve_caseta || index} className='text-center align-middle'>
+                                                <td className='align-middle'>
                                                     <div className="d-flex" style={{ textAlign: 'left' }}>
                                                         {item?.direccion.replace('Cruce la caseta ', '')}
                                                     </div>
                                                 </td>
-                                                <td className='pr-0 pl-0'>
+                                                <td className='pr-0 pl-0 align-middle'>
                                                     <div className="text-center">
                                                         ${item?.costo_caseta}
                                                     </div>
                                                 </td>
-                                                <td>
+                                                <td className='align-middle'>
                                                     <div className="text-center">
-                                                        <button className="btn btn-sm btn-outline-success">
-                                                            ✅
+                                                        <button className="btn btn-sm btn-outline-success" onClick={() => handleAddCaseta(item)}>
+                                                            <MapPinPlus size={20} className='mr-1 py-0 px-0'></MapPinPlus>
                                                         </button>
                                                     </div>
                                                 </td>
@@ -1223,6 +1330,16 @@ const RutasModule = () => {
                     </div>
                 </div>
             </div>
+
+            {/* MODAL PARA buscar la caseta que será vinculada sobre la ruta. */}
+            {isModalSeleccionOrigenDestinoOpen && (
+                <ModalSelectorOrigenDestino
+                    isOpen={isModalSeleccionOrigenDestinoOpen}
+                    onClose={() => setIsModalSeleccionOrigenDestinoOpen(false)}
+                    objeto={directoriosCoincidentes[0]}
+                    valoresSugeridos={directoriosCoincidentes}
+                />
+            )}
 
             {/* MODAL PARA SELECCIONAR RUTA */}
             {isModalOpen && (
@@ -1256,6 +1373,7 @@ const RutasModule = () => {
 
 
 
+
             {/* MODAL PARA SELECCIONAR Origen o destino */}
             {isModalSeleccionOrigenDestinoOpen && (
                 <ModalSelectorOrigenDestino
@@ -1273,8 +1391,9 @@ const RutasModule = () => {
                     onClose={() => {
                         setIsModalConfirmacionOpen(false);
                         setCasetaAEliminar(null); // Limpiamos al cerrar
+                        setMensajeModal(null) // Limpiamos al cerrar
                     }}
-                    mensaje={`¿Deseas eliminar la caseta de la ruta seleccionada?`}
+                    mensaje={mensajeModal || `¿Deseas eliminar la caseta de "${casetasEnRutaTusa.find(caseta => caseta.ID_Caseta === casetaAEliminar)?.Nombre}" de la ruta seleccionada?  `}
                     onSelect={() => {
                         // Aquí ejecutamos la eliminación
                         if (casetaAEliminar) {
@@ -1285,6 +1404,7 @@ const RutasModule = () => {
                         setIsModalConfirmacionOpen(false);
                         setCasetaAEliminar(null); // Limpiamos
                     }}
+                    color={colorModalConfirmacion}
                 />
             )}
 
