@@ -287,7 +287,7 @@ const RutasModule = () => {
     const handleKeyDown = (event) => {
         // Verificar si se presionó Ctrl y Enter
         if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
-            event.preventDefault(); 
+            event.preventDefault();
             // Simular un clic en el botón referenciado
             if (buttonRef.current) {
                 buttonRef.current.click();
@@ -358,6 +358,7 @@ const RutasModule = () => {
     }, [origen, destino]);
 
     const handleDeleteCaseta = (idCaseta) => {
+
         setCasetaAEliminar(idCaseta); // Guardamos el ID de la caseta a eliminar
         setColorModalConfirmacion('danger');
         setIsModalConfirmacionOpen(true);
@@ -1398,14 +1399,18 @@ const RutasModule = () => {
                     onSelect={() => {
                         // Aquí ejecutamos la eliminación
                         if (casetaAEliminar) {
-                            setCasetasEnRutaTusa(prev => {
-                                const filtradas = prev.filter(caseta => caseta.ID_Caseta !== casetaAEliminar);
-                                //actualizamos los consecutivos
-                                return filtradas.map((caseta, index) => ({
-                                    ...caseta,
-                                    consecutivo: index + 1
-                                }));
-                            });
+
+                            //retraso de 500ms para que no interfiera con el drag
+                            setTimeout(() => {
+                                setCasetasEnRutaTusa(prev => {
+                                    const filtradas = prev.filter(caseta => caseta.ID_Caseta !== casetaAEliminar);
+                                    //actualizamos los consecutivos
+                                    return filtradas.map((caseta, index) => ({
+                                        ...caseta,
+                                        consecutivo: index + 1
+                                    }));
+                                });
+                            }, 800);
                         }
                         //Cerramos el modal y actualizamos nuevamente los consecutivos.
                         setIsModalConfirmacionOpen(false);

@@ -141,4 +141,8 @@ WHERE TRN.Id_Ruta =4982 AND TRN.id_Tipo_ruta=4901
 
 
 
-DELETE FROM PCasetasporruta WHERE Id_Ruta =4982 AND id_Tipo_ruta=4901 AND PCasetasporruta.ID IN 
+-- DELETE FROM PCasetasporruta WHERE Id_Ruta =4982 AND id_Tipo_ruta=4901 AND PCasetasporruta.ID IN 
+SELECT DISTINCT  PCasetasporruta.id_Tipo_ruta, COUNT(Id_Caseta) FROM PCasetasporruta WHERE consecutivo IS NULL GROUP BY id_Tipo_ruta;
+
+SELECT COUNT(PCasetasporruta.Id_Caseta) FROM PCasetasporruta 
+SELECT * FROM PCasetasporruta WHERE id_Tipo_ruta = 600

@@ -3,16 +3,16 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical } from 'lucide-react';
 
-function Ordenamiento({ 
-    caseta, 
-    index, 
-    rutaSeleccionada, 
-    tipoVehiculo, 
-    handleDeleteCaseta, 
-    handleConsecutivoChange, 
-    formatearEnteros, 
+function Ordenamiento({
+    caseta,
+    index,
+    rutaSeleccionada,
+    tipoVehiculo,
+    handleDeleteCaseta,
+    handleConsecutivoChange,
+    formatearEnteros,
     switchTipoVehiculo,
-    onOrdenamientoCompleto 
+    onOrdenamientoCompleto
 }) {
     const {
         attributes,
@@ -37,13 +37,13 @@ function Ordenamiento({
         <tr
             ref={setNodeRef}
             style={style}
-            className={`text-center py-1 ${(rutaSeleccionada[1]?.find) ? 'table-success' : 'table-warning'}`}
+            className={`tabla-ordenamiento text-center py-1 ${(rutaSeleccionada[1]?.find) ? 'table-success' : 'table-warning'}`}
         >
             {/* Celda con el handle de drag */}
-            <td 
+            <td
                 ref={setActivatorNodeRef}
-                className="drag-handle py-1" 
-                style={{ 
+                className="drag-handle py-1 tabla-ordenamiento"
+                style={{
                     cursor: isDragging ? 'grabbing' : 'grab',
                     padding: '0.5rem',
                     verticalAlign: 'middle',
@@ -56,7 +56,7 @@ function Ordenamiento({
             </td>
 
             {/* ID Caseta */}
-            <td className='text-right py-1'>
+            <td className='text-right py-1 tabla-ordenamiento'>
                 {caseta.ID_Caseta}{' '}
                 <span
                     style={{ cursor: 'help' }}
@@ -67,33 +67,33 @@ function Ordenamiento({
             </td>
 
             {/* Nombre */}
-            <td className='py-1'>{caseta.Nombre}</td>
+            <td className='py-1 tabla-ordenamiento'>{caseta.Nombre}</td>
 
             {/* Estado - con onClick funcional */}
-            <td 
+            <td
                 onClick={(e) => {
                     e.stopPropagation();
                     alert('Hola desde ' + caseta.Estado);
                 }}
-                className='py-1'
+                className='py-1 tabla-ordenamiento'
                 style={{ cursor: 'pointer' }}
             >
                 {caseta.Estado}
             </td>
 
             {/* Latitud */}
-            <td className='py-1'>{caseta.latitud}</td>
+            <td className='py-1 tabla-ordenamiento'>{caseta.latitud}</td>
 
             {/* Longitud */}
-            <td className='py-1'>{caseta.longitud}</td>
+            <td className='py-1 tabla-ordenamiento'>{caseta.longitud}</td>
 
             {/* Precio */}
-            <td className='py-1'>
+            <td className='py-1 tabla-ordenamiento'>
                 $ {formatearEnteros(caseta[switchTipoVehiculo(tipoVehiculo).replaceAll(" ", "")])}
             </td>
 
             {/* Consecutivo y acciones */}
-            <td className='d-flex flex-row-reverse py-1'>
+            <td className='d-flex flex-row-reverse py-1 tabla-ordenamiento'>
                 <button
                     className="btn btn-sm btn-outline-danger"
                     style={{ float: 'right' }}
@@ -106,13 +106,14 @@ function Ordenamiento({
                     <i className="fas fa-trash"></i>
                 </button>
                 <input
-                    style={{ 
-                        maxWidth: '3rem', 
-                        textAlign: 'center', 
-                        marginRight: '0.5rem' 
+                    style={{
+                        maxWidth: '3rem',
+                        textAlign: 'center',
+                        marginRight: '0.5rem'
                     }}
-                    className="form-control form-control-sm"
+                    className="form-control form-control-sm "
                     maxLength={2}
+                    disabled={true}
                     type="text"
                     name="txtCasetaConsecutivo"
                     id={`txtCasetaConsecutivo_${caseta.ID_Caseta}`}
