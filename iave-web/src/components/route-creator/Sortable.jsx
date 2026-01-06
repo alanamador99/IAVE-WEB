@@ -3,7 +3,17 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical } from 'lucide-react';
 
-function Ordenamiento({ caseta, index, rutaSeleccionada, tipoVehiculo, handleDeleteCaseta, handleConsecutivoChange, formatearEnteros, switchTipoVehiculo }) {
+function Ordenamiento({ 
+    caseta, 
+    index, 
+    rutaSeleccionada, 
+    tipoVehiculo, 
+    handleDeleteCaseta, 
+    handleConsecutivoChange, 
+    formatearEnteros, 
+    switchTipoVehiculo,
+    onOrdenamientoCompleto 
+}) {
     const {
         attributes,
         listeners,
@@ -27,12 +37,12 @@ function Ordenamiento({ caseta, index, rutaSeleccionada, tipoVehiculo, handleDel
         <tr
             ref={setNodeRef}
             style={style}
-            className={`text-center ${(rutaSeleccionada[1]?.find) ? 'table-success' : 'table-warning'}`}
+            className={`text-center py-1 ${(rutaSeleccionada[1]?.find) ? 'table-success' : 'table-warning'}`}
         >
             {/* Celda con el handle de drag */}
             <td 
                 ref={setActivatorNodeRef}
-                className="drag-handle" 
+                className="drag-handle py-1" 
                 style={{ 
                     cursor: isDragging ? 'grabbing' : 'grab',
                     padding: '0.5rem',
@@ -46,7 +56,7 @@ function Ordenamiento({ caseta, index, rutaSeleccionada, tipoVehiculo, handleDel
             </td>
 
             {/* ID Caseta */}
-            <td className='text-right'>
+            <td className='text-right py-1'>
                 {caseta.ID_Caseta}{' '}
                 <span
                     style={{ cursor: 'help' }}
@@ -57,32 +67,33 @@ function Ordenamiento({ caseta, index, rutaSeleccionada, tipoVehiculo, handleDel
             </td>
 
             {/* Nombre */}
-            <td>{caseta.Nombre}</td>
+            <td className='py-1'>{caseta.Nombre}</td>
 
             {/* Estado - con onClick funcional */}
             <td 
                 onClick={(e) => {
                     e.stopPropagation();
-                    alert('Hola ' + caseta.Estado);
+                    alert('Hola desde ' + caseta.Estado);
                 }}
+                className='py-1'
                 style={{ cursor: 'pointer' }}
             >
                 {caseta.Estado}
             </td>
 
             {/* Latitud */}
-            <td>{caseta.latitud}</td>
+            <td className='py-1'>{caseta.latitud}</td>
 
             {/* Longitud */}
-            <td>{caseta.longitud}</td>
+            <td className='py-1'>{caseta.longitud}</td>
 
             {/* Precio */}
-            <td>
+            <td className='py-1'>
                 $ {formatearEnteros(caseta[switchTipoVehiculo(tipoVehiculo).replaceAll(" ", "")])}
             </td>
 
             {/* Consecutivo y acciones */}
-            <td className='d-flex flex-row-reverse'>
+            <td className='d-flex flex-row-reverse py-1'>
                 <button
                     className="btn btn-sm btn-outline-danger"
                     style={{ float: 'right' }}
@@ -100,7 +111,6 @@ function Ordenamiento({ caseta, index, rutaSeleccionada, tipoVehiculo, handleDel
                         textAlign: 'center', 
                         marginRight: '0.5rem' 
                     }}
-                    disabled={true}
                     className="form-control form-control-sm"
                     maxLength={2}
                     type="text"
@@ -113,6 +123,9 @@ function Ordenamiento({ caseta, index, rutaSeleccionada, tipoVehiculo, handleDel
                         // Solo permitir números
                         if (valor === '' || /^\d+$/.test(valor)) {
                             handleConsecutivoChange(caseta.ID_Caseta, valor);
+                            if (onOrdenamientoCompleto) {
+                                onOrdenamientoCompleto();
+                            }
                         }
                     }}
                     onClick={(e) => e.stopPropagation()}

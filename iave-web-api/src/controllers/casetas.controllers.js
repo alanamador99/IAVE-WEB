@@ -1194,6 +1194,24 @@ export const updateCasetasEnRuta = async (req, res) => {
   }
 };
 
+export const deleteCasetaDeLaRuta = async (req, res) => {
+  const { IDcaseta } = req.params;
+  const { IDTipoRuta } = req.body;
+
+  try {
+    const pool = await getConnection();
+
+    const result = await pool.request()
+      .input("IDCaseta", sql.Int, IDcaseta)
+      .input("IDTipoRuta", sql.Int, IDTipoRuta)
+      .query(` cruces SET observaciones = @nuevoComentario WHERE ID = @ID`);
+    res.status(200).json({ message: 'Comentario actualizado correctamente' });
+  } catch (error) {
+    console.error('Error actualizando estatus:', error);
+    res.status(500).json({ error: 'Error en el servidor' });
+  }
+};
+
 
 export const getNearDirectorios = async (req, res) => {
   const { lat, lng } = req.query;

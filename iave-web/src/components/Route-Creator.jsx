@@ -243,6 +243,11 @@ const RutasModule = () => {
     const { results: puntosIntermedios, loading: loadingPuntoIntermedio } = useDestinationSearch(txtPuntoIntermedio, 'Intermedio');
 
     // ===== HANDLERS MEMOIZADOS =====
+    const handleRestaurarRuta = useCallback(() => {
+        // Restaurar los casetasEnRutaTusa a la ruta original de TUSA
+        setCasetasEnRutaTusa(casetasEnRutaTusa);
+    }, [casetasEnRutaTusa]);
+
     const handleChange = useCallback((e) => {
         const { name, value } = e.target;
 
@@ -282,7 +287,7 @@ const RutasModule = () => {
     const handleKeyDown = (event) => {
         // Verificar si se presionó Ctrl y Enter
         if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
-            event.preventDefault(); // Evitar el comportamiento predeterminado (ej. salto de línea en un textarea)
+            event.preventDefault(); 
             // Simular un clic en el botón referenciado
             if (buttonRef.current) {
                 buttonRef.current.click();
@@ -291,7 +296,7 @@ const RutasModule = () => {
     };
 
 
-    //Ayudame a generar una funcion llamada getRouteDetails que reciba un parametro origenOdestino y que haga lo siguiente:
+    //funcion para que
     //al mandarla a llamar desde cualquiera de las pildoras de origen/destino, haga una petición a la API de TUSA para obtener los directorios que coincidan con el origen o destino seleccionado
     // la API está sobre /api/casetas/rutas/<origenOdestino>/RutasConCoincidencia. (TEPEAPULCO por ejemplo)
     const changeOrigenDestinoHandler = useCallback(async (tipo, origenOdestino) => {
@@ -711,13 +716,14 @@ const RutasModule = () => {
                     <h1>🚛 Creador de Rutas - Propuesta IAVE-WEB</h1>
                     <div className="header-actions-RC">
                         <button className="btn btn-success" onClick={() => { alert("Ruta seleccionada " + rutaTusa[0].id_Tipo_ruta) }}>💾 Guardar Ruta</button>
+                        <button className="btn btn-info" onClick={() => { handleRestaurarRuta() }}>🔄️ Restaurar Ruta</button>
                     </div>
                 </div>
 
                 <div className="container-fluid py-1 border">
                     <div className="alert alert-info border-left-info" role="alert">
                         <i className="fas fa-info-circle mr-2"></i>
-                        <strong>Estado de :</strong> {loadingRutas || loadingRutaSeleccionada ? 'Cargando rutas...' : boolExiste} {(casetasEnRutaTusa) ? `(${casetasEnRutaTusa.length} casetas en la ruta)` : ''}
+                        <strong>Estado de :</strong> {loadingRutas || loadingRutaSeleccionada ? 'Cargando rutas...' : boolExiste} {(casetasEnRutaTusa) ? `(${casetasEnRutaTusa.length} casetas en la ruta) ` : ' '} {((casetasEnRutaTusa.length - rutaSeleccionada[1]?.length) > 0) ? `Se tienen ${casetasEnRutaTusa.length - rutaSeleccionada[1]?.length} casetas adicionales en la ruta del INEGI vs TUSA` : ``}
                     </div>
 
                     <DndContext
@@ -1028,7 +1034,7 @@ const RutasModule = () => {
                                 maxWidth: 'fit-content',
                                 padding: '0px',
                             }}>
-                            <span className='btn btn-primary mr-2'>
+                            <span className='alert alert-primary' role='alert' style={{ margin: '0px', padding: '0.4rem 0.6rem', fontSize: '0.9rem' }}>
                                 Se han cargado las casetas que se encuentran en la ruta TUSA.
                             </span>
                         </div>
@@ -1388,21 +1394,28 @@ const RutasModule = () => {
             {isModalConfirmacionOpen && (
                 <ModalConfirmacion
                     isOpen={isModalConfirmacionOpen}
-                    onClose={() => {
-                        setIsModalConfirmacionOpen(false);
-                        setCasetaAEliminar(null); // Limpiamos al cerrar
-                        setMensajeModal(null) // Limpiamos al cerrar
-                    }}
                     mensaje={mensajeModal || `¿Deseas eliminar la caseta de "${casetasEnRutaTusa.find(caseta => caseta.ID_Caseta === casetaAEliminar)?.Nombre}" de la ruta seleccionada?  `}
                     onSelect={() => {
                         // Aquí ejecutamos la eliminación
                         if (casetaAEliminar) {
-                            setCasetasEnRutaTusa(prev =>
-                                prev.filter(caseta => caseta.ID_Caseta !== casetaAEliminar)
-                            );
+                            setCasetasEnRutaTusa(prev => {
+                                const filtradas = prev.filter(caseta => caseta.ID_Caseta !== casetaAEliminar);
+                                //actualizamos los consecutivos
+                                return filtradas.map((caseta, index) => ({
+                                    ...caseta,
+                                    consecutivo: index + 1
+                                }));
+                            });
                         }
+                        //Cerramos el modal y actualizamos nuevamente los consecutivos.
                         setIsModalConfirmacionOpen(false);
                         setCasetaAEliminar(null); // Limpiamos
+
+                    }}
+                    onClose={() => {
+                        setIsModalConfirmacionOpen(false);
+                        setCasetaAEliminar(null); // Limpiamos al cerrar
+                        setMensajeModal(null) // Limpiamos al cerrar
                     }}
                     color={colorModalConfirmacion}
                 />

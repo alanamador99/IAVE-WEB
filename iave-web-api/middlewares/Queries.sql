@@ -112,7 +112,10 @@ SELECT DISTINCT YEAR(Fecha) as 'AÑO'
 FROM cruces
 
 
-SELECT [TRN].[id_Tipo_ruta],
+SELECT 
+CP.Nombre_IAVE,
+PCR.consecutivo,
+[TRN].[id_Tipo_ruta],
 PobO.Poblacion as PoblacionOrigen,
 PobD.Poblacion as PoblacionDestino,
 [TRN].[Id_Ruta],
@@ -125,15 +128,17 @@ PobD.Poblacion as PoblacionDestino,
 [TRN].[Peaje_Dos_Ejes],
 [TRN].[Peaje_Tres_Ejes],
 [TRN].[Cemex]
-FROM Tipo_de_ruta_N as TRN
+FROM PCasetasporruta as PCR
+INNER JOIN
+Tipo_de_ruta_N TRN ON PCR.id_Tipo_ruta = TRN.id_Tipo_ruta
 INNER JOIN 
 Poblaciones PobO ON TRN.id_origen = PobO.ID_poblacion
 INNER JOIN 
 Poblaciones PobD ON TRN.id_destino = PobD.ID_poblacion
-INNER JOIN
-PCasetasporruta PCR ON PCR.id_Tipo_ruta = TRN.id_Tipo_ruta
+INNER JOIN 
+casetas_Plantillas CP ON CP.ID_Caseta = PCR.Id_Caseta
 WHERE TRN.Id_Ruta =4982 AND TRN.id_Tipo_ruta=4901
 
 
 
-DELETE FROM PCasetasporruta WHERE Id_Ruta =4982 AND id_Tipo_ruta=4901 AND consecutivo IS NULL;
+DELETE FROM PCasetasporruta WHERE Id_Ruta =4982 AND id_Tipo_ruta=4901 AND PCasetasporruta.ID IN 
