@@ -63,7 +63,7 @@ ORDER BY ID DESC;
 INSERT INTO PCasetasporruta
     ( Id_Ruta, Id_Caseta, F_Captura, Captor, id_Tipo_ruta)
 VALUES
-    ( '4982', '66', DATEFROMPARTS(2025,12,30), 'IAVE', 4901);
+    ( '4982', '66', DATEFROMPARTS(2027,01,08), 'IAVE', 4901);
 
 
 
@@ -80,9 +80,15 @@ WHERE ID = 57916;
 
 
 --Ejemplo de consulta de los primeros 10 registros de Tipo_de_ruta_N
-SELECT TOP(10)    *  from casetas_Plantillas;
-SELECT TOP(10)    *  from Tipo_de_ruta_N;
-SELECT TOP(10)    *  from PCasetasporruta;
+SELECT TOP(10)
+    *
+from casetas_Plantillas;
+SELECT TOP(10)
+    *
+from Tipo_de_ruta_N;
+SELECT TOP(10)
+    *
+from PCasetasporruta;
 ORDER BY Tipo_de_ruta_N.id_Tipo_ruta DESC;
 -- Ejemplo de inserción en la tabla de Tipo_de_ruta_N
 INSERT INTO Tipo_de_ruta_N
@@ -91,16 +97,18 @@ VALUES
     ( '4982', '8112', '8346', 0, 1, 0, 0, 0, 'Ruta de prueba', DATEFROMPARTS(2025,12,30), '1514', '1506', 200.5, 210.0, 205.0, 208.0, 150.00, 250.00, 0);
 
 
-SELECT CPorRuta.consecutivo, Casetas.Nombre_IAVE, PobO.Poblacion as 'Origen', PobD.Poblacion as 'Destino', TRN.* FROM Tipo_de_ruta_N as TRN
-INNER JOIN 
-Poblaciones PobO ON PobO.ID_poblacion=TRN.id_origen 
-INNER JOIN 
-Poblaciones PobD ON PobD.ID_poblacion=TRN.id_destino 
-INNER JOIN
-PCasetasporruta CPorRuta ON CPorRuta.id_Tipo_ruta=TRN.id_Tipo_ruta
-INNER JOIN
-casetas_Plantillas Casetas ON Casetas.ID_Caseta=CPorRuta.Id_Caseta
-WHERE TRN.id_Tipo_ruta=865 ORDER BY CPorRuta.consecutivo ASC
+SELECT CPorRuta.consecutivo, Casetas.Nombre_IAVE, PobO.Poblacion as 'Origen', PobD.Poblacion as 'Destino', TRN.*
+FROM Tipo_de_ruta_N as TRN
+    INNER JOIN
+    Poblaciones PobO ON PobO.ID_poblacion=TRN.id_origen
+    INNER JOIN
+    Poblaciones PobD ON PobD.ID_poblacion=TRN.id_destino
+    INNER JOIN
+    PCasetasporruta CPorRuta ON CPorRuta.id_Tipo_ruta=TRN.id_Tipo_ruta
+    INNER JOIN
+    casetas_Plantillas Casetas ON Casetas.ID_Caseta=CPorRuta.Id_Caseta
+WHERE TRN.id_Tipo_ruta=865
+ORDER BY CPorRuta.consecutivo ASC
 
 -- Ejemplo de Actualización en la tabla de PCasetasporruta
 UPDATE Tipo_de_ruta_N
@@ -112,37 +120,78 @@ SELECT DISTINCT YEAR(Fecha) as 'AÑO'
 FROM cruces
 
 
-SELECT 
-CP.Nombre_IAVE,
-PCR.consecutivo,
-[TRN].[id_Tipo_ruta],
-PobO.Poblacion as PoblacionOrigen,
-PobD.Poblacion as PoblacionDestino,
-[TRN].[Id_Ruta],
-[TRN].[observaciones],
-[TRN].[fecha_Alta],
-[TRN].[Km_reales],
-[TRN].[Km_oficiales],
-[TRN].[Km_de_pago],
-[TRN].[Km_Tabulados],
-[TRN].[Peaje_Dos_Ejes],
-[TRN].[Peaje_Tres_Ejes],
-[TRN].[Cemex]
+SELECT
+    pcr.*
 FROM PCasetasporruta as PCR
-INNER JOIN
-Tipo_de_ruta_N TRN ON PCR.id_Tipo_ruta = TRN.id_Tipo_ruta
-INNER JOIN 
-Poblaciones PobO ON TRN.id_origen = PobO.ID_poblacion
-INNER JOIN 
-Poblaciones PobD ON TRN.id_destino = PobD.ID_poblacion
-INNER JOIN 
-casetas_Plantillas CP ON CP.ID_Caseta = PCR.Id_Caseta
+    INNER JOIN
+    Tipo_de_ruta_N TRN ON PCR.id_Tipo_ruta = TRN.id_Tipo_ruta
+    INNER JOIN
+    Poblaciones PobO ON TRN.id_origen = PobO.ID_poblacion
+    INNER JOIN
+    Poblaciones PobD ON TRN.id_destino = PobD.ID_poblacion
+    INNER JOIN
+    casetas_Plantillas CP ON CP.ID_Caseta = PCR.Id_Caseta
 WHERE TRN.Id_Ruta =4982 AND TRN.id_Tipo_ruta=4901
 
 
 
 -- DELETE FROM PCasetasporruta WHERE Id_Ruta =4982 AND id_Tipo_ruta=4901 AND PCasetasporruta.ID IN 
-SELECT DISTINCT  PCasetasporruta.id_Tipo_ruta, COUNT(Id_Caseta) FROM PCasetasporruta WHERE consecutivo IS NULL GROUP BY id_Tipo_ruta;
+SELECT DISTINCT PCasetasporruta.id_Tipo_ruta, COUNT(Id_Caseta)
+FROM PCasetasporruta
+WHERE consecutivo IS NULL
+GROUP BY id_Tipo_ruta;
 
-SELECT COUNT(PCasetasporruta.Id_Caseta) FROM PCasetasporruta 
-SELECT * FROM PCasetasporruta WHERE id_Tipo_ruta = 600
+SELECT COUNT(PCasetasporruta.Id_Caseta)
+FROM PCasetasporruta
+SELECT *
+FROM PCasetasporruta
+WHERE id_Tipo_ruta = 600
+
+
+
+
+DECLARE @latitud FLOAT = 17.9101386;
+DECLARE @longitud FLOAT = -94.93727412;
+DECLARE @costo FLOAT = 320;
+DECLARE @nombre VARCHAR(100) = 'Ocozocoautla';
+
+SELECT
+    casetas_Plantillas.ID_Caseta,
+    casetas_Plantillas.Nombre,
+    casetas_Plantillas.Carretera,
+    casetas_Plantillas.Estado,
+    casetas_Plantillas.Automovil,
+    casetas_Plantillas.Autobus2Ejes,
+    casetas_Plantillas.Camion2Ejes,
+    casetas_Plantillas.Camion3Ejes,
+    casetas_Plantillas.Camion5Ejes,
+    casetas_Plantillas.Camion9Ejes,
+    casetas_Plantillas.IAVE,
+    casetas_Plantillas.latitud,
+    casetas_Plantillas.longitud,
+    casetas_Plantillas.Nombre_IAVE,
+    casetas_Plantillas.Notas,
+          (
+            6371 * ACOS(
+              COS(RADIANS(@latitud)) 
+              * COS(RADIANS(TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(latitud)), CHAR(9), ''), ' ', '') AS FLOAT))) 
+              * COS(RADIANS(TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(longitud)), CHAR(9), ''), ' ', '') AS FLOAT)) - RADIANS(@longitud)) 
+              + SIN(RADIANS(@latitud)) 
+              * SIN(RADIANS(TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(latitud)), CHAR(9), ''), ' ', '') AS FLOAT)))
+            )
+          ) AS distancia_km
+FROM casetas_Plantillas
+WHERE TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(latitud)), CHAR(9), ''), ' ', '') AS FLOAT) IS NOT NULL
+    AND TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(longitud)), CHAR(9), ''), ' ', '') AS FLOAT) IS NOT NULL
+    AND (
+            6371 * ACOS(
+              COS(RADIANS(@latitud)) 
+              * COS(RADIANS(TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(latitud)), CHAR(9), ''), ' ', '') AS FLOAT))) 
+              * COS(RADIANS(TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(longitud)), CHAR(9), ''), ' ', '') AS FLOAT)) - RADIANS(@longitud)) 
+              + SIN(RADIANS(@latitud)) 
+              * SIN(RADIANS(TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(latitud)), CHAR(9), ''), ' ', '') AS FLOAT)))
+            )
+          ) <= 100
+    AND (casetas_Plantillas.Camion2Ejes - @costo) BETWEEN -20 AND 20
+
+ORDER BY distancia_km

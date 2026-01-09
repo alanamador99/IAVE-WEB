@@ -35,43 +35,43 @@ const claveToImporteField = {
 };
 
 const switchTipoVehiculo = (tvehiculo) => {
-    let resultado;
-    switch (tvehiculo) {
-        case "1":
-            resultado = "Automovil";
-            break;
-        case "2":
-            resultado = "Autobus2Ejes";
-            break;
-        case "5":
-            resultado = "Camion2Ejes";
-            break;
-        case "6":
-            resultado = "Camion3Ejes";
-            break;
-        case "7":
-            resultado = "Camion3Ejes";
-            break;
-        case "8":
-            resultado = "Camion5Ejes";
-            break;
-        case "9":
-            resultado = "Camion5Ejes";
-            break;
-        case "10":
-            resultado = "Camion9Ejes";
-            break;
-        case "11":
-            resultado = "Camion9Ejes";
-            break;
-        case "12":
-            resultado = "Camion9Ejes";
-            break;
-        default:
-            resultado = "Error";
-            break;
-    }
-    return resultado;
+  let resultado;
+  switch (tvehiculo) {
+    case "1":
+      resultado = "Automovil";
+      break;
+    case "2":
+      resultado = "Autobus2Ejes";
+      break;
+    case "5":
+      resultado = "Camion2Ejes";
+      break;
+    case "6":
+      resultado = "Camion3Ejes";
+      break;
+    case "7":
+      resultado = "Camion3Ejes";
+      break;
+    case "8":
+      resultado = "Camion5Ejes";
+      break;
+    case "9":
+      resultado = "Camion5Ejes";
+      break;
+    case "10":
+      resultado = "Camion9Ejes";
+      break;
+    case "11":
+      resultado = "Camion9Ejes";
+      break;
+    case "12":
+      resultado = "Camion9Ejes";
+      break;
+    default:
+      resultado = "Error";
+      break;
+  }
+  return resultado;
 }
 
 /**
@@ -1069,7 +1069,7 @@ export const getRutaPorOrigen_Destino = async (req, res) => {
       total: result.recordset.length,
       mensaje: hayResultados
         ? 'Ruta encontrada en TUSA'
-        : 'Ruta no encontrada en TUSA. Mostrando solo información de INEGI  '+ "origen:" + origen + "destino:" + destino,
+        : 'Ruta no encontrada en TUSA. Mostrando solo información de INEGI  ' + "origen:" + origen + "destino:" + destino,
       enTUSA: hayResultados // Flag para que el frontend sepa si está en TUSA
     });
 
@@ -1274,3 +1274,224 @@ export const getNearDirectorios = async (req, res) => {
     res.status(500).json({ msg: 'Error al obtener directorio cercano' });
   }
 };
+
+
+
+export const GuardarCambiosEnRuta = async (req, res) => {
+  const pool = await getConnection();
+  const transaction = new sql.Transaction(pool);
+
+  try {
+    const {
+      id_Tipo_ruta,
+      casetasActualizadas,
+      casetasAEliminar,
+      casetasAAgregar
+    } = req.body;
+
+    // Validaciones
+    if (!id_Tipo_ruta) {
+      return res.status(400).json({
+        success: false,
+        message: 'El id_Tipo_ruta es requerido'
+      });
+    }
+
+    console.log('📥 Recibiendo cambios para ruta:', id_Tipo_ruta);
+    console.log('🗑️ Casetas a eliminar:', casetasAEliminar?.length || 0);
+    console.log('➕ Casetas a agregar:', casetasAAgregar?.length || 0);
+    console.log('🔄 Casetas a actualizar:', casetasActualizadas?.length || 0);
+
+    // Iniciar transacción
+    await transaction.begin();
+
+    // ===== 1. ELIMINAR CASETAS =====
+    if (casetasAEliminar && casetasAEliminar.length > 0) {
+      const request1 = new sql.Request(transaction);
+
+      // Construir lista de IDs para el WHERE IN 
+      const idsEliminar = casetasAEliminar.map(c => c.ID_Caseta).join(',');
+
+      const deleteQuery = `
+                DELETE FROM PCasetasporruta 
+                WHERE ID_Caseta IN (${idsEliminar})
+                AND id_Tipo_ruta = @id_Tipo_ruta
+            `;
+
+      request1.input('id_Tipo_ruta', sql.Int, id_Tipo_ruta);
+      const deleteResult = await request1.query(deleteQuery);
+
+      console.log(`✅ Eliminadas ${deleteResult.rowsAffected[0]} casetas`);
+    }
+
+    // ===== 2. AGREGAR NUEVAS CASETAS =====
+    if (casetasAAgregar && casetasAAgregar.length > 0) {
+      for (const caseta of casetasAAgregar) {
+        const request2 = new sql.Request(transaction);
+
+        const insertQuery = `
+                    INSERT INTO PCasetasporruta (ID_Caseta, id_Tipo_ruta, consecutivo)
+                    VALUES (@ID_Caseta, @id_Tipo_ruta, @consecutivo)
+                `;
+
+        request2.input('ID_Caseta', sql.Int, caseta.ID_Caseta);
+        request2.input('id_Tipo_ruta', sql.Int, id_Tipo_ruta);
+        request2.input('consecutivo', sql.Int, caseta.consecutivo);
+
+        await request2.query(insertQuery);
+      }
+
+      console.log(`✅ Agregadas ${casetasAAgregar.length} casetas`);
+    }
+
+    // ===== 3. ACTUALIZAR CONSECUTIVOS =====
+    if (casetasActualizadas && casetasActualizadas.length > 0) {
+      for (const caseta of casetasActualizadas) {
+        const request3 = new sql.Request(transaction);
+
+        const updateQuery = `
+                    UPDATE PCasetasporruta 
+                    SET consecutivo = @consecutivo 
+                    WHERE ID_Caseta = @ID_Caseta 
+                    AND id_Tipo_ruta = @id_Tipo_ruta
+                `;
+
+        request3.input('consecutivo', sql.Int, caseta.consecutivo);
+        request3.input('ID_Caseta', sql.Int, caseta.ID_Caseta);
+        request3.input('id_Tipo_ruta', sql.Int, id_Tipo_ruta);
+
+        await request3.query(updateQuery);
+      }
+
+      console.log(`✅ Actualizados ${casetasActualizadas.length} consecutivos`);
+    }
+
+    // Commit de la transacción
+    await transaction.commit();
+
+    // Obtener las casetas actualizadas de la ruta
+    const requestFinal = new sql.Request(pool);
+    requestFinal.input('id_Tipo_ruta', sql.Int, id_Tipo_ruta);
+
+    const resultFinal = await requestFinal.query(`
+            SELECT 
+                cpr.*,
+                c.Nombre,
+                c.Nombre_IAVE,
+                c.Estado,
+                c.latitud,
+                c.longitud,
+                c.IAVE,
+                c.Automovil,
+                c.Autobus2Ejes,
+                c.Camion2Ejes,
+                c.Camion3Ejes,
+                c.Camion5Ejes,
+                c.Camion9Ejes
+            FROM PCasetasporruta cpr
+            INNER JOIN casetas_Plantillas c ON cpr.ID_Caseta = c.ID_Caseta
+            WHERE cpr.id_Tipo_ruta = @id_Tipo_ruta
+            ORDER BY cpr.consecutivo ASC
+        `);
+
+    res.json({
+      success: true,
+      message: 'Cambios guardados exitosamente',
+      data: {
+        casetasEliminadas: casetasAEliminar?.length || 0,
+        casetasAgregadas: casetasAAgregar?.length || 0,
+        consecutivosActualizados: casetasActualizadas?.length || 0,
+        casetasEnRuta: resultFinal.recordset
+      }
+    });
+
+  } catch (error) {
+    // Rollback en caso de error - solo si la transacción comenzó
+    try {
+      if (transaction && transaction._begun) {
+        await transaction.rollback();
+      }
+    } catch (rollbackError) {
+      console.error('❌ Error al hacer rollback:', rollbackError);
+    }
+
+    console.error('❌ Error al guardar cambios:', error);
+
+    res.status(500).json({
+      success: false,
+      message: 'Error al guardar los cambios de la ruta',
+      error: error.message
+    });
+  }
+}
+
+
+export const getCasetaFromInegi = async (req, res) => {
+  try {
+    const {
+      lat,
+      lng,
+      costo,
+      ejes,
+      nombre
+
+    } = req.body;
+
+    const pool = await getConnection();
+    const vehiculoColumn = switchTipoVehiculo(ejes);
+
+    const result = await pool.request()
+      .input('latitud', sql.Float, parseFloat(lat))
+      .input('longitud', sql.Float, parseFloat(lng))
+      .input('costo', sql.Float, parseFloat(costo))
+      .input('nombreCasetaINEGI', sql.VarChar, nombre)
+      .query(`
+        SELECT
+    casetas_Plantillas.ID_Caseta,
+    casetas_Plantillas.Nombre,
+    casetas_Plantillas.Carretera,
+    casetas_Plantillas.Estado,
+    casetas_Plantillas.Automovil,
+    casetas_Plantillas.Autobus2Ejes,
+    casetas_Plantillas.Camion2Ejes,
+    casetas_Plantillas.Camion3Ejes,
+    casetas_Plantillas.Camion5Ejes,
+    casetas_Plantillas.Camion9Ejes,
+    casetas_Plantillas.IAVE,
+    casetas_Plantillas.latitud,
+    casetas_Plantillas.longitud,
+    casetas_Plantillas.Nombre_IAVE,
+    casetas_Plantillas.Notas,
+          (
+            6371 * ACOS(
+              COS(RADIANS(@latitud)) 
+              * COS(RADIANS(TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(latitud)), CHAR(9), ''), ' ', '') AS FLOAT))) 
+              * COS(RADIANS(TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(longitud)), CHAR(9), ''), ' ', '') AS FLOAT)) - RADIANS(@longitud)) 
+              + SIN(RADIANS(@latitud)) 
+              * SIN(RADIANS(TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(latitud)), CHAR(9), ''), ' ', '') AS FLOAT)))
+            )
+          ) AS distancia_km
+FROM casetas_Plantillas
+WHERE TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(latitud)), CHAR(9), ''), ' ', '') AS FLOAT) IS NOT NULL
+    AND TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(longitud)), CHAR(9), ''), ' ', '') AS FLOAT) IS NOT NULL
+    AND (
+            6371 * ACOS(
+              COS(RADIANS(@latitud)) 
+              * COS(RADIANS(TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(latitud)), CHAR(9), ''), ' ', '') AS FLOAT))) 
+              * COS(RADIANS(TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(longitud)), CHAR(9), ''), ' ', '') AS FLOAT)) - RADIANS(@longitud)) 
+              + SIN(RADIANS(@latitud)) 
+              * SIN(RADIANS(TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(latitud)), CHAR(9), ''), ' ', '') AS FLOAT)))
+            )
+          ) <= 10
+    AND (casetas_Plantillas.[${vehiculoColumn}] - @costo) BETWEEN -20 AND 20
+
+ORDER BY distancia_km
+      `);
+
+    res.json(result.recordset);
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ msg: 'Error al obtener las casetas de TUSA' });
+  }
+}

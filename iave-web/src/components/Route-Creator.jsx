@@ -203,7 +203,7 @@ const RutasModule = () => {
         }
     }, []);
     // Referencia a la combinación ctrl + enter para atajo de teclado
-    const buttonRef = useRef(null);
+    const buttonRefCalcularRuta = useRef(null);
     // Estados de búsqueda
     const [txtOrigen, setTxtOrigen] = useState('');
     const [txtPuntoIntermedio, setTxtPuntoIntermedio] = useState('');
@@ -216,6 +216,11 @@ const RutasModule = () => {
     const [puntoIntermedio, setPuntoIntermedio] = useState(null);
     const [casetaAEliminar, setCasetaAEliminar] = useState(null);
     const [casetaAAgregar, setCasetaAAgregar] = useState(null);
+
+    const [casetasEliminadas, setCasetasEliminadas] = useState([]);
+    const [casetasOriginales, setCasetasOriginales] = useState([]);
+    const [casetasAgregadas, setCasetasAgregadas] = useState([]);
+    const [hayCambiosPendientes, setHayCambiosPendientes] = useState(false);
 
 
 
@@ -243,11 +248,22 @@ const RutasModule = () => {
     const { results: puntosIntermedios, loading: loadingPuntoIntermedio } = useDestinationSearch(txtPuntoIntermedio, 'Intermedio');
 
     // ===== HANDLERS MEMOIZADOS =====
-    const handleRestaurarRuta = useCallback(() => {
-        // Restaurar los casetasEnRutaTusa a la ruta original de TUSA
-        setCasetasEnRutaTusa(casetasEnRutaTusa);
-    }, [casetasEnRutaTusa]);
+    const detectarCambiosConsecutivos = useCallback(() => {
+        if (casetasOriginales.length === 0) return false;
 
+        // Verificar si cambió el orden comparando consecutivos
+        for (let i = 0; i < casetasEnRutaTusa.length; i++) {
+            const casetaActual = casetasEnRutaTusa[i];
+            const casetaOriginal = casetasOriginales.find(
+                c => c.ID_Caseta === casetaActual.ID_Caseta
+            );
+
+            if (casetaOriginal && casetaOriginal.consecutivo !== casetaActual.consecutivo) {
+                return true;
+            }
+        }
+        return false;
+    }, [casetasEnRutaTusa, casetasOriginales]);
     const handleChange = useCallback((e) => {
         const { name, value } = e.target;
 
@@ -283,14 +299,29 @@ const RutasModule = () => {
         calcularRutaHandler('SinIntermedio');
     }, []);
 
+    const cargarCasetasRuta = useCallback((casetas) => {
+        // Asignar consecutivos si no los tienen
+        const casetasConConsecutivos = casetas.map((caseta, index) => ({
+            ...caseta,
+            consecutivo: caseta.consecutivo || index + 1
+        }));
+
+        setCasetasEnRutaTusa(casetasConConsecutivos);
+        setCasetasOriginales(JSON.parse(JSON.stringify(casetasConConsecutivos))); // Deep copy
+        setCasetasEliminadas([]);
+        setCasetasAgregadas([]);
+        setHayCambiosPendientes(false);
+
+        console.log('✅ Casetas cargadas y estado limpio:', casetasConConsecutivos.length);
+    }, []);
     // ===== MANEJADOR DEL KEYDOWN =====
     const handleKeyDown = (event) => {
         // Verificar si se presionó Ctrl y Enter
         if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
             event.preventDefault();
             // Simular un clic en el botón referenciado
-            if (buttonRef.current) {
-                buttonRef.current.click();
+            if (buttonRefCalcularRuta.current) {
+                buttonRefCalcularRuta.current.click();
             }
         }
     };
@@ -358,14 +389,107 @@ const RutasModule = () => {
     }, [origen, destino]);
 
     const handleDeleteCaseta = (idCaseta) => {
+        const caseta = casetasEnRutaTusa.find(c => c.ID_Caseta === idCaseta);
 
-        setCasetaAEliminar(idCaseta); // Guardamos el ID de la caseta a eliminar
+        setCasetaAEliminar(idCaseta);
         setColorModalConfirmacion('danger');
+        setMensajeModal(
+            `¿Deseas eliminar la caseta de "${caseta?.Nombre}" de la ruta seleccionada? Esta caseta se eliminará definitivamente al guardar la ruta.`
+        );
         setIsModalConfirmacionOpen(true);
     };
     const handleDragStart = (event) => {
         setActiveId(event.active.id);
     }
+
+    const handleCrearRuta = async () => {
+        alert("Creando ruta");
+    }
+    const guardarRutaHandler = async () => {
+        try {
+            if (!rutaTusa[0]?.id_Tipo_ruta) {
+                alert('❌ No hay una ruta seleccionada para guardar');
+                return;
+            }
+
+            if (!hayCambiosPendientes && casetasEliminadas.length === 0 && casetasAgregadas.length === 0) {
+                alert('ℹ️ No hay cambios pendientes para guardar');
+                return;
+            }
+
+            // Confirmación antes de guardar
+            const confirmar = window.confirm(
+                `¿Deseas guardar los cambios en la ruta?\n\n` +
+                `• Casetas eliminadas: ${casetasEliminadas.length}\n` +
+                `• Casetas agregadas: ${casetasAgregadas.length}\n` +
+                `• Cambios en consecutivos: ${detectarCambiosConsecutivos() ? 'Sí' : 'No'}`
+            );
+
+            if (!confirmar) return;
+
+            // Preparar datos para enviar
+            const datosGuardar = {
+                id_Tipo_ruta: rutaTusa[0].id_Tipo_ruta,
+                casetasActualizadas: casetasEnRutaTusa.map((caseta, index) => ({
+                    ID_Caseta: caseta.ID_Caseta,
+                    consecutivo: index + 1, // Consecutivo basado en posición actual
+                    id_Tipo_ruta: rutaTusa[0].id_Tipo_ruta
+                })),
+                casetasAEliminar: casetasEliminadas.map(caseta => ({
+                    ID_Caseta: caseta.ID_Caseta,
+                    id_Tipo_ruta: rutaTusa[0].id_Tipo_ruta
+                })),
+                casetasAAgregar: casetasAgregadas.map((caseta, index) => ({
+                    ID_Caseta: caseta.ID_Caseta,
+                    consecutivo: caseta.consecutivo,
+                    id_Tipo_ruta: rutaTusa[0].id_Tipo_ruta
+                }))
+            };
+
+            console.log('💾 Guardando cambios:', datosGuardar);
+
+            // Petición al backend
+            const response = await axios.post(
+                `${API_URL}/api/casetas/rutas/guardar-cambios`,
+                datosGuardar
+            );
+
+            if (response.status === 200) {
+                alert('✅ Ruta guardada exitosamente');
+
+                // Actualizar estado
+                setCasetasOriginales(JSON.parse(JSON.stringify(casetasEnRutaTusa)));
+                setCasetasEliminadas([]);
+                setCasetasAgregadas([]);
+                setHayCambiosPendientes(false);
+
+                console.log('✅ Estado actualizado después de guardar');
+            }
+
+        } catch (error) {
+            console.error('❌ Error al guardar ruta:', error);
+            alert(`❌ Error al guardar la ruta: ${error.response?.data?.message || error.message}`);
+        }
+    };
+
+    const handleRestaurarRuta = useCallback(() => {
+        if (casetasOriginales.length === 0) {
+            alert('ℹ️ No hay una ruta original para restaurar');
+            return;
+        }
+
+        const confirmar = window.confirm(
+            '¿Deseas restaurar la ruta a su estado original? Se perderán todos los cambios no guardados.'
+        );
+
+        if (confirmar) {
+            setCasetasEnRutaTusa(JSON.parse(JSON.stringify(casetasOriginales)));
+            setCasetasEliminadas([]);
+            setCasetasAgregadas([]);
+            setHayCambiosPendientes(false);
+            alert('✅ Ruta restaurada al estado original');
+        }
+    }, [casetasOriginales]);
 
     // NUEVA FUNCIÓN: Actualizar consecutivo manual
     const handleConsecutivoChange = (idCaseta, nuevoValor) => {
@@ -380,8 +504,7 @@ const RutasModule = () => {
 
     const handleDragEnd = (event) => {
         const { active, over } = event;
-
-        setActiveId(null); // Limpiar el activeId
+        setActiveId(null);
 
         if (!over) return;
 
@@ -391,23 +514,41 @@ const RutasModule = () => {
 
             if (oldIndex === -1 || newIndex === -1) return casetasEnRutaTusa;
 
-            // Reordenar el array
             const reordenado = arrayMove(casetasEnRutaTusa, oldIndex, newIndex);
 
-            // Actualizar consecutivos basados en la nueva posición
             const conConsecutivosActualizados = reordenado.map((caseta, index) => ({
                 ...caseta,
-                consecutivo: index + 1 // Consecutivo basado en posición (1, 2, 3, ...)
+                consecutivo: index + 1
             }));
 
+            // MARCAR CAMBIOS PENDIENTES
+            setHayCambiosPendientes(true);
+
             return conConsecutivosActualizados;
-        })
+        });
     }
 
     const handleAddCaseta = (casetaINEGI) => {
-        setCasetaAAgregar(casetaINEGI); // Aquí no solo guardamos el ID de la caseta a agregar en la ruta, sino que mandamos toda la caseta al componente hijo para que se consulten las casetas cercanas a la ubicación INEGI y también el costo.
+        casetaINEGI.lat = JSON.parse(casetaINEGI.geojson)?.coordinates[1];
+        casetaINEGI.lng = JSON.parse(casetaINEGI.geojson)?.coordinates[0];
+        casetaINEGI.costo = casetaINEGI?.costo_caseta;
+        casetaINEGI.ejes = tipoVehiculo;
+        casetaINEGI.nombre = casetaINEGI?.direccion.replace('Cruce la caseta ', '');
+        casetaINEGI.consecutivo = casetasEnRutaTusa.length + 1; // Asignar el siguiente consecutivo disponible
+
+        //Depuramos CasetaINEGI antes de mandarla al modal de confirmación (eliminando los demás elementos que no se usan)
+        const casetaLimpia = {
+            lat: casetaINEGI.lat,
+            lng: casetaINEGI.lng,
+            costo: casetaINEGI.costo,
+            ejes: casetaINEGI.ejes,
+            nombre: casetaINEGI.nombre,
+        };
+
+        console.log('Caseta a agregar:', casetaLimpia);
+        setCasetaAAgregar(casetaLimpia); // Aquí no solo guardamos el ID de la caseta a agregar en la ruta, sino que mandamos toda la caseta al componente hijo para que se consulten las casetas cercanas a la ubicación INEGI y también el costo.
         setColorModalConfirmacion('success');
-        setMensajeModal('¿Desea agregar la caseta de ' + casetaINEGI?.direccion.replace('Cruce la caseta ', '') + ' sobre la ruta TUSA actual? ')
+        setMensajeModal('Seleccione la caseta que desea vincular con la caseta INEGI "' + casetaINEGI?.direccion.replace('Cruce la caseta ', '') + '" cuyo costo es de $' + casetaINEGI.costo + ' sobre la ruta TUSA actual. ');
         setIsModalConfirmacionOpen(true);
         console.log(JSON.parse(casetaINEGI.geojson)?.coordinates);
         console.log(tipoVehiculo);
@@ -504,7 +645,7 @@ const RutasModule = () => {
             ];
             setRutaSeleccionada(rutas_OyL ? selectedRoute : []);
         }
-        setBoolExiste(prev => prev.replace(', selecciona una ruta', ', recuerda guardar'));
+        setBoolExiste(prev => prev.replace(', selecciona una ruta INEGI', ', recuerda guardar'));
     }, [rutas_OyL, getRouteDetails]);
 
     const calcularRutaHandler = useCallback(async (e) => {
@@ -637,7 +778,8 @@ const RutasModule = () => {
                 const casetasEnTUSA = await axios.get(
                     `${API_URL}/api/casetas/rutas/${rutaTUSAData[0]?.id_Tipo_ruta}/casetasPorRuta`
                 );
-                setCasetasEnRutaTusa(casetasEnTUSA.data);
+                //setCasetasEnRutaTusa(casetasEnTUSA.data);
+                cargarCasetasRuta(casetasEnTUSA.data);
             }
 
             if (dataTusa.total > 0) {
@@ -673,7 +815,7 @@ const RutasModule = () => {
             });
 
             const mensaje = dataTusa?.[0]?.Categoria ? 'Ruta existente' : 'Creando ruta';
-            setBoolExiste(`${mensaje}, selecciona una ruta`);
+            setBoolExiste(`${mensaje}, selecciona una ruta INEGI`);
 
         } catch (error) {
             console.error('Error al calcular la ruta:', error);
@@ -715,16 +857,60 @@ const RutasModule = () => {
             <div className="container-fluid py-0 rounded-top">
                 <div className="header-RC py-2 rounded-top">
                     <h1>🚛 Creador de Rutas - Propuesta IAVE-WEB</h1>
-                    <div className="header-actions-RC">
-                        <button className="btn btn-success" onClick={() => { alert("Ruta seleccionada " + rutaTusa[0].id_Tipo_ruta) }}>💾 Guardar Ruta</button>
-                        <button className="btn btn-info" onClick={() => { handleRestaurarRuta() }}>🔄️ Restaurar Ruta</button>
-                    </div>
+                    {rutas_OyL &&
+                        <div className="header-actions-RC">
+                            {casetasEnRutaTusa.length === 0 && <button
+                                className="btn btn-info"
+                                onClick={handleCrearRuta}
+                            >
+                                ➕ Crear Ruta
+                            </button>}
+                            <button
+                                className="btn btn-success"
+                                onClick={guardarRutaHandler}
+                                disabled={!hayCambiosPendientes && casetasEliminadas.length === 0 && casetasAgregadas.length === 0}
+                            >
+                                💾 Guardar Cambios
+                                {(casetasEliminadas.length > 0 || casetasAgregadas.length > 0) && (
+                                    <span className="badge badge-light ml-2">
+                                        {casetasEliminadas.length > 0 && `${casetasEliminadas.length} 🗑️`}
+                                        {casetasAgregadas.length > 0 && ` ${casetasAgregadas.length} ➕`}
+                                    </span>
+                                )}
+                            </button>
+                            {casetasEnRutaTusa.length > 0 && <button
+                                className="btn btn-info"
+                                onClick={handleRestaurarRuta}
+                                disabled={!hayCambiosPendientes && casetasEliminadas.length === 0}
+                            >
+                                🔄️ Restaurar Ruta
+                            </button>}
+
+                        </div>
+                    }
                 </div>
+                {(hayCambiosPendientes || casetasEliminadas.length > 0 || casetasAgregadas.length > 0) && (
+                    <div className="alert alert-warning my-0" role="alert">
+                        <strong>⚠️ Cambios pendientes de guardar:</strong>
+                        <ul className="mb-0 mt-2">
+                            {casetasEliminadas.length > 0 && (
+                                <li>{casetasEliminadas.length} caseta{casetasEliminadas.length > 1 ? 's' : ''} será{casetasEliminadas.length > 1 ? 'n' : ''} eliminada{casetasEliminadas.length > 1 ? 's' : ''}</li>
+                            )}
+                            {casetasAgregadas.length > 0 && (
+                                <li>{casetasAgregadas.length} caseta{casetasAgregadas.length > 1 ? 's' : ''} será{casetasAgregadas.length > 1 ? 'n' : ''} agregada{casetasAgregadas.length > 1 ? 's' : ''}</li>
+                            )}
+                            {detectarCambiosConsecutivos() && (
+                                <li>Se actualizarán los consecutivos de las casetas</li>
+                            )}
+                        </ul>
+                        <small className="text-muted">Los cambios se aplicarán al dar click en "Guardar Cambios"</small>
+                    </div>
+                )}
 
                 <div className="container-fluid py-1 border">
-                    <div className="alert alert-info border-left-info" role="alert">
+                    <div className="alert alert-info border-left-info mb-0" role="alert">
                         <i className="fas fa-info-circle mr-2"></i>
-                        <strong>Estado de :</strong> {loadingRutas || loadingRutaSeleccionada ? 'Cargando rutas...' : boolExiste} {(casetasEnRutaTusa) ? `(${casetasEnRutaTusa.length} casetas en la ruta) ` : ' '} {((casetasEnRutaTusa.length - rutaSeleccionada[1]?.length) > 0) ? `Se tienen ${casetasEnRutaTusa.length - rutaSeleccionada[1]?.length} casetas adicionales en la ruta del INEGI vs TUSA` : ``}
+                        <strong>Estado de :</strong> {loadingRutas || loadingRutaSeleccionada ? 'Cargando rutas...' : boolExiste} {(rutas_OyL) ? `(${casetasEnRutaTusa.length} casetas en la ruta) ` : ' '} {((casetasEnRutaTusa.length - rutaSeleccionada[1]?.length) > 0) ? `Se tienen ${casetasEnRutaTusa.length - rutaSeleccionada[1]?.length} casetas adicionales en la ruta del INEGI vs TUSA` : ``}
                     </div>
 
                     <DndContext
@@ -801,6 +987,7 @@ const RutasModule = () => {
                                                     <td>{caseta.longitud}</td>
                                                     <td>
                                                         $ {formatearEnteros(caseta[switchTipoVehiculo(tipoVehiculo).replaceAll(" ", "")])}
+
                                                     </td>
                                                     <td>
                                                         <input
@@ -824,7 +1011,7 @@ const RutasModule = () => {
                     </DndContext>
                 </div>
 
-                <div className="main-content-RC mt-2">
+                <div className="main-content-RC mt-0">
                     <div className="sidebar-RC px-3">
                         <div className="form-section-RC">
                             <h3>ℹ️ Información General</h3>
@@ -1008,7 +1195,7 @@ const RutasModule = () => {
                                 </div>
                             </div>
                             <div className="container text-center my-3">
-                                <button className="btn btn-success container-fluid" ref={buttonRef} onClick={calcularRutaHandler}>
+                                <button className="btn btn-success container-fluid" ref={buttonRefCalcularRuta} onClick={calcularRutaHandler}>
                                     Calcular ruta
                                 </button>
                             </div>
@@ -1022,11 +1209,11 @@ const RutasModule = () => {
                         scrollWheelZoom={true}
                         style={{ height: '100%', width: '100%' }}
                     >
-                        {/* Botón de descarga */}
+                        {/*  span de notificación, se muestra únicamente cuando se ha encontrado una ruta TUSA con casetas vinculadas. */}
                         <div className="container-fluid pb-3"
                             style={{
                                 zIndex: 999,
-                                display: rutas_OyL ? 'block' : 'none',
+                                display: casetasEnRutaTusa.length > 0 ? 'block' : 'none',
                                 borderRadius: '0.6rem',
                                 position: 'relative',
                                 top: '1vh',
@@ -1267,6 +1454,12 @@ const RutasModule = () => {
                                 </span>
                             </div>
                             <div className="summary-item-RC">
+                                <span className="summary-label-RC">Costo TUSA:</span>
+                                <span className="summary-value-RC">
+                                    {(casetasEnRutaTusa?.length > 0 ? '$' + formatearDinero(casetasEnRutaTusa.reduce((total, caseta) => total + (caseta[switchTipoVehiculo(tipoVehiculo).replaceAll(" ", "")] || 0), 0)) : '-')}
+                                </span>
+                            </div>
+                            <div className="summary-item-RC">
                                 <span className="summary-label-RC">Estado:</span>
                                 <span className="summary-value-RC">
                                     <span className={`status-indicator-RC ${(boolExiste.includes('Ruta calculada') || boolExiste.includes('Ruta existente'))
@@ -1359,11 +1552,9 @@ const RutasModule = () => {
                             const casetasResponse = await axios.get(
                                 `${API_URL}/api/casetas/rutas/${rutaSeleccionadaDelModal}/casetasPorRuta`
                             );
-                            setCasetasEnRutaTusa(casetasResponse.data);
-                            console.log('✅ Casetas cargadas:', casetasResponse.data);
+                            cargarCasetasRuta(casetasResponse.data); // CAMBIAR ESTA LÍNEA
 
                             setIsModalOpen(false);
-                            console.log('✅ Ruta TUSA actualizada:', rutaTusa.filter(ruta => ruta.id_Tipo_ruta == rutaSeleccionadaDelModal));
                             setRutaTusa(rutaTusa.filter(ruta => ruta.id_Tipo_ruta == rutaSeleccionadaDelModal));
                         } catch (error) {
                             console.error('❌ Error al cargar casetas:', error);
@@ -1391,36 +1582,69 @@ const RutasModule = () => {
                 />
             )}
 
-            {/* MODAL de confirmación PARA confirmar eliminación de la caseta en la ruta*/}
+            {/* MODAL de confirmación PARA confirmar eliminación/adicion  de una caseta en la ruta*/}
             {isModalConfirmacionOpen && (
                 <ModalConfirmacion
+                    casetaAAgregar={casetaAAgregar}
                     isOpen={isModalConfirmacionOpen}
-                    mensaje={mensajeModal || `¿Deseas eliminar la caseta de "${casetasEnRutaTusa.find(caseta => caseta.ID_Caseta === casetaAEliminar)?.Nombre}" de la ruta seleccionada?  `}
+                    mensaje={mensajeModal || `¿Deseas eliminar la caseta?`}
                     onSelect={() => {
-                        // Aquí ejecutamos la eliminación
                         if (casetaAEliminar) {
+                            // Buscar si la caseta estaba en las originales
+                            const casetaOriginal = casetasOriginales.find(
+                                c => c.ID_Caseta === casetaAEliminar
+                            );
 
-                            //retraso de 500ms para que no interfiera con el drag
-                            setTimeout(() => {
-                                setCasetasEnRutaTusa(prev => {
-                                    const filtradas = prev.filter(caseta => caseta.ID_Caseta !== casetaAEliminar);
-                                    //actualizamos los consecutivos
-                                    return filtradas.map((caseta, index) => ({
-                                        ...caseta,
-                                        consecutivo: index + 1
-                                    }));
+                            // Si estaba en originales, marcarla para eliminar
+                            if (casetaOriginal) {
+                                setCasetasEliminadas(prev => {
+                                    if (!prev.some(c => c.ID_Caseta === casetaAEliminar)) {
+                                        return [...prev, casetaOriginal];
+                                    }
+                                    return prev;
                                 });
-                            }, 800);
-                        }
-                        //Cerramos el modal y actualizamos nuevamente los consecutivos.
-                        setIsModalConfirmacionOpen(false);
-                        setCasetaAEliminar(null); // Limpiamos
+                            } else {
+                                // Si no estaba en originales, quitarla de agregadas
+                                setCasetasAgregadas(prev =>
+                                    prev.filter(c => c.ID_Caseta !== casetaAEliminar)
+                                );
+                            }
 
+                            // Eliminar de la lista visible y actualizar consecutivos
+                            setCasetasEnRutaTusa(prev => {
+                                const filtradas = prev.filter(caseta => caseta.ID_Caseta !== casetaAEliminar);
+                                return filtradas.map((caseta, index) => ({
+                                    ...caseta,
+                                    consecutivo: index + 1
+                                }));
+                            });
+
+                            setHayCambiosPendientes(true);
+                            console.log('🗑️ Caseta marcada para eliminar:', casetaAEliminar);
+                            setCasetaAEliminar(null);
+                        }
+                        if (casetaAAgregar) {
+                            // Agregar la caseta que coincide con el ID_Caseta que se  a la lista visible con el consecutivo correcto
+                            setCasetasEnRutaTusa(prev => [
+                                ...prev,
+                                {
+                                    ...casetaAAgregar,
+                                    consecutivo: prev.length + 1
+                                }
+                            ]);
+                            // Agregar a la lista de casetas agregadas
+                            setCasetasAgregadas(prev => [...prev, casetaAAgregar]);
+                            setHayCambiosPendientes(true);
+                            console.log('➕ Caseta agregada:', casetaAAgregar);
+                            setCasetaAAgregar(null);
+                        }
+                        setMensajeModal(null);
+                        setIsModalConfirmacionOpen(false);
                     }}
                     onClose={() => {
                         setIsModalConfirmacionOpen(false);
-                        setCasetaAEliminar(null); // Limpiamos al cerrar
-                        setMensajeModal(null) // Limpiamos al cerrar
+                        setCasetaAEliminar(null);
+                        setMensajeModal(null);
                     }}
                     color={colorModalConfirmacion}
                 />
