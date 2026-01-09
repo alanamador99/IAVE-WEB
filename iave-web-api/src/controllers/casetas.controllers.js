@@ -760,7 +760,8 @@ export const getCasetas_por_RutaTUSA_TRN = async (req, res) => {
                   CP.longitud,
                   CP.Nombre_IAVE,
                   CP.Notas,
-                  PCR.consecutivo
+                  PCR.consecutivo,
+                  TRN.Id_Ruta
 
               FROM
                   Tipo_de_ruta_N TRN
@@ -1284,6 +1285,7 @@ export const GuardarCambiosEnRuta = async (req, res) => {
   try {
     const {
       id_Tipo_ruta,
+      Id_Ruta,
       casetasActualizadas,
       casetasAEliminar,
       casetasAAgregar
@@ -1330,13 +1332,14 @@ export const GuardarCambiosEnRuta = async (req, res) => {
         const request2 = new sql.Request(transaction);
 
         const insertQuery = `
-                    INSERT INTO PCasetasporruta (ID_Caseta, id_Tipo_ruta, consecutivo)
-                    VALUES (@ID_Caseta, @id_Tipo_ruta, @consecutivo)
+                    INSERT INTO PCasetasporruta (ID_Caseta, id_Tipo_ruta, consecutivo, Id_Ruta, F_Captura, Captor)
+                    VALUES (@ID_Caseta, @id_Tipo_ruta, @consecutivo, @Id_Ruta, GETDATE(), 'IAVE')
                 `;
 
         request2.input('ID_Caseta', sql.Int, caseta.ID_Caseta);
         request2.input('id_Tipo_ruta', sql.Int, id_Tipo_ruta);
         request2.input('consecutivo', sql.Int, caseta.consecutivo);
+        request2.input('Id_Ruta', sql.Int, Id_Ruta);
 
         await request2.query(insertQuery);
       }

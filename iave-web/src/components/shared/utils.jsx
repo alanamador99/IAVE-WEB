@@ -981,10 +981,15 @@ const ModalConfirmacion = ({ isOpen, onClose, onSelect, mensaje, color, casetaAA
   if (!isOpen) return null;
 
   const handleConfirmar = () => {
-    onSelect(casetaSeleccionada);
     onClose();
+    if(!casetaSeleccionada) return;
+    onSelect(
+      lista.find(caseta => caseta.ID_Caseta == casetaSeleccionada)
+    );
+    console.log('Caseta seleccionada para agregar:',
+      lista.find(caseta => caseta.ID_Caseta == casetaSeleccionada));
   };
-  
+
 
   const handleCancelar = () => {
     onClose();
@@ -1015,10 +1020,34 @@ const ModalConfirmacion = ({ isOpen, onClose, onSelect, mensaje, color, casetaAA
             </div>
 
 
+
+            {loadingCasetas && casetaAAgregar && (
+              <div className="container-fluid pb-3"
+                style={{
+                  zIndex: 999999,
+                  backgroundColor: '#3adb129d',
+                  width: '60%',
+                  height: '7vh',
+                  textAlign: 'center',
+                  padding: '0px',
+                  display: 'block',
+                  alignContent: 'center',
+                  placeSelf: 'anchor-center',
+                  borderRadius: '1rem',
+                }}>
+                <div className='row text-center container-fluid py-1' style={{ justifyContent: 'center', color: '#045e13ff', alignContent: 'center' }}>
+                  <div className="spinner-border text-primary" role="status" style={{ width: "2.8rem", height: "2.8rem" }}>
+                    <span className="visually-hidden"></span>
+                  </div>
+                  <h1 className="text-center font-weight-bold ml-4">Cargando</h1>
+                </div>
+              </div>
+            )}
+
             {lista?.length > 0 &&
               <div className="form-group">
                 <label className="font-weight-bold text-gray-800">
-                  Selecciona una caseta TUSA que deseas agregar: <span className="text-danger">*</span>
+                  Selecciona la caseta TUSA que deseas agregar: <span className="text-danger">*</span>
                 </label>
                 <select
                   value={casetaSeleccionada}
@@ -1065,11 +1094,12 @@ const ModalConfirmacion = ({ isOpen, onClose, onSelect, mensaje, color, casetaAA
                 onClick={handleConfirmar}
                 className="btn btn-success"
                 tabIndex={2}
-                disabled={loadingCasetas || lista.length === 0 || !casetaSeleccionada}
+                disabled={(loadingCasetas || (!casetaSeleccionada )) && mensaje.includes('vincular')}
 
               >
                 <i className="fas fa-check mr-2"></i>
                 Confirmar
+                {mensaje.includes('eliminar') ? ' Eliminación' : ' Adición'}
               </button>
             </div>
           </div>

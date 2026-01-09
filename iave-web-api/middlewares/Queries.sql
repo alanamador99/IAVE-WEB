@@ -69,7 +69,7 @@ VALUES
 
 --Ejemplo de consulta de los primeros 10 registros de las casetas por ruta
 SELECT TOP(10)
-    *
+    *   
 from PCasetasporruta
 ORDER BY ID DESC;
 -- Ejemplo de Actualización en la tabla de PCasetasporruta
@@ -88,8 +88,8 @@ SELECT TOP(10)
 from Tipo_de_ruta_N;
 SELECT TOP(10)
     *
-from PCasetasporruta;
-ORDER BY Tipo_de_ruta_N.id_Tipo_ruta DESC;
+from PCasetasporruta
+ORDER BY PCasetasporruta.ID DESC;
 -- Ejemplo de inserción en la tabla de Tipo_de_ruta_N
 INSERT INTO Tipo_de_ruta_N
     ( Id_Ruta, PoblacionOrigen, PoblacionDestino, Latinos, Nacionales, Exportacion, Otros, Alterna, observaciones, fecha_Alta, id_destino, id_origen, Km_reales, Km_oficiales, Km_de_pago, Km_Tabulados,Peaje_Dos_Ejes,Peaje_Tres_Ejes, Cemex)
@@ -97,7 +97,7 @@ VALUES
     ( '4982', '8112', '8346', 0, 1, 0, 0, 0, 'Ruta de prueba', DATEFROMPARTS(2025,12,30), '1514', '1506', 200.5, 210.0, 205.0, 208.0, 150.00, 250.00, 0);
 
 
-SELECT CPorRuta.consecutivo, Casetas.Nombre_IAVE, PobO.Poblacion as 'Origen', PobD.Poblacion as 'Destino', TRN.*
+SELECT CPorRuta.consecutivo, Casetas.Nombre_IAVE, PobO.Poblacion as 'Origen', PobD.Poblacion as 'Destino', TRN.*, TRN.Id_Ruta
 FROM Tipo_de_ruta_N as TRN
     INNER JOIN
     Poblaciones PobO ON PobO.ID_poblacion=TRN.id_origen

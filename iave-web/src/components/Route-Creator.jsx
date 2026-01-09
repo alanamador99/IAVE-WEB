@@ -17,7 +17,7 @@ import markerPin from 'leaflet/dist/images/pin_intermedio.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 import { Container } from 'react-bootstrap';
 import { result, set } from 'lodash';
-import { AlertTriangle, MapPinPlus, GripVertical } from 'lucide-react';
+import { AlertTriangle, MapPinPlus, GripVertical, AlignVerticalJustifyCenter } from 'lucide-react';
 
 
 // ===== CONSTANTES =====
@@ -430,6 +430,7 @@ const RutasModule = () => {
             // Preparar datos para enviar
             const datosGuardar = {
                 id_Tipo_ruta: rutaTusa[0].id_Tipo_ruta,
+                Id_Ruta: casetasEnRutaTusa[0].Id_Ruta,
                 casetasActualizadas: casetasEnRutaTusa.map((caseta, index) => ({
                     ID_Caseta: caseta.ID_Caseta,
                     consecutivo: index + 1, // Consecutivo basado en posición actual
@@ -547,7 +548,7 @@ const RutasModule = () => {
 
         console.log('Caseta a agregar:', casetaLimpia);
         setCasetaAAgregar(casetaLimpia); // Aquí no solo guardamos el ID de la caseta a agregar en la ruta, sino que mandamos toda la caseta al componente hijo para que se consulten las casetas cercanas a la ubicación INEGI y también el costo.
-        setColorModalConfirmacion('success');
+        setColorModalConfirmacion('primary');
         setMensajeModal('Seleccione la caseta que desea vincular con la caseta INEGI "' + casetaINEGI?.direccion.replace('Cruce la caseta ', '') + '" cuyo costo es de $' + casetaINEGI.costo + ' sobre la ruta TUSA actual. ');
         setIsModalConfirmacionOpen(true);
         console.log(JSON.parse(casetaINEGI.geojson)?.coordinates);
@@ -1588,7 +1589,7 @@ const RutasModule = () => {
                     casetaAAgregar={casetaAAgregar}
                     isOpen={isModalConfirmacionOpen}
                     mensaje={mensajeModal || `¿Deseas eliminar la caseta?`}
-                    onSelect={() => {
+                    onSelect={(casetaAAgregar) => {
                         if (casetaAEliminar) {
                             // Buscar si la caseta estaba en las originales
                             const casetaOriginal = casetasOriginales.find(
@@ -1624,6 +1625,7 @@ const RutasModule = () => {
                             setCasetaAEliminar(null);
                         }
                         if (casetaAAgregar) {
+                            alert('Agregar caseta: ' + casetaAAgregar.ID_Caseta);
                             // Agregar la caseta que coincide con el ID_Caseta que se  a la lista visible con el consecutivo correcto
                             setCasetasEnRutaTusa(prev => [
                                 ...prev,
@@ -1645,6 +1647,8 @@ const RutasModule = () => {
                         setIsModalConfirmacionOpen(false);
                         setCasetaAEliminar(null);
                         setMensajeModal(null);
+                        setCasetaAAgregar(null);
+                        
                     }}
                     color={colorModalConfirmacion}
                 />
