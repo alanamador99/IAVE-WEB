@@ -744,7 +744,7 @@ export const getCasetas_por_RutaTUSA_TRN = async (req, res) => {
     const result = await pool.request()
       .input("IDTipoRuta", sql.Int, IDTipoRuta)
       .query(`
-              SELECT DISTINCT 
+              SELECT 
                   CP.ID_Caseta,
                   CP.Nombre,
                   CP.Carretera,
@@ -761,7 +761,8 @@ export const getCasetas_por_RutaTUSA_TRN = async (req, res) => {
                   CP.Nombre_IAVE,
                   CP.Notas,
                   PCR.consecutivo,
-                  TRN.Id_Ruta
+                  TRN.Id_Ruta,
+                  PCR.ID
 
               FROM
                   Tipo_de_ruta_N TRN

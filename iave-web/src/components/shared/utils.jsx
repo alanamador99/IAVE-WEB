@@ -982,7 +982,8 @@ const ModalConfirmacion = ({ isOpen, onClose, onSelect, mensaje, color, casetaAA
 
   const handleConfirmar = () => {
     onClose();
-    if(!casetaSeleccionada) return;
+    if (mensaje.includes('eliminar')) onSelect(true);
+    if (!casetaSeleccionada) return;
     onSelect(
       lista.find(caseta => caseta.ID_Caseta == casetaSeleccionada)
     );
@@ -1013,7 +1014,7 @@ const ModalConfirmacion = ({ isOpen, onClose, onSelect, mensaje, color, casetaAA
       >
         <div className="modal-dialog modal-dialog-centered" role="document">
           <div className="modal-content shadow-lg">
-            <div className="form-group pt-3 px-4">
+            <div className="form-group pt-3 px-4 mb-0 pb-0">
               <label className="font-weight-bold text-gray-800">
                 <span className={`text-${color}`}> {mensaje}</span>
               </label>
@@ -1025,21 +1026,20 @@ const ModalConfirmacion = ({ isOpen, onClose, onSelect, mensaje, color, casetaAA
               <div className="container-fluid pb-3"
                 style={{
                   zIndex: 999999,
-                  backgroundColor: '#3adb129d',
+                  backgroundColor: 'none',
                   width: '60%',
-                  height: '7vh',
+                  height: '8vh',
                   textAlign: 'center',
                   padding: '0px',
+                  margin: '0px',
                   display: 'block',
                   alignContent: 'center',
                   placeSelf: 'anchor-center',
-                  borderRadius: '1rem',
                 }}>
                 <div className='row text-center container-fluid py-1' style={{ justifyContent: 'center', color: '#045e13ff', alignContent: 'center' }}>
                   <div className="spinner-border text-primary" role="status" style={{ width: "2.8rem", height: "2.8rem" }}>
                     <span className="visually-hidden"></span>
                   </div>
-                  <h1 className="text-center font-weight-bold ml-4">Cargando</h1>
                 </div>
               </div>
             )}
@@ -1094,7 +1094,7 @@ const ModalConfirmacion = ({ isOpen, onClose, onSelect, mensaje, color, casetaAA
                 onClick={handleConfirmar}
                 className="btn btn-success"
                 tabIndex={2}
-                disabled={(loadingCasetas || (!casetaSeleccionada )) && mensaje.includes('vincular')}
+                disabled={(loadingCasetas || (!casetaSeleccionada)) && mensaje.includes('vincular')}
 
               >
                 <i className="fas fa-check mr-2"></i>

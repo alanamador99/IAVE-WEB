@@ -300,10 +300,13 @@ const RutasModule = () => {
     }, []);
 
     const cargarCasetasRuta = useCallback((casetas) => {
-        // Asignar consecutivos si no los tienen
+        // Asignar consecutivos si no los tienen y normalizar coordenadas
         const casetasConConsecutivos = casetas.map((caseta, index) => ({
             ...caseta,
-            consecutivo: caseta.consecutivo || index + 1
+            consecutivo: caseta.consecutivo || index + 1,
+            // Normalizar propiedades de coordenadas para evitar undefined
+            latitud: caseta.latitud || caseta.lat,
+            longitud: caseta.longitud || caseta.lng
         }));
 
         setCasetasEnRutaTusa(casetasConConsecutivos);
@@ -388,10 +391,10 @@ const RutasModule = () => {
         }
     }, [origen, destino]);
 
-    const handleDeleteCaseta = (idCaseta) => {
-        const caseta = casetasEnRutaTusa.find(c => c.ID_Caseta === idCaseta);
+    const handleDeleteCaseta = (IDCaseta) => {
+        const caseta = casetasEnRutaTusa.find(c => c.ID === IDCaseta);
 
-        setCasetaAEliminar(idCaseta);
+        setCasetaAEliminar(IDCaseta);
         setColorModalConfirmacion('danger');
         setMensajeModal(
             `¿Deseas eliminar la caseta de "${caseta?.Nombre}" de la ruta seleccionada? Esta caseta se eliminará definitivamente al guardar la ruta.`
@@ -546,13 +549,10 @@ const RutasModule = () => {
             nombre: casetaINEGI.nombre,
         };
 
-        console.log('Caseta a agregar:', casetaLimpia);
         setCasetaAAgregar(casetaLimpia); // Aquí no solo guardamos el ID de la caseta a agregar en la ruta, sino que mandamos toda la caseta al componente hijo para que se consulten las casetas cercanas a la ubicación INEGI y también el costo.
         setColorModalConfirmacion('primary');
         setMensajeModal('Seleccione la caseta que desea vincular con la caseta INEGI "' + casetaINEGI?.direccion.replace('Cruce la caseta ', '') + '" cuyo costo es de $' + casetaINEGI.costo + ' sobre la ruta TUSA actual. ');
         setIsModalConfirmacionOpen(true);
-        console.log(JSON.parse(casetaINEGI.geojson)?.coordinates);
-        console.log(tipoVehiculo);
     };
     // ===== FUNCIONES DE API =====
     const getRouteDetails = useCallback(async (tipoDetalleOoL) => {
@@ -772,7 +772,6 @@ const RutasModule = () => {
             const [rutaOptima1, rutaLibre1, dataTusa, rutaOptima2, rutaLibre2] = await Promise.all(promesas);
             const rutaTUSAData = dataTusa?.data || dataTusa || [];
             const existeEnTUSA = Array.isArray(rutaTUSAData) ? rutaTUSAData.length > 0 : dataTusa?.enTUSA;
-            console.log(rutaTUSAData);
             setRutaTusa(rutaTUSAData);
 
             if (dataTusa.total === 1) {
@@ -943,7 +942,7 @@ const RutasModule = () => {
                                     >
                                         {casetasEnRutaTusa?.map((caseta, index) => (
                                             <Ordenamiento
-                                                key={caseta.ID_Caseta}
+                                                key={caseta.ID + '-' + index}
                                                 caseta={caseta}
                                                 index={index}
                                                 rutaSeleccionada={rutaSeleccionada}
@@ -1015,10 +1014,10 @@ const RutasModule = () => {
                 <div className="main-content-RC mt-0">
                     <div className="sidebar-RC px-3">
                         <div className="form-section-RC">
-                            <h3>ℹ️ Información General</h3>
+                            <h3 className='py-0 pb-1 mb-1'>ℹ️ Información General</h3>
 
                             {/* ORIGEN */}
-                            <div className="form-group-RC py-0">
+                            <div className="form-group-RC py-0 mb-1">
                                 <label className='py-0 my-0'>Origen</label>
                                 <input
                                     type="text"
@@ -1059,7 +1058,7 @@ const RutasModule = () => {
                             </div>
 
                             {/* DESTINO */}
-                            <div className="form-group-RC py-0">
+                            <div className="form-group-RC py-0 mb-1">
                                 <label className='py-0 my-0'>Destino</label>
                                 <input
                                     type="text"
@@ -1098,7 +1097,7 @@ const RutasModule = () => {
                                 </select>
                             </div>
 
-                            <div className="form-group py-0" style={{ justifySelf: 'center' }}>
+                            <div className="form-group py-0 mb-1" style={{ justifySelf: 'center' }}>
                                 <label className='py-0 my-0 mr-2'>Tipo de unidad:</label>
                                 <select
                                     className='form-select form-select-sm custom-select'
@@ -1365,20 +1364,33 @@ const RutasModule = () => {
                                 </Popup>
                             </Marker>
                         ))}
-                        {casetasEnRutaTusa?.map((caseta, index) => (
-                            <Marker key={caseta.ID_Caseta + ' _ ' + index} className='text-center'
-                                position={[caseta.latitud, caseta.longitud]}
+                        {casetasEnRutaTusa?.map((caseta, index) => {
+                            // Validar que la caseta tenga coordenadas válidas
+                            const lat = caseta.latitud || caseta.lat;
+                            const lng = caseta.longitud || caseta.lng;
+                            
+                            // Si no tienen coordenadas, no renderizar el marcador
+                            if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
+                                console.warn(`⚠️ Caseta sin coordenadas válidas: ${caseta.Nombre || caseta.nombre}`, caseta);
+                                return null;
+                            }
 
-                            >
-                                <Popup>
-                                    Caseta TUSA:
-                                    <br />
-                                    {caseta.Nombre_IAVE}
-                                    <br />
-                                    <strong style={{ color: 'green' }}>${caseta[switchTipoVehiculo(tipoVehiculo).replaceAll(" ", "")]}</strong>
-                                </Popup>
-                            </Marker>
-                        ))}
+                            return (
+                                <Marker 
+                                    key={caseta.ID_Caseta + ' _ ' + index} 
+                                    className='text-center'
+                                    position={[lat, lng]}
+                                >
+                                    <Popup>
+                                        Caseta TUSA:
+                                        <br />
+                                        {caseta.Nombre_IAVE || caseta.nombre}
+                                        <br />
+                                        <strong style={{ color: 'green' }}>${caseta[switchTipoVehiculo(tipoVehiculo).replaceAll(" ", "")]}</strong>
+                                    </Popup>
+                                </Marker>
+                            );
+                        })}
 
                     </MapContainer>
 
@@ -1493,7 +1505,7 @@ const RutasModule = () => {
                             <div className="table-header-RC text-center py-0" style={{ fontSize: '1.2rem', lineHeight: '2.5rem' }}>
                                 {rutaSeleccionada[1]?.length ? `${rutaSeleccionada[1].length} ` : ' '}Casetas en la ruta seleccionada:
                             </div>
-                            <div className="table-container" style={{ maxHeight: '30vh' }}>
+                            <div className="table-container" style={{ maxHeight: '25vh' }}>
                                 <table className="table table-bordered table-scroll table-sm table-hover align-middle">
                                     <thead className="table-hover">
                                         <tr className='text-center'>
@@ -1588,18 +1600,18 @@ const RutasModule = () => {
                 <ModalConfirmacion
                     casetaAAgregar={casetaAAgregar}
                     isOpen={isModalConfirmacionOpen}
-                    mensaje={mensajeModal || `¿Deseas eliminar la caseta?`}
-                    onSelect={(casetaAAgregar) => {
-                        if (casetaAEliminar) {
+                    mensaje={mensajeModal}
+                    onSelect={(casetaAAgregarModal) => {
+                        if (casetaAEliminar && mensajeModal?.toLowerCase().includes('eliminar')) {
                             // Buscar si la caseta estaba en las originales
                             const casetaOriginal = casetasOriginales.find(
-                                c => c.ID_Caseta === casetaAEliminar
+                                c => c.ID === casetaAEliminar
                             );
 
                             // Si estaba en originales, marcarla para eliminar
                             if (casetaOriginal) {
                                 setCasetasEliminadas(prev => {
-                                    if (!prev.some(c => c.ID_Caseta === casetaAEliminar)) {
+                                    if (!prev.some(c => c.ID === casetaAEliminar)) {
                                         return [...prev, casetaOriginal];
                                     }
                                     return prev;
@@ -1607,13 +1619,13 @@ const RutasModule = () => {
                             } else {
                                 // Si no estaba en originales, quitarla de agregadas
                                 setCasetasAgregadas(prev =>
-                                    prev.filter(c => c.ID_Caseta !== casetaAEliminar)
+                                    prev.filter(c => c.ID !== casetaAEliminar)
                                 );
                             }
 
                             // Eliminar de la lista visible y actualizar consecutivos
                             setCasetasEnRutaTusa(prev => {
-                                const filtradas = prev.filter(caseta => caseta.ID_Caseta !== casetaAEliminar);
+                                const filtradas = prev.filter(caseta => caseta.ID !== casetaAEliminar);
                                 return filtradas.map((caseta, index) => ({
                                     ...caseta,
                                     consecutivo: index + 1
@@ -1624,31 +1636,39 @@ const RutasModule = () => {
                             console.log('🗑️ Caseta marcada para eliminar:', casetaAEliminar);
                             setCasetaAEliminar(null);
                         }
-                        if (casetaAAgregar) {
-                            alert('Agregar caseta: ' + casetaAAgregar.ID_Caseta);
-                            // Agregar la caseta que coincide con el ID_Caseta que se  a la lista visible con el consecutivo correcto
+
+                        if (casetaAAgregarModal && !casetaAEliminar) {
+                            // Normalizar propiedades de la caseta para asegurar que tenga latitud y longitud
+                            const casetaNormalizada = {
+                                ...casetaAAgregarModal,
+                                latitud: casetaAAgregarModal.latitud || casetaAAgregarModal.lat,
+                                longitud: casetaAAgregarModal.longitud || casetaAAgregarModal.lng,
+                                consecutivo: (casetasEnRutaTusa || []).length + 1
+                            };
+
+                            // Agregar la caseta que coincide con el ID_Caseta a la lista visible con el consecutivo correcto
                             setCasetasEnRutaTusa(prev => [
                                 ...prev,
-                                {
-                                    ...casetaAAgregar,
-                                    consecutivo: prev.length + 1
-                                }
+                                casetaNormalizada
                             ]);
                             // Agregar a la lista de casetas agregadas
-                            setCasetasAgregadas(prev => [...prev, casetaAAgregar]);
+                            setCasetasAgregadas(prev => [...prev, casetaNormalizada]);
                             setHayCambiosPendientes(true);
-                            console.log('➕ Caseta agregada:', casetaAAgregar);
+                            console.log('➕ Caseta agregada:', casetaNormalizada);
                             setCasetaAAgregar(null);
                         }
                         setMensajeModal(null);
                         setIsModalConfirmacionOpen(false);
+                        setCasetaAAgregar(null);
+                        setCasetaAEliminar(null);
+
                     }}
                     onClose={() => {
                         setIsModalConfirmacionOpen(false);
                         setCasetaAEliminar(null);
                         setMensajeModal(null);
                         setCasetaAAgregar(null);
-                        
+
                     }}
                     color={colorModalConfirmacion}
                 />
