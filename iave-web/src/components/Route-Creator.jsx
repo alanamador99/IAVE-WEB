@@ -4,7 +4,7 @@ import { DndContext, closestCenter, DragOverlay } from '@dnd-kit/core';
 import { arrayMove, SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 
 import Ordenamiento from './route-creator/Sortable';
-import { ModalConfirmacion, ModalSelector, ModalSelectorOrigenDestino, CustomToast, parsearMinutos, formatearDinero, RouteOption, formatearEnteros } from '../components/shared/utils';
+import { ModalConfirmacion, ModalFillCreation, ModalSelector, ModalSelectorOrigenDestino, CustomToast, parsearMinutos, formatearDinero, RouteOption, formatearEnteros } from '../components/shared/utils';
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
 import axios from 'axios';
 import 'leaflet/dist/leaflet.css';
@@ -216,7 +216,9 @@ const RutasModule = () => {
     const [puntoIntermedio, setPuntoIntermedio] = useState(null);
     const [casetaAEliminar, setCasetaAEliminar] = useState(null);
     const [casetaAAgregar, setCasetaAAgregar] = useState(null);
+    const [tipoTraslado, setTipoTraslado] = useState('');
 
+    const [tipoOrigenDestinoSeleccionado, setTipoOrigenDestinoSeleccionado] = useState(null);
     const [casetasEliminadas, setCasetasEliminadas] = useState([]);
     const [casetasOriginales, setCasetasOriginales] = useState([]);
     const [casetasAgregadas, setCasetasAgregadas] = useState([]);
@@ -225,6 +227,7 @@ const RutasModule = () => {
 
 
     // Estados de rutas
+    const [datosPrecargadosParaLaCreacionDeRuta, setDatosPrecargadosParaLaCreacionDeRuta] = useState(null);
     const [rutaTusa, setRutaTusa] = useState([]);
     const [casetasEnRutaTusa, setCasetasEnRutaTusa] = useState([]);
     const [rutas_OyL, setRutas_OyL] = useState(null);
@@ -237,6 +240,7 @@ const RutasModule = () => {
     const [colorModalConfirmacion, setColorModalConfirmacion] = useState(null);
     const [mensajeModal, setMensajeModal] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isModalCreacionOpen, setIsModalCreacionOpen] = useState(false);
     const [isModalSeleccionOrigenDestinoOpen, setIsModalSeleccionOrigenDestinoOpen] = useState(false);
     const [loadingRutas, setLoadingRutas] = useState(false);
     const [loadingRutaSeleccionada, setLoadingRutaSeleccionada] = useState(false);
@@ -288,6 +292,8 @@ const RutasModule = () => {
                 break;
             case 'SelectIntermedio':
                 setPuntoIntermedio(puntosIntermedios.find(item => item.nombre === value) || null);
+                break;
+            case 'selectTipoTraslado':
                 break;
             default:
                 break;
@@ -380,7 +386,7 @@ const RutasModule = () => {
 
             // Unir ambos arreglos en uno solo
             data1.push(...data);
-
+            setTipoOrigenDestinoSeleccionado(tipo);
             setDirectoriosCoincidentes(data1);
             setIsModalSeleccionOrigenDestinoOpen(true);
 
@@ -391,10 +397,10 @@ const RutasModule = () => {
         }
     }, [origen, destino]);
 
-    const handleDeleteCaseta = (IDCaseta) => {
-        const caseta = casetasEnRutaTusa.find(c => c.ID === IDCaseta);
-
-        setCasetaAEliminar(IDCaseta);
+    const handleDeleteCaseta = (ID) => {
+        const caseta = casetasEnRutaTusa.find(c => (c?.ID === ID || c?.ID_Caseta === ID));
+        console.log('caseta a eliminar:', caseta);
+        setCasetaAEliminar(caseta?.ID);
         setColorModalConfirmacion('danger');
         setMensajeModal(
             `¿Deseas eliminar la caseta de "${caseta?.Nombre}" de la ruta seleccionada? Esta caseta se eliminará definitivamente al guardar la ruta.`
@@ -406,12 +412,38 @@ const RutasModule = () => {
     }
 
     const handleCrearRuta = async () => {
-        alert("Creando ruta");
+
+        console.log("Creando ruta con: ", origen, destino);
+
+        setDatosPrecargadosParaLaCreacionDeRuta({
+            id_dest_origenINEGI: origen?.id_dest,
+            id_dest_destinoINEGI: destino?.id_dest,
+            tipo_vehiculo: tipoVehiculo,
+            nombre_origen: normalizarNombre(origen),
+            nombre_destino: normalizarNombre(destino),
+            peajeDosEjes: (rutaSeleccionada[0]?.costoCasetas || 0),
+            distanciaTotal: 10 * Math.ceil(rutaSeleccionada[0]?.distancia / 10) || 0,
+        });
+
+        if (!origen?.ID_PoblacionTUSA) {
+            alert('Es necesario seleccionar una razón social vinculada en el origen para crear la ruta. Por favor, selecciona la razón social en el siguiente modal.');
+            changeOrigenDestinoHandler('Origen', normalizarNombre(origen));
+            return;
+        }
+        if (!destino?.ID_PoblacionTUSA) {
+            alert('Es necesario seleccionar una razón social vinculada en el destino para crear la ruta. Por favor, selecciona la razón social en el siguiente modal.');
+            changeOrigenDestinoHandler('Destino', normalizarNombre(destino));
+            return;
+        }
+        if (origen?.ID_PoblacionTUSA && destino?.ID_PoblacionTUSA) {
+            setIsModalCreacionOpen(true);
+        }
     }
     const guardarRutaHandler = async () => {
         try {
             if (!rutaTusa[0]?.id_Tipo_ruta) {
                 alert('❌ No hay una ruta seleccionada para guardar');
+                console.log(rutaTusa);
                 return;
             }
 
@@ -835,12 +867,17 @@ const RutasModule = () => {
     }, []);
     // ===== VALORES MEMOIZADOS =====
     const origenCoords = useMemo(() => {
+        if (origen?.latitud && origen?.longitud) return [parseFloat(origen.latitud), parseFloat(origen.longitud)];
+
         if (!origen?.geojson) return null;
+        console.log("geojson origenCoords" + typeof (JSON.parse(origen?.geojson).coordinates[0]));
         const coords = JSON.parse(origen.geojson).coordinates;
         return [coords[1], coords[0]];
+
     }, [origen]);
 
     const destinoCoords = useMemo(() => {
+        if (destino?.latitud && destino?.longitud) return [parseFloat(destino.latitud), parseFloat(destino.longitud)];
         if (!destino?.geojson) return null;
         const coords = JSON.parse(destino.geojson).coordinates;
         return [coords[1], coords[0]];
@@ -1157,17 +1194,23 @@ const RutasModule = () => {
                                 </select>
                             </div>
                         </div>
-
+                        {/* PILLS para el origen y destino */}
                         {/* Se manda a llamar un modal que nos permita seleccionar un origen conforme al directorio. */}
 
                         <div className="route-points-RC">
-                            <div className="route-point-RC origin-RC py-1" style={{ cursor: (rutaTusa[0]?.RazonOrigen || origen?.nombre) ? 'pointer' : 'not-allowed' }} onClick={() => changeOrigenDestinoHandler('Origen', origen?.nombre.split(',')[0].trim())}>
+                            <div className="route-point-RC origin-RC py-1" style={{ cursor: (rutaTusa[0]?.RazonOrigen || origen?.nombre) ? 'pointer' : 'not-allowed' }} onClick={
+                                () => {
+                                    if (rutaTusa[0]?.RazonOrigen || origen?.nombre)
+                                        changeOrigenDestinoHandler('Origen', origen?.nombre.split(',')[0].trim());
+                                    else { return; }
+
+                                }}>
                                 <div className="route-icon-RC origin-RC"></div>
                                 <div>
                                     <strong>Origen</strong><br />
                                     <small style={{
-                                        fontWeight: rutaTusa[0]?.RazonOrigen ? 'bold' : 'normal',
-                                        color: rutaTusa[0]?.RazonOrigen ? 'green' : 'black',
+                                        fontWeight: (rutaTusa[0]?.RazonOrigen || origen?.Razon_social) ? 'bold' : 'normal',
+                                        color: (rutaTusa[0]?.RazonOrigen || origen?.Razon_social) ? 'green' : 'black',
                                     }}>
                                         {rutaTusa[0]?.RazonOrigen || origen?.nombre || 'Selecciona un origen valido.'}
                                     </small>
@@ -1187,8 +1230,8 @@ const RutasModule = () => {
                                 <div>
                                     <strong>Destino</strong><br />
                                     <small style={{
-                                        fontWeight: rutaTusa[0]?.RazonDestino ? 'bold' : 'normal',
-                                        color: rutaTusa[0]?.RazonDestino ? 'red' : 'black',
+                                        fontWeight: (rutaTusa[0]?.RazonDestino || destino?.Razon_social) ? 'bold' : 'normal',
+                                        color: (rutaTusa[0]?.RazonDestino || destino?.Razon_social) ? 'red' : 'black',
                                     }}>
                                         {rutaTusa[0]?.RazonDestino || destino?.nombre || 'Selecciona un destino valido.'}
                                     </small>
@@ -1358,17 +1401,21 @@ const RutasModule = () => {
                                 icon={markerIcons.caseta}
                             >
                                 <Popup>
+                                    <span style={{ marginTop: '5px', fontSize: '0.8rem', color: 'green', fontWeight: 'bold' }}>(INEGI)</span>
+                                    <br />
                                     {item?.direccion.replace('Cruce la caseta ', '')}
                                     <br />
                                     <strong style={{ color: 'green' }}>${item?.costo_caseta.toFixed(2)}</strong>
+                                    <span className='btn btn-outline-success ml-2 ' style={{ width: '1.5rem', height: '1.5rem', padding: '0', margin: '0', fontSize: '.8rem', textAlign: 'center', borderRadius: '40%', alignContent: 'center' }} onClick={() => handleAddCaseta(item)}>➕</span>
                                 </Popup>
                             </Marker>
                         ))}
+
                         {casetasEnRutaTusa?.map((caseta, index) => {
                             // Validar que la caseta tenga coordenadas válidas
                             const lat = caseta.latitud || caseta.lat;
                             const lng = caseta.longitud || caseta.lng;
-                            
+
                             // Si no tienen coordenadas, no renderizar el marcador
                             if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
                                 console.warn(`⚠️ Caseta sin coordenadas válidas: ${caseta.Nombre || caseta.nombre}`, caseta);
@@ -1376,17 +1423,23 @@ const RutasModule = () => {
                             }
 
                             return (
-                                <Marker 
-                                    key={caseta.ID_Caseta + ' _ ' + index} 
+                                <Marker
+                                    key={caseta.IDCaseta + ' _ ' + index}
                                     className='text-center'
                                     position={[lat, lng]}
                                 >
                                     <Popup>
-                                        Caseta TUSA:
+                                        <span style={{ marginTop: '5px', fontSize: '0.8rem', color: 'blue', fontWeight: 'bold' }}>(TUSA)</span>
                                         <br />
                                         {caseta.Nombre_IAVE || caseta.nombre}
                                         <br />
                                         <strong style={{ color: 'green' }}>${caseta[switchTipoVehiculo(tipoVehiculo).replaceAll(" ", "")]}</strong>
+                                        <span className='btn btn-outline-danger ml-2 ' style={{ width: '1.5rem', height: '1.5rem', padding: '0', margin: '0', fontSize: '.8rem', textAlign: 'center', borderRadius: '40%', alignContent: 'center' }} onClick={() => {
+                                            if (rutaTusa.length > 0) handleDeleteCaseta(caseta.ID)
+                                            if (!rutaTusa?.length) handleDeleteCaseta(caseta.IDCaseta)
+                                        }
+                                        }>❌</span>
+
                                     </Popup>
                                 </Marker>
                             );
@@ -1416,13 +1469,13 @@ const RutasModule = () => {
                     )}
 
                     <div className="details-panel-RC py-0" style={{ display: loadingRutaSeleccionada ? 'none' : 'block' }}>
-                        <div className="route-summary-RC pt-2">
-                            <h3 className='pb-0 mb-0' style={{ marginBottom: '15px', color: '#2c3e50' }}>📊 Resumen de Ruta</h3>
+                        <div className="route-summary-RC pt-2 mb-2">
+                            <h3 className='pb-0 mb-0' style={{ marginBottom: '15px', color: '#2c3e50', fontSize: '1.5rem' }}>📊 Resumen de Ruta INEGI</h3>
                             <center className='pb-3 text-primary'>
                                 <small>
                                     <strong>
-                                        {rutaTusa[0]?.Categoria
-                                            ? `Esta ruta YA existe en TUSA ${rutaTusa[0]?.Categoria}`
+                                        {tipoTraslado
+                                            ? `Esta ruta YA existe en TUSA ${tipoTraslado === 'Latinos' ? '(Latinos)' : tipoTraslado === 'Nacionales' ? '(Nacionales)' : tipoTraslado === 'Exportacion' ? '(Exportación)' : tipoTraslado === 'Cemex' ? '(Cemex)' : tipoTraslado === 'Otros' ? '(Otros)' : ''}. Puedes crear una nueva ruta cambiando el tipo de traslado.`
                                             : ''}
                                     </strong>
                                 </small>
@@ -1435,8 +1488,8 @@ const RutasModule = () => {
                                     name="selectTipoTraslado"
                                     id='selectTipoTraslado'
                                     style={{ width: 'auto', height: '2.5rem' }}
-                                    disabled={!!rutaTusa[0]?.Categoria}
-                                    value={rutaTusa[0]?.Categoria || ''}
+                                    disabled={!!tipoTraslado}
+                                    value={tipoTraslado}
                                     onChange={handleChange}
                                 >
                                     <option value="">Selecciona</option>
@@ -1461,13 +1514,19 @@ const RutasModule = () => {
                                 </span>
                             </div>
                             <div className="summary-item-RC">
-                                <span className="summary-label-RC">Costo Estimado:</span>
+                                <span className="summary-label-RC">Costo Peaje 2 ejes:</span>
                                 <span className="summary-value-RC">
                                     {rutaSeleccionada[0]?.costoCasetas ? `$${formatearDinero(rutaSeleccionada[0].costoCasetas)}` : '-'}
                                 </span>
                             </div>
                             <div className="summary-item-RC">
-                                <span className="summary-label-RC">Costo TUSA:</span>
+                                <span className="summary-label-RC">Costo Peaje 3 ejes:</span>
+                                <span className="summary-value-RC">
+                                    {rutaSeleccionada[0]?.costoCasetas ? `$${formatearDinero(rutaSeleccionada[0].costoCasetas)}` : '-'}
+                                </span>
+                            </div>
+                            <div className="summary-item-RC">
+                                <span className="summary-label-RC">Costo Peaje (TUSA):</span>
                                 <span className="summary-value-RC">
                                     {(casetasEnRutaTusa?.length > 0 ? '$' + formatearDinero(casetasEnRutaTusa.reduce((total, caseta) => total + (caseta[switchTipoVehiculo(tipoVehiculo).replaceAll(" ", "")] || 0), 0)) : '-')}
                                 </span>
@@ -1505,7 +1564,7 @@ const RutasModule = () => {
                             <div className="table-header-RC text-center py-0" style={{ fontSize: '1.2rem', lineHeight: '2.5rem' }}>
                                 {rutaSeleccionada[1]?.length ? `${rutaSeleccionada[1].length} ` : ' '}Casetas en la ruta seleccionada:
                             </div>
-                            <div className="table-container" style={{ maxHeight: '25vh' }}>
+                            <div className="table-container" style={{ maxHeight: '24vh' }}>
                                 <table className="table table-bordered table-scroll table-sm table-hover align-middle">
                                     <thead className="table-hover">
                                         <tr className='text-center'>
@@ -1544,15 +1603,6 @@ const RutasModule = () => {
                 </div>
             </div>
 
-            {/* MODAL PARA buscar la caseta que será vinculada sobre la ruta. */}
-            {isModalSeleccionOrigenDestinoOpen && (
-                <ModalSelectorOrigenDestino
-                    isOpen={isModalSeleccionOrigenDestinoOpen}
-                    onClose={() => setIsModalSeleccionOrigenDestinoOpen(false)}
-                    objeto={directoriosCoincidentes[0]}
-                    valoresSugeridos={directoriosCoincidentes}
-                />
-            )}
 
             {/* MODAL PARA SELECCIONAR RUTA */}
             {isModalOpen && (
@@ -1582,6 +1632,41 @@ const RutasModule = () => {
             )}
 
 
+            {/* MODAL PARA SELECCIONAR CREAR LA RUTA */}
+
+            <ModalFillCreation
+                datosPrecargados={datosPrecargadosParaLaCreacionDeRuta}
+                isOpen={isModalCreacionOpen}
+                onClose={() => setIsModalCreacionOpen(false)}
+                onConfirm={async (datosAGuardar) => {
+                    console.log('✅ Se han llenado los siguientes datos para crear la nueva ruta TUSA:', datosAGuardar);
+                    datosAGuardar.id_origen = origen?.ID_entidad;
+                    datosAGuardar.id_destino = destino?.ID_entidad;
+                    datosAGuardar.PoblacionOrigen = origen?.ID_PoblacionTUSA;
+                    datosAGuardar.PoblacionDestino = destino?.ID_PoblacionTUSA;
+                    try {
+                        const rutaResponse = await axios.post(
+                            `${API_URL}/api/casetas/rutas/crear-nueva-ruta`,
+                            datosAGuardar
+                        );
+                        if (rutaResponse.data.error) {
+                            console.error('❌ Error al crear la ruta:', rutaResponse.data.error);
+                            return;
+                        } else {
+                            setRutaTusa([rutaResponse.data]);
+                        }
+                        console.log('✅ Ruta creada exitosamente:', rutaResponse.data);
+                        //No podemos cargar casetas porque la ruta no tiene casetas vinculadas aún.
+                        //Pero si debemos setear la rutaTusa para que el usuario vea que ya existe la ruta.
+                        console.log(rutaTusa);
+
+
+                        setIsModalCreacionOpen(false);
+                    } catch (error) {
+                        console.error('❌ Error al crear la ruta:', error);
+                    }
+                }}
+            />
 
 
 
@@ -1591,7 +1676,37 @@ const RutasModule = () => {
                     isOpen={isModalSeleccionOrigenDestinoOpen}
                     onClose={() => setIsModalSeleccionOrigenDestinoOpen(false)}
                     objeto={directoriosCoincidentes[0]}
+                    tipo={tipoOrigenDestinoSeleccionado}
                     valoresSugeridos={directoriosCoincidentes}
+                    onConfirm={(origenODestinoSeleccionado) => {
+                        if (tipoOrigenDestinoSeleccionado === 'Origen') {
+                            origenODestinoSeleccionado.latitud = origenCoords?.[0];
+                            origenODestinoSeleccionado.longitud = origenCoords?.[1];
+                            origenODestinoSeleccionado.id_dest = origen?.id_dest;
+
+                        }
+                        if (tipoOrigenDestinoSeleccionado === 'Destino') {
+                            origenODestinoSeleccionado.latitud = destinoCoords?.[0];
+                            origenODestinoSeleccionado.longitud = destinoCoords?.[1];
+                            origenODestinoSeleccionado.id_dest = destino?.id_dest;
+
+                        }
+                        console.log('✅ Origen/Destino seleccionado:', origenODestinoSeleccionado);
+                        console.log()
+                        if (tipoOrigenDestinoSeleccionado === 'Origen') {
+                            setOrigen({
+                                ...origenODestinoSeleccionado
+
+                            });
+
+                        } else {
+                            setDestino({
+                                ...origenODestinoSeleccionado
+                            });
+                        }
+                        setIsModalSeleccionOrigenDestinoOpen(false);
+                        setTipoOrigenDestinoSeleccionado(null);
+                    }}
                 />
             )}
 
@@ -1602,7 +1717,7 @@ const RutasModule = () => {
                     isOpen={isModalConfirmacionOpen}
                     mensaje={mensajeModal}
                     onSelect={(casetaAAgregarModal) => {
-                        if (casetaAEliminar && mensajeModal?.toLowerCase().includes('eliminar')) {
+                        if (mensajeModal?.toLowerCase().includes('eliminar')) {
                             // Buscar si la caseta estaba en las originales
                             const casetaOriginal = casetasOriginales.find(
                                 c => c.ID === casetaAEliminar
@@ -1637,7 +1752,7 @@ const RutasModule = () => {
                             setCasetaAEliminar(null);
                         }
 
-                        if (casetaAAgregarModal && !casetaAEliminar) {
+                        if (mensajeModal?.toLowerCase().includes('vincular')) {
                             // Normalizar propiedades de la caseta para asegurar que tenga latitud y longitud
                             const casetaNormalizada = {
                                 ...casetaAAgregarModal,
@@ -1681,20 +1796,20 @@ const RutasModule = () => {
                         <CustomToast
                             color={'text-warning'}
                             mensaje={'No existe una ruta creada con las poblaciones origen y destino seleccionadas'}
-                            tiempo={5000}
+                            tiempo={2000}
+                            mostrar={true}
                             titulo={'⚠️ Advertencia'}
                             onClick={() => { alert('Advertencia') }}
-                            mostrar={1}
                         />
                     )}
                     {rutas_OyL && rutaSeleccionada && !loadingRutas && rutaTusa.length === 1 && (
                         <CustomToast
                             color={'text-success'}
                             mensaje={'Ruta TUSA encontrada y vinculada'}
-                            tiempo={5000}
+                            tiempo={2000}
                             titulo={'✅ Éxito'}
                             onClick={() => { alert('Advertencia') }}
-                            mostrar={1}
+                            mostrar={true}
                         />
                     )}
                 </Container>

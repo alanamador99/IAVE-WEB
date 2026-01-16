@@ -3,6 +3,7 @@ import {
   getCasetas,
   getRutasTUSA_TRN,
   getCasetas_por_RutaTUSA_TRN,
+  crearNuevaRutaTUSA,
   getCoordenadasOrigenDestino,
   getNombresOrigenDestino,
   getRutaPorOrigen_Destino,
@@ -32,5 +33,6 @@ router.get("/rutas/near-directorio", getNearDirectorios);
 router.patch("/:id", setCasetasByID);
 router.post("/rutas/guardar-cambios", GuardarCambiosEnRuta);
 router.post("/casetaINEGI", getCasetaFromInegi);
+router.post("/rutas/crear-nueva-ruta", crearNuevaRutaTUSA);
 
 export default router;

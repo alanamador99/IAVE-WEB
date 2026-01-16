@@ -794,6 +794,315 @@ export const getCasetas_por_RutaTUSA_TRN = async (req, res) => {
 
 
 
+/**
+ * Crea una nueva ruta en el sistema TUSA
+ * @async
+ * @function crearNuevaRutaTUSA
+ * @param {Object} req - Objeto de solicitud
+ * @param {Object} req.body - Parámetros de la ruta
+ * @param {number} req.body.id_origen - ID de población origen
+ * @param {number} req.body.id_destino - ID de población destino
+ * @param {number} req.body.PoblacionOrigen - ID entidad origen (Directorio)
+ * @param {number} req.body.PoblacionDestino - ID entidad destino (Directorio)
+ * @param {string} req.body.Categoria - Categoría (Latinos, Nacionales, Exportacion, Otros, Cemex)
+ * @param {number} req.body.Km_reales - Kilómetros reales
+ * @param {number} req.body.Km_oficiales - Kilómetros oficiales INEGI
+ * @param {number} req.body.Km_de_pago - Kilómetros de pago
+ * @param {number} req.body.Km_Tabulados - Kilómetros tabulados
+ * @param {number} req.body.Peaje_Dos_Ejes - Tarifa peaje 2 ejes
+ * @param {number} req.body.Peaje_Tres_Ejes - Tarifa peaje 3 ejes
+ * @param {string} [req.body.observaciones=""] - Observaciones (opcional)
+ * @param {boolean} [req.body.Alterna=false] - Es ruta alterna (opcional)
+ * @param {Object} res - Objeto de respuesta
+ * @returns {Promise<void>} Responde con la ruta creada
+ * @throws {Error} 400 si faltan parámetros requeridos; 500 si falla BD
+ * @description
+ * Valida que todos los parámetros requeridos estén presentes.
+ * Mapea la categoría a los campos booleanos de la tabla.
+ * Inserta la nueva ruta y retorna los datos guardados.
+ * @example
+ * // POST /api/rutas/crear
+ * // Body
+ * {
+ *   "id_origen": 30655,
+ *   "id_destino": 2486,
+ *   "PoblacionOrigen": 100,
+ *   "PoblacionDestino": 200,
+ *   "Categoria": "Nacionales",
+ *   "Km_reales": 250.5,
+ *   "Km_oficiales": 260.0,
+ *   "Km_de_pago": 255.0,
+ *   "Km_Tabulados": 258.0,
+ *   "Peaje_Dos_Ejes": 450.00,
+ *   "Peaje_Tres_Ejes": 650.00,
+ *   "observaciones": "Ruta nueva 2025",
+ *   "Alterna": false
+ * }
+ * // Response (201 Created)
+ * {
+ *   "success": true,
+ *   "message": "Ruta creada exitosamente",
+ *   "data": {
+ *     "id_Tipo_ruta": 150,
+ *     "id_origen": 30655,
+ *     "id_destino": 2486,
+ *     "Categoria": "Nacionales",
+ *     "Km_reales": 250.5,
+ *     "fecha_Alta": "2025-01-14T..."
+ *   }
+ * }
+ */
+export const crearNuevaRutaTUSA = async (req, res) => {
+  try {
+    const {
+      id_origen,
+      id_destino,
+      PoblacionOrigen,
+      PoblacionDestino,
+      Categoria,
+      Km_reales,
+      Km_oficiales,
+      Km_de_pago,
+      Km_Tabulados,
+      Peaje_Dos_Ejes,
+      Peaje_Tres_Ejes,
+      observaciones = '',
+      Alterna = false
+    } = req.body;
+
+    // Validación de parámetros requeridos
+    const camposRequeridos = [
+      'id_origen',
+      'id_destino',
+      'PoblacionOrigen',
+      'PoblacionDestino',
+      'Categoria',
+      'Km_reales',
+      'Km_oficiales',
+      'Km_de_pago',
+      'Km_Tabulados',
+      'Peaje_Dos_Ejes',
+      'Peaje_Tres_Ejes'
+    ];
+
+    const camposFaltantes = camposRequeridos.filter(campo => req.body[campo] === undefined || req.body[campo] === null);
+
+    if (camposFaltantes.length > 0) {
+      console.log('Campos faltantes:', camposFaltantes);
+      console.log('Cuerpo recibido:', req.body);
+      return res.status(400).json({
+        success: false,
+        message: `Faltan campos requeridos: ${camposFaltantes.join(', ')}`
+      });
+    }
+
+    // Mapear categoría a campos booleanos
+    const camposBooleanos = {
+      latinos: false,
+      nacionales: false,
+      exportacion: false,
+      otros: false,
+      cemex: false,
+      alterna: Boolean(Alterna)
+    };
+
+    // Asignar la categoría seleccionada
+    if (Categoria && camposBooleanos.hasOwnProperty(Categoria)) {
+      camposBooleanos[Categoria] = true;
+    } else {
+      console.log('Categoría inválida:', Categoria);
+      return res.status(400).json({
+        success: false,
+        message: `Categoría inválida. Debe ser una de: ${Object.keys(camposBooleanos).join(', ')}`
+      });
+    }
+
+    const pool = await getConnection();
+    let nuevoIDRuta = 1;
+
+    //antes de insertar verificar si existe un IDruta (alguna ruta con el mismo origen y destino)
+    const verificarRuta = await pool.request()
+      .input('PoblacionOrigen', sql.Int, PoblacionOrigen)
+      .input('PoblacionDestino', sql.Int, PoblacionDestino)
+      .query(`
+        SELECT TOP 1 Id_Ruta, id_Tipo_ruta
+        FROM Tipo_de_ruta_N
+        WHERE (id_origen = @PoblacionOrigen AND id_destino = @PoblacionDestino) OR (PoblacionOrigen = @PoblacionDestino AND PoblacionDestino = @PoblacionOrigen);
+      `);
+    if (verificarRuta.recordset.length > 0) {
+      console.log('Ruta existente con mismo origen y destino. ID Ruta:', verificarRuta.recordset[0].Id_Ruta);
+      nuevoIDRuta = parseFloat(verificarRuta.recordset[0].Id_Ruta);
+      return res.status(208).json({
+        success: false,
+        message: `Ya existe una ruta con el mismo origen y destino. ID Ruta existente: ${nuevoIDRuta}`,
+        id_Tipo_ruta: parseFloat(verificarRuta.recordset[0].id_Tipo_ruta)
+      });
+    }
+    else {
+      console.log('No existe ruta con mismo origen y destino. Procediendo a crear nueva ruta.');
+      const verificarUltimoID = await pool.request()
+        .query(`
+          SELECT TOP 1 Id_Ruta
+          FROM Tipo_de_ruta_N
+          ORDER BY Id_Ruta DESC;
+        `);
+      if (verificarUltimoID.recordset.length > 0) {
+        nuevoIDRuta = parseFloat(verificarUltimoID.recordset[0].Id_Ruta) + 1;
+      }
+      console.log('Nuevo ID Ruta asignado:', nuevoIDRuta);
+    }
+    // Insertar nueva ruta
+    const result = await pool.request()
+      .input('Id_Ruta', sql.Int, nuevoIDRuta)
+      .input('id_origen', sql.Int, PoblacionOrigen)
+      .input('id_destino', sql.Int, PoblacionDestino)
+      .input('PoblacionOrigen', sql.Int, id_origen)
+      .input('PoblacionDestino', sql.Int, id_destino)
+      .input('latinos', sql.Bit, camposBooleanos.latinos)
+      .input('nacionales', sql.Bit, camposBooleanos.nacionales)
+      .input('exportacion', sql.Bit, camposBooleanos.exportacion)
+      .input('otros', sql.Bit, camposBooleanos.otros)
+      .input('cemex', sql.Bit, camposBooleanos.cemex)
+      .input('alterna', sql.Bit, camposBooleanos.alterna)
+      .input('observaciones', sql.VarChar(sql.MAX), observaciones)
+      .input('Km_reales', sql.Float, Km_reales)
+      .input('Km_oficiales', sql.Float, Km_oficiales)
+      .input('Km_de_pago', sql.Float, Km_de_pago)
+      .input('Km_Tabulados', sql.Float, Km_Tabulados)
+      .input('Peaje_Dos_Ejes', sql.Float, Peaje_Dos_Ejes)
+      .input('Peaje_Tres_Ejes', sql.Float, Peaje_Tres_Ejes)
+      .query(`
+        INSERT INTO Tipo_de_ruta_N (
+        Id_Ruta,
+          id_origen, 
+          id_destino, 
+          PoblacionOrigen, 
+          PoblacionDestino, 
+          latinos, 
+          nacionales, 
+          exportacion, 
+          otros, 
+          cemex, 
+          alterna, 
+          Observaciones, 
+          fecha_Alta, 
+          Km_reales, 
+          Km_oficiales, 
+          Km_de_pago, 
+          Km_Tabulados, 
+          peaje_dos_ejes, 
+          peaje_tres_ejes
+        )
+        VALUES (
+          @Id_Ruta,
+          @id_origen,
+          @id_destino,
+          @PoblacionOrigen,
+          @PoblacionDestino,
+          @latinos,
+          @nacionales,
+          @exportacion,
+          @otros,
+          @cemex,
+          @alterna,
+          @observaciones,
+          GETDATE(),
+          @Km_reales,
+          @Km_oficiales,
+          @Km_de_pago,
+          @Km_Tabulados,
+          @Peaje_Dos_Ejes,
+          @Peaje_Tres_Ejes
+        );
+        
+        -- Retornar la ruta creada con su ID
+        SELECT 
+          SCOPE_IDENTITY() AS id_Tipo_ruta,
+          id_origen,
+          id_destino,
+          PoblacionOrigen,
+          PoblacionDestino,
+-- Procesar categoría directamente en SQL
+          CASE 
+            -- Un solo campo activo
+            WHEN (CAST(TRN.Latinos AS INT) + CAST(TRN.Nacionales AS INT) + 
+                  CAST(TRN.Exportacion AS INT) + CAST(TRN.Otros AS INT) + 
+                  CAST(TRN.Cemex AS INT) + CAST(TRN.Alterna AS INT)) = 1 
+            THEN 
+              CASE 
+                WHEN TRN.Latinos = 1 THEN 'Latinos'
+                WHEN TRN.Nacionales = 1 THEN 'Nacionales'
+                WHEN TRN.Exportacion = 1 THEN 'Exportacion'
+                WHEN TRN.Otros = 1 THEN 'Otros'
+                WHEN TRN.Cemex = 1 THEN 'Cemex'
+                WHEN TRN.Alterna = 1 THEN 'Alterna'
+              END
+            -- Dos campos activos y uno es Alterna
+            WHEN (CAST(TRN.Latinos AS INT) + CAST(TRN.Nacionales AS INT) + 
+                  CAST(TRN.Exportacion AS INT) + CAST(TRN.Otros AS INT) + 
+                  CAST(TRN.Cemex AS INT) + CAST(TRN.Alterna AS INT)) = 2 
+                 AND TRN.Alterna = 1
+            THEN 
+              CASE 
+                WHEN TRN.Latinos = 1 THEN 'Latinos'
+                WHEN TRN.Nacionales = 1 THEN 'Nacionales'
+                WHEN TRN.Exportacion = 1 THEN 'Exportacion'
+                WHEN TRN.Otros = 1 THEN 'Otros'
+                WHEN TRN.Cemex = 1 THEN 'Cemex'
+              END
+            ELSE NULL
+          END AS Categoria,
+          -- Determinar si es ruta alterna
+          CASE 
+            WHEN (CAST(TRN.Latinos AS INT) + CAST(TRN.Nacionales AS INT) + 
+                  CAST(TRN.Exportacion AS INT) + CAST(TRN.Otros AS INT) + 
+                  CAST(TRN.Cemex AS INT) + CAST(TRN.Alterna AS INT)) = 2 
+                 AND TRN.Alterna = 1
+            THEN CAST(1 AS BIT)
+            ELSE CAST(0 AS BIT)
+          END AS RutaAlterna,
+          Observaciones,
+          fecha_Alta,
+          Km_reales,
+          Km_oficiales,
+          Km_de_pago,
+          Km_Tabulados,
+          peaje_dos_ejes,
+          peaje_tres_ejes
+        FROM Tipo_de_ruta_N TRN
+        WHERE id_Tipo_ruta = SCOPE_IDENTITY();
+      `);
+
+    // Extraer la ruta creada
+    const rutaCreada = result?.recordset[0];
+
+    if (!rutaCreada) {
+      console.log('No se pudo recuperar la ruta creada.');
+      console.log('Resultado completo de la inserción:', result);
+      return res.status(500).json({
+        success: false,
+        message: 'Error al recuperar los datos de la ruta creada'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Ruta creada exitosamente',
+      id_Tipo_ruta: parseFloat(rutaCreada.id_Tipo_ruta)
+    });
+
+  } catch (error) {
+    console.error('Error al crear ruta TUSA:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al crear la ruta',
+      error: error.message
+    });
+  }
+};
+
+
+
 
 /**
  * Obtiene coordenadas (latitud/longitud) de origen y destino de una ruta.
@@ -1146,7 +1455,8 @@ export const getCoincidenciasPoblacion = async (req, res) => {
       Dir.Correo_electronico,
       Dir.Fecha_captura,
       Dir.ID_Usuario,
-      Pob.Poblacion as ID_poblacion,
+      Dir.ID_poblacion as 'ID_PoblacionTUSA',
+      Pob.Poblacion as 'ID_poblacion',
       Dir.Contacto,
       Dir.Celular,
       Dir.latitud,
@@ -1239,7 +1549,8 @@ export const getNearDirectorios = async (req, res) => {
       Dir.Correo_electronico,
       Dir.Fecha_captura,
       Dir.ID_Usuario,
-      Pob.Poblacion as ID_poblacion,
+      Dir.ID_poblacion as 'ID_PoblacionTUSA',
+      Pob.Poblacion as 'ID_poblacion',
       Dir.Contacto,
       Dir.Celular,
       Dir.latitud,
@@ -1286,12 +1597,11 @@ export const GuardarCambiosEnRuta = async (req, res) => {
   try {
     const {
       id_Tipo_ruta,
-      Id_Ruta,
       casetasActualizadas,
       casetasAEliminar,
       casetasAAgregar
     } = req.body;
-
+    let Id_Ruta = req.body.Id_Ruta;
     // Validaciones
     if (!id_Tipo_ruta) {
       return res.status(400).json({
@@ -1308,6 +1618,23 @@ export const GuardarCambiosEnRuta = async (req, res) => {
     // Iniciar transacción
     await transaction.begin();
 
+    // ===== 0. VERIFICAR Id_Ruta =====
+    if (!Id_Ruta) {
+      const request0 = new sql.Request(transaction);
+      const resultRuta = await request0
+        .input('id_Tipo_ruta', sql.Int, id_Tipo_ruta)
+        .query(`
+                SELECT TOP 1 Id_Ruta 
+                FROM Tipo_de_ruta_N 
+                WHERE id_Tipo_ruta = @id_Tipo_ruta
+            `);
+      if (resultRuta.recordset.length === 0) {
+        throw new Error(`No se encontró Id_Ruta para id_Tipo_ruta: ${id_Tipo_ruta}`);
+      }
+      console.log(`🔍 Id_Ruta encontrado: ${resultRuta.recordset[0].Id_Ruta} para id_Tipo_ruta: ${id_Tipo_ruta}`);
+      Id_Ruta = resultRuta.recordset[0].Id_Ruta;
+
+    }
     // ===== 1. ELIMINAR CASETAS =====
     if (casetasAEliminar && casetasAEliminar.length > 0) {
       const request1 = new sql.Request(transaction);

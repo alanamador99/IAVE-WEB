@@ -15,8 +15,9 @@
  * @requires leaflet
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, use } from 'react';
 import { Toast } from 'react-bootstrap';
+import { NumericFormat } from 'react-number-format';
 import axios from 'axios';
 
 import { MapPin, Mail, Phone, User, Calendar, Building, Clipboard, LocateFixed } from 'lucide-react';
@@ -466,15 +467,19 @@ const formatearEnteros = (monto) => {
  * - Posicionado en esquina inferior derecha (fixed)
  * - Color personalizable mediante clases Bootstrap
  */
-function CustomToast({ titulo, mensaje, mostrar, color, tiempo = 5000 }) {
-  const [show, setShow] = useState(true);
+function CustomToast({ titulo, mensaje, mostrar, color, tiempo = 2000 }) {
+  const [show, setShow] = useState(false);
+
+  useEffect(() => {
+    setShow(mostrar);
+  }, [mostrar]);
 
   return (
     <>
 
       <Toast
         onClose={() => setShow(false)}
-        show={mostrar && show}
+        show={show}
         delay={tiempo}
         autohide={true}
         style={{ position: 'relative', bottom: 20, right: 20, minWidth: 250, zIndex: 9999 }}
@@ -484,7 +489,7 @@ function CustomToast({ titulo, mensaje, mostrar, color, tiempo = 5000 }) {
         <Toast.Header className='bg-dark' closeButton={true}>
           <strong className={`m-auto ${color}`} style={{ fontSize: '1.3rem', justifyContent: 'center' }}>{titulo}</strong>
         </Toast.Header>
-        <Toast.Body style={{ fontSize: '1rem', backgroundColor: 'gainsboro', animationName: 'toastAnimate', animationDuration: '6s' }} className='align-middle text-dark'>
+        <Toast.Body style={{ fontSize: '1rem', backgroundColor: 'gainsboro', animationName: 'toastAnimate', animationDuration: '2.3s' }} className='align-middle text-dark'>
 
           {mensaje}
 
@@ -662,15 +667,15 @@ const RouteOption = ({ tipo, distance, time, distanceUnit = ' KM', costs, advert
  *   tituloDelSelect="Rutas disponibles"
  * />
  * 
- * @description
  * - Modal centrado con backdrop
+ * @description
  * - Select dropdown con opciones
  * - Formatea razones sociales automáticamente
  * - Botones Cancelar y Confirmar
  * - Botón confirmar deshabilitado si nada seleccionado
  * - Estilos Bootstrap SB Admin
  */
-const ModalSelectorOrigenDestino = ({ isOpen, onClose, onSelect, objeto, valoresSugeridos }) => {
+const ModalSelectorOrigenDestino = ({ isOpen, onClose, onConfirm, objeto, valoresSugeridos, tipo }) => {
   const [clienteSeleccionado, setClienteSeleccionado] = useState('');
   const [objetoMostrado, setObjetoMostrado] = useState(objeto);
   const focusRef = useRef(null);
@@ -702,9 +707,13 @@ const ModalSelectorOrigenDestino = ({ isOpen, onClose, onSelect, objeto, valores
 
   const handleConfirmar = () => {
     if (clienteSeleccionado) {
-      onSelect(clienteSeleccionado);
+      const objetoSeleccionado = valoresSugeridos.find(
+        valor => valor.ID_entidad == clienteSeleccionado
+      );
+      objetoSeleccionado.nombre = objetoSeleccionado.Nombre;
+      onConfirm(objetoSeleccionado);
+      setObjetoMostrado(objetoSeleccionado);
       setClienteSeleccionado('');
-      setObjetoMostrado(objeto);
       onClose();
     }
   };
@@ -753,7 +762,7 @@ const ModalSelectorOrigenDestino = ({ isOpen, onClose, onSelect, objeto, valores
           <div className="modal-content shadow-lg">
             <div className="form-group pt-3 px-4">
               <label className="font-weight-bold text-gray-800">
-                Vinculando cliente manualmente<span className="text-danger">*</span> <small>(Con base en la población)</small>
+                Vinculando <span className='text text-info'>{tipo} </span> manualmente<span className="text-danger">*</span> <small>(Con base en la población)</small>
               </label>
               <select
                 value={clienteSeleccionado}
@@ -1053,6 +1062,7 @@ const ModalConfirmacion = ({ isOpen, onClose, onSelect, mensaje, color, casetaAA
                   value={casetaSeleccionada}
                   ref={focusRef}
                   autoFocus={isOpen}
+                  tabIndex={1}
                   onChange={(e) => {
                     setCasetaSeleccionada(e.target.value);
                   }}
@@ -1084,7 +1094,7 @@ const ModalConfirmacion = ({ isOpen, onClose, onSelect, mensaje, color, casetaAA
                 type="button"
                 onClick={handleCancelar}
                 className="btn btn-secondary"
-                tabIndex={1}
+                tabIndex={2}
               >
                 <i className="fas fa-times mr-2"></i>
                 Cancelar
@@ -1093,7 +1103,7 @@ const ModalConfirmacion = ({ isOpen, onClose, onSelect, mensaje, color, casetaAA
                 type="button"
                 onClick={handleConfirmar}
                 className="btn btn-success"
-                tabIndex={2}
+                tabIndex={3}
                 disabled={(loadingCasetas || (!casetaSeleccionada)) && mensaje.includes('vincular')}
 
               >
@@ -1111,47 +1121,369 @@ const ModalConfirmacion = ({ isOpen, onClose, onSelect, mensaje, color, casetaAA
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const ModalFillCreation = ({ isOpen, onClose, onConfirm, datosPrecargados }) => {
+  const cancelButtonRef = useRef(null);
+  const [kmReales, setKmReales] = useState('');
+  const [kmOficiales, setKmOficiales] = useState('');
+  const [kmDePago, setKmDePago] = useState('');
+  const [kmTabulados, setKmTabulados] = useState('');
+  const [peajeDosEjes, setPeajeDosEjes] = useState('');
+  const [peajeTresEjes, setPeajeTresEjes] = useState('');
+  const [categoriaRuta, setCategoriaRuta] = useState();
+  const [alterna, setAlterna] = useState(false);
+
+  useEffect(() => {
+    setPeajeDosEjes(parseFloat(datosPrecargados?.peajeDosEjes) || '');
+    setPeajeTresEjes(parseFloat(datosPrecargados?.peajeTresEjes) || '');
+    setKmOficiales(datosPrecargados?.distanciaTotal || '');
+  }, [datosPrecargados]);
+
+
+  const validarCamposLlenos = () => {
+    return (
+      kmReales &&
+      kmOficiales &&
+      kmDePago &&
+      kmTabulados &&
+      peajeDosEjes &&
+      peajeTresEjes &&
+      categoriaRuta
+    );
+  };
+
+
+
+  const handleChange = useCallback((e) => {
+    const { name, value } = e.target;
+
+    switch (name) {
+      case 'txtKmReales':
+        setKmReales(value);
+        break;
+      case 'txtKmOficiales':
+        setKmOficiales(value);
+        break;
+      case 'txtKmDePago':
+        setKmDePago(value);
+        break;
+      case 'txtKmTabulados':
+        setKmTabulados(value);
+        break;
+      case 'txtPeajeDosEjes':
+        setPeajeDosEjes(value);
+        break;
+      case 'txtPeajeTresEjes':
+        setPeajeTresEjes(value);
+        break;
+      case 'selectCategoriaRuta':
+        setCategoriaRuta(value);
+        break;
+      default:
+        break;
+    }
+  }, []);
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  const handleConfirmar = () => {
+    const datosCompletos = {
+      Km_reales: kmReales,
+      Km_oficiales: kmOficiales,
+      Km_de_pago: kmDePago,
+      Km_Tabulados: kmTabulados,
+      Peaje_Dos_Ejes: peajeDosEjes,
+      Peaje_Tres_Ejes: peajeTresEjes,
+      Alterna: alterna,
+      Categoria: categoriaRuta
+    };
+    onConfirm(datosCompletos);
+    onClose();
+  };
+
+
+  const handleCancelar = () => {
+    setKmReales('');
+    setKmOficiales('');
+    setKmDePago('');
+    setKmTabulados('');
+    setPeajeDosEjes('');
+    setPeajeTresEjes('');
+    setCategoriaRuta('');
+    onClose();
+  };
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        className="modal-backdrop fade show"
+        onClick={handleCancelar}
+        style={{ zIndex: 1040 }}
+      ></div>
+
+      {/* Modal */}
+      <div
+        className="modal fade show"
+        style={{ display: 'block', zIndex: 1050 }}
+        tabIndex="-1"
+        role="dialog"
+      >
+        <div className="modal-dialog modal-dialog-centered" role="document">
+          <div className="modal-content shadow-lg">
+            {/* Header */}
+            <div className="modal-header bg-gradient-primary">
+              <h5 className="modal-title text-white">
+                <i className="fas fa-user-tie mr-2"></i>
+                Creando nueva ruta TUSA.
+              </h5>
+              <button
+                type="button"
+                className="close text-white"
+                onClick={handleCancelar}
+                style={{ opacity: 0.8 }}
+              >
+                <span aria-hidden="true">&times;</span>
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="modal-body">
+
+              <div className="form-group">
+                <label className="font-weight-bold text-gray-800">
+                  Datos para la creación de una nueva ruta TUSA <span className="text-danger">*</span>
+                </label>
+                {/*Se contempla un input para cada uno de los campos de la creación de la ruta TUSA:
+                PoblacionOrigen, (estos valores se cargarán de los pill de la interfaz gráfica del Route-Creator.jsx)
+                PoblacionDestino, (estos valores se cargarán de los pill de la interfaz gráfica del Route-Creator.jsx)
+                id_destino, (estos valores se cargarán de los pill de la interfaz gráfica del Route-Creator.jsx)
+                id_origen, (estos valores se cargarán de los pill de la interfaz gráfica del Route-Creator.jsx)
+
+
+                Latinos, (Select)
+                Nacionales, (Select)
+                Exportacion, (Select)
+                Otros, (Select)
+                Cemex, (Estos campos estarán en un select/Option porque solo uno puede estar activo)
+
+                Alterna, (este campo estará con un checkbox, para poder activar/desactivar).
+
+
+                observaciones, (textArea)
+                Km_reales, (text)
+                Km_oficiales, (text)
+                Km_de_pago, (text)
+                Km_Tabulados, (text)
+                Peaje_Dos_Ejes, (text)
+                Peaje_Tres_Ejes (text)
+                */}
+
+                <div className="form-group" >
+
+                  <select className="form-control form-control-lg border-left-primary"
+                    style={{ borderLeftWidth: '4px' }}
+                    onChange={handleChange}
+                    value={categoriaRuta}
+                    autoFocus={isOpen}
+                    name='selectCategoriaRuta'
+                  >
+                    <option value="">-- Categoría de la ruta --</option>
+                    <option value="latinos">Latinos</option>
+                    <option value="nacionales">Nacionales</option>
+                    <option value="exportacion">Exportacion</option>
+                    <option value="cemex">Cemex</option>
+                    <option value="otros">Otros</option>
+                  </select>
+                  <input type="checkbox" onChange={(e) => setAlterna(e.target.checked)} checked={alterna} id="chkAlterna" className='' /> <label htmlFor="chkAlterna"> Ruta Alterna</label>
+                </div>
+
+                <hr />
+                <div className="form-group">
+
+                  <div className="row" style={{ justifyContent: 'center' }}>
+
+                    <div className="form-floating pr-2" style={{ maxWidth: '9rem', }}>
+                      <input type="number" name="txtKmReales" className="form-control form-control-sm border-left-primary" placeholder='KM Reales' onChange={handleChange} value={kmReales} id='txtKmReales' min={0} />
+                      <label className="form-label" htmlFor='txtKmReales'>KM Reales</label>
+                    </div>
+
+                    <div className="form-floating pr-2" style={{ maxWidth: '9rem', }}>
+                      <input type="number" name="txtKmDePago" className="form-control form-control-sm border-left-primary" placeholder='KM de pago' onChange={handleChange} value={kmDePago} id='txtKmDePago' min={0} />
+                      <label className="form-label" htmlFor='txtKmDePago'>KM de pago</label>
+                    </div>
+                  </div>
+
+                  <div className="row mt-2" style={{ justifyContent: 'center' }}>
+                    <div className="form-floating pr-2" style={{ maxWidth: '12rem', }}>
+                      <input type="number" name="txtKmOficiales" className="form-control form-control-sm border-left-primary" placeholder='KM Oficiales' onChange={handleChange} value={kmOficiales} id='txtKmOficiales' min={0} />
+                      <label className="form-label" htmlFor='txtKmOficiales'>KM Oficiales INEGI</label>
+                    </div>
+
+                    <div className="form-floating pr-2" style={{ maxWidth: '12rem', }}>
+                      <input type="number" name="txtKmTabulados" className="form-control form-control-sm border-left-primary" placeholder='KM Tabulados' onChange={handleChange} value={kmTabulados} id='txtKmTabulados' min={0} />
+                      <label className="form-label" htmlFor='txtKmTabulados'>KM Tabulados</label>
+                    </div>
+                  </div>
+                  <hr />
+
+                  <div className="form-group">
+
+                    <div className="row" style={{ justifyContent: 'center' }}>
+                      <div className="form-floating pr-2" style={{ maxWidth: '9rem', }}>
+                        <NumericFormat
+                          name="txtPeajeDosEjes"
+                          className="form-control form-control-sm border-left-primary"
+                          placeholder='Peaje 2 Ejes'
+                          onValueChange={(values) => {
+                            handleChange({ target: { name: 'txtPeajeDosEjes', value: values.floatValue || '' } });
+                          }}
+                          value={peajeDosEjes}
+                          id='txtPeajeDosEjes'
+                          thousandSeparator=","
+                          decimalSeparator="."
+                          prefix="$"
+                          decimalScale={2}
+                          fixedDecimalScale={true}
+                          allowNegative={false}
+                        />
+                        <label className="form-label" htmlFor='txtPeajeDosEjes'>Peaje 2 Ejes</label>
+                      </div>
+
+
+                      <div className="form-floating pr-2" style={{ maxWidth: '9rem', }}>
+                        <NumericFormat
+                          name="txtPeajeTresEjes"
+                          className="form-control form-control-sm border-left-primary"
+                          placeholder='Peaje 3 Ejes'
+                          onValueChange={(values) => {
+                            handleChange({ target: { name: 'txtPeajeTresEjes', value: values.floatValue || '' } });
+                          }}
+                          value={peajeTresEjes}
+                          id='txtPeajeTresEjes'
+                          thousandSeparator=","
+                          decimalSeparator="."
+                          prefix="$"
+                          decimalScale={2}
+                          fixedDecimalScale={true}
+                          allowNegative={false}
+                        />
+                        <label className="form-label" htmlFor='txtPeajeTresEjes'>Peaje 3 Ejes</label>
+                      </div>
+
+                    </div>
+                  </div>
+
+
+
+
+
+                </div>
+
+                {!validarCamposLlenos() && (
+                  <small className="form-text text-muted">
+                    <i className="fas fa-info-circle mr-1"></i>
+                    Completa todos los campos para continuar.
+                  </small>
+                )}
+              </div>
+
+            </div>
+
+            {/* Footer */}
+            <div className="modal-footer bg-light">
+              <button
+                type="button"
+                onClick={handleCancelar}
+                className="btn btn-secondary"
+              >
+                <i className="fas fa-times mr-2"></i>
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmar}
+                disabled={!validarCamposLlenos()}
+                className="btn btn-success"
+                style={{ cursor: validarCamposLlenos() ? 'pointer' : 'not-allowed' }}
+              >
+                <i className="fas fa-check mr-2"></i>
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
+
 /**
  * Modal de selección con dropdown
  * @component
  * @param {Object} props - Props del componente
- * @param {boolean} props.isOpen - Controla visibilidad del modal
- * @param {Function} props.onClose - Callback al cerrar
- * @param {Function} props.onSelect - Callback con valor seleccionado
- * @param {string} props.valorCampo - Valor actual del campo (mostrado en alerta)
- * @param {Array<Object>} props.valoresSugeridos - Array de opciones
- * @param {string} props.valoresSugeridos[].id_Tipo_ruta - ID de la ruta
- * @param {string} props.valoresSugeridos[].RazonOrigen - Origen
- * @param {string} props.valoresSugeridos[].RazonDestino - Destino
- * @param {string} props.valoresSugeridos[].Categoria - Categoría
- * @param {string} [props.titulo=""] - Título del modal
- * @param {string} [props.campo=""] - Nombre del campo
- * @param {string} [props.tituloDelSelect="Opciones"] - Etiqueta del select
- * @returns {React.ReactElement|null} Modal o null si no está abierto
- * 
- * @example
- * const [modalOpen, setModalOpen] = useState(false);
- * const [selected, setSelected] = useState(null);
- * 
- * <ModalSelector
+      * @param {boolean} props.isOpen - Controla visibilidad del modal
+      * @param {Function} props.onClose - Callback al cerrar
+      * @param {Function} props.onSelect - Callback con valor seleccionado
+      * @param {string} props.valorCampo - Valor actual del campo (mostrado en alerta)
+      * @param {Array < Object >} props.valoresSugeridos - Array de opciones
+      * @param {string} props.valoresSugeridos[].id_Tipo_ruta - ID de la ruta
+      * @param {string} props.valoresSugeridos[].RazonOrigen - Origen
+      * @param {string} props.valoresSugeridos[].RazonDestino - Destino
+      * @param {string} props.valoresSugeridos[].Categoria - Categoría
+      * @param {string} [props.titulo=""] - Título del modal
+      * @param {string} [props.campo=""] - Nombre del campo
+      * @param {string} [props.tituloDelSelect="Opciones"] - Etiqueta del select
+      * @returns {React.ReactElement | null} Modal o null si no está abierto
+      *
+      * @example
+      * const [modalOpen, setModalOpen] = useState(false);
+      * const [selected, setSelected] = useState(null);
+      *
+      * <ModalSelector
  *   isOpen={modalOpen}
- *   onClose={() => setModalOpen(false)}
- *   onSelect={(value) => setSelected(value)}
- *   valorCampo="Guadalajara"
- *   valoresSugeridos={rutasData}
- *   titulo="Seleccionar Ruta"
- *   campo="Origen"
- *   tituloDelSelect="Rutas disponibles"
+      *   onClose={() => setModalOpen(false)}
+      *   onSelect={(value) => setSelected(value)}
+      *   valorCampo="Guadalajara"
+      *   valoresSugeridos={rutasData}
+      *   titulo="Seleccionar Ruta"
+      *   campo="Origen"
+      *   tituloDelSelect="Rutas disponibles"
  * />
- * 
- * @description
- * - Modal centrado con backdrop
- * - Select dropdown con opciones
- * - Formatea razones sociales automáticamente
- * - Botones Cancelar y Confirmar
- * - Botón confirmar deshabilitado si nada seleccionado
- * - Estilos Bootstrap SB Admin
- */
+      *
+      * @description
+      * - Modal centrado con backdrop
+      * - Select dropdown con opciones
+      * - Formatea razones sociales automáticamente
+      * - Botones Cancelar y Confirmar
+      * - Botón confirmar deshabilitado si nada seleccionado
+      * - Estilos Bootstrap SB Admin
+      */
 const ModalSelector = ({ isOpen, onClose, onSelect, valorCampo, valoresSugeridos, titulo = '', campo = '', tituloDelSelect = 'Opciones' }) => {
   const [clienteSeleccionado, setClienteSeleccionado] = useState('');
   const focusRef = useRef(null);
@@ -1334,5 +1666,6 @@ export {
   RouteOption,
   ModalSelector,
   ModalSelectorOrigenDestino,
-  ModalConfirmacion
+  ModalConfirmacion,
+  ModalFillCreation
 };

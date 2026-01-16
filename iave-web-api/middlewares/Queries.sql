@@ -98,20 +98,20 @@ VALUES
     ( '4982', '8112', '8346', 0, 1, 0, 0, 0, 'Ruta de prueba', DATEFROMPARTS(2025,12,30), '1514', '1506', 200.5, 210.0, 205.0, 208.0, 150.00, 250.00, 0);
 
 
+SELECT TOP 1 * FROM Tipo_de_ruta_N ORDER BY Id_Ruta DESC;
 
-
-SELECT CPorRuta.consecutivo, Casetas.Nombre_IAVE, PobO.Poblacion as 'Origen', PobD.Poblacion as 'Destino', TRN.*, TRN.Id_Ruta
+SELECT TOP(10) CPorRuta.consecutivo, Casetas.Nombre_IAVE, PobO.Poblacion as 'Origen', PobD.Poblacion as 'Destino', TRN.*, TRN.id_Tipo_ruta
 FROM Tipo_de_ruta_N as TRN
     INNER JOIN
-    Poblaciones PobO ON PobO.ID_poblacion=TRN.id_origen
+    Poblaciones PobO ON PobO.ID_poblacion=TRN.PoblacionOrigen
     INNER JOIN
-    Poblaciones PobD ON PobD.ID_poblacion=TRN.id_destino
-    INNER JOIN
+    Poblaciones PobD ON PobD.ID_poblacion=TRN.PoblacionDestino
+    LEFT JOIN
     PCasetasporruta CPorRuta ON CPorRuta.id_Tipo_ruta=TRN.id_Tipo_ruta
-    INNER JOIN
+    LEFT JOIN
     casetas_Plantillas Casetas ON Casetas.ID_Caseta=CPorRuta.Id_Caseta
-WHERE TRN.id_Tipo_ruta=865
-ORDER BY CPorRuta.consecutivo ASC
+
+ORDER BY TRN.Id_Ruta DESC
 
 -- Ejemplo de Actualización en la tabla de PCasetasporruta
 UPDATE Tipo_de_ruta_N

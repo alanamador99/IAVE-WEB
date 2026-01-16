@@ -100,8 +100,6 @@ function Ordenamiento({
                     onClick={(e) => {
                         e.stopPropagation();
                         handleDeleteCaseta(caseta.ID);
-                        alert('Eliminar caseta ' + caseta.ID_Caseta + ' con ID: ' + caseta.ID);
-                        console.log(caseta);
                     }}
                     title={'Retirar caseta de la ruta TUSA.'}
                 >
