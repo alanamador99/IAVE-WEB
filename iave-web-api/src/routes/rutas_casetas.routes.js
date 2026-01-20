@@ -14,7 +14,8 @@ import {
   getNearDirectorios,
   setCasetasByID,
   GuardarCambiosEnRuta,
-  getCasetaFromInegi
+  getCasetaFromInegi,
+  getCasetasTUSACoincidentes
 } from "../controllers/casetas.controllers.js";
 
 const router = Router();
@@ -34,5 +35,6 @@ router.patch("/:id", setCasetasByID);
 router.post("/rutas/guardar-cambios", GuardarCambiosEnRuta);
 router.post("/casetaINEGI", getCasetaFromInegi);
 router.post("/rutas/crear-nueva-ruta", crearNuevaRutaTUSA);
+router.post("/rutas/casetas-tusa-coincidentes", getCasetasTUSACoincidentes);
 
 export default router;

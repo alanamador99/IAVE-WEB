@@ -763,7 +763,6 @@ export const getCasetas_por_RutaTUSA_TRN = async (req, res) => {
                   PCR.consecutivo,
                   TRN.Id_Ruta,
                   PCR.ID
-
               FROM
                   Tipo_de_ruta_N TRN
                   INNER JOIN
@@ -783,7 +782,8 @@ export const getCasetas_por_RutaTUSA_TRN = async (req, res) => {
       }
     });
     if (result.recordset.length === 0) {
-      return res.status(404).json({ message: "No se encontraron casetas para la ruta proporcionada." });
+      //Creamos un 204 No Content si no hay casetas para la ruta pero rellenamos con recordset vacío
+      return res.status(204).json({ message: "No se encontraron casetas para la ruta proporcionada." });
     }
     res.status(200).json(result.recordset);
   } catch (error) {
@@ -1756,6 +1756,100 @@ export const GuardarCambiosEnRuta = async (req, res) => {
   }
 }
 
+// Este controlador es un esqueleto para la devolución de varias casetas, hace lo mismo que getCasetaFromInegi, pero con por cada uno de las casetas en el array
+export const getCasetasTUSACoincidentes = async (req, res) => {
+  console.log('📥 Solicitud de casetas TUSA coincidentes recibida');
+  const pool = await getConnection();
+  const vehiculoColumn = switchTipoVehiculo("5"); // Se deja fijo el tipo de vehiculo en 5 (Camion de 2 ejes) para este ejemplo
+  
+  try {
+    const { casetasLimpias } = req.body;
+
+    // ===== Recorriendo las casetas del objeto para encontrar las coincidencias por cada caseta =====
+    if (casetasLimpias && casetasLimpias.length > 0) {
+      // Procesar casetas secuencialmente para evitar saturar el pool
+      for (const caseta of casetasLimpias) {
+        try {
+          console.log(`🔍 Buscando coincidencias para caseta: ${caseta.nombre}`);
+          const busquedaDeCaseta = await pool.request()
+            .input('latitud', sql.Float, parseFloat(caseta.lat))
+            .input('longitud', sql.Float, parseFloat(caseta.lng))
+            .input('costo', sql.Float, parseFloat(caseta.costo))
+            .input('nombreCasetaINEGI', sql.VarChar, caseta.nombre)
+            .query(`
+            SELECT TOP 1
+              casetas_Plantillas.ID_Caseta,
+              casetas_Plantillas.Nombre,
+              casetas_Plantillas.Carretera,
+              casetas_Plantillas.Estado,
+              casetas_Plantillas.Automovil,
+              casetas_Plantillas.Autobus2Ejes,
+              casetas_Plantillas.Camion2Ejes,
+              casetas_Plantillas.Camion3Ejes,
+              casetas_Plantillas.Camion5Ejes,
+              casetas_Plantillas.Camion9Ejes,
+              casetas_Plantillas.IAVE,
+              casetas_Plantillas.latitud,
+              casetas_Plantillas.longitud,
+              casetas_Plantillas.Nombre_IAVE,
+              casetas_Plantillas.Notas,
+              (
+                6371 * ACOS(
+                  COS(RADIANS(@latitud)) 
+                  * COS(RADIANS(TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(latitud)), CHAR(9), ''), ' ', '') AS FLOAT))) 
+                  * COS(RADIANS(TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(longitud)), CHAR(9), ''), ' ', '') AS FLOAT)) - RADIANS(@longitud)) 
+                  + SIN(RADIANS(@latitud)) 
+                  * SIN(RADIANS(TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(latitud)), CHAR(9), ''), ' ', '') AS FLOAT)))
+                )
+              ) AS distancia_km,
+               ABS((casetas_Plantillas.[${vehiculoColumn}] - @costo)) AS diferencia_costo
+            FROM casetas_Plantillas
+            WHERE TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(latitud)), CHAR(9), ''), ' ', '') AS FLOAT) IS NOT NULL
+                AND TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(longitud)), CHAR(9), ''), ' ', '') AS FLOAT) IS NOT NULL
+                AND (
+                  6371 * ACOS(
+                    COS(RADIANS(@latitud)) 
+                    * COS(RADIANS(TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(latitud)), CHAR(9), ''), ' ', '') AS FLOAT))) 
+                    * COS(RADIANS(TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(longitud)), CHAR(9), ''), ' ', '') AS FLOAT)) - RADIANS(@longitud)) 
+                    + SIN(RADIANS(@latitud)) 
+                    * SIN(RADIANS(TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(latitud)), CHAR(9), ''), ' ', '') AS FLOAT)))
+                  )
+                ) <= 10
+                AND ABS((casetas_Plantillas.[${vehiculoColumn}] - @costo)) <= 20
+            ORDER BY diferencia_costo, distancia_km
+          `);
+
+          // Se agregan al objeto que se va a devolver las casetas encontradas
+          caseta.resultado = busquedaDeCaseta.recordset;
+          console.log(`✅ Caseta procesada: ${caseta.nombre}, coincidencias encontradas: ${busquedaDeCaseta.recordset.length}`);
+        } catch (casetaError) {
+          console.error(`❌ Error procesando caseta ${caseta.nombre}:`, casetaError.message);
+          caseta.resultado = [];
+          caseta.error = casetaError.message;
+        }
+      }
+
+      console.log(`✅ Procesadas ${casetasLimpias.length} casetas`);
+    }
+
+    res.json({
+      success: true,
+      message: 'Casetas encontradas:',
+      data: {
+        casetasTusaEncontradas: casetasLimpias?.length,
+        casetas: casetasLimpias
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error al consultar las casetas.:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener las casetas coincidentes.',
+      error: error.message
+    });
+  }
+}
 
 export const getCasetaFromInegi = async (req, res) => {
   try {
@@ -1815,7 +1909,6 @@ WHERE TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(latitud)), CHAR(9), ''), ' ', '') AS 
             )
           ) <= 10
     AND (casetas_Plantillas.[${vehiculoColumn}] - @costo) BETWEEN -20 AND 20
-
 ORDER BY distancia_km
       `);
 

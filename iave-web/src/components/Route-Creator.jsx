@@ -15,9 +15,9 @@ import markerCaseta from 'leaflet/dist/images/MapPinGreen.png';
 import markerB from 'leaflet/dist/images/B.png';
 import markerPin from 'leaflet/dist/images/pin_intermedio.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
-import { Container } from 'react-bootstrap';
+import { Button, Container } from 'react-bootstrap';
 import { result, set } from 'lodash';
-import { AlertTriangle, MapPinPlus, GripVertical, AlignVerticalJustifyCenter } from 'lucide-react';
+import { AlertTriangle, MapPinPlus, GripVertical, CopyPlus, AlignVerticalJustifyCenter } from 'lucide-react';
 
 
 // ===== CONSTANTES =====
@@ -232,6 +232,7 @@ const RutasModule = () => {
     const [casetasEnRutaTusa, setCasetasEnRutaTusa] = useState([]);
     const [rutas_OyL, setRutas_OyL] = useState(null);
     const [rutaSeleccionada, setRutaSeleccionada] = useState([]);
+    const [rutasPeaje3Ejes, setRutasPeaje3Ejes] = useState(null);
     const [directoriosCoincidentes, setDirectoriosCoincidentes] = useState([]);
 
     // Estados de UI
@@ -307,6 +308,11 @@ const RutasModule = () => {
 
     const cargarCasetasRuta = useCallback((casetas) => {
         // Asignar consecutivos si no los tienen y normalizar coordenadas
+        // En caso de que el objeto casetas no sea un array, evitar error
+        if (!Array.isArray(casetas)) {
+            console.log('Error: casetas no es un array:', casetas);
+            return;
+        }
         const casetasConConsecutivos = casetas.map((caseta, index) => ({
             ...caseta,
             consecutivo: caseta.consecutivo || index + 1,
@@ -586,6 +592,69 @@ const RutasModule = () => {
         setMensajeModal('Seleccione la caseta que desea vincular con la caseta INEGI "' + casetaINEGI?.direccion.replace('Cruce la caseta ', '') + '" cuyo costo es de $' + casetaINEGI.costo + ' sobre la ruta TUSA actual. ');
         setIsModalConfirmacionOpen(true);
     };
+
+
+    const handleAgregarTodasLasCasetas = async () => {
+        console.log('Casetas a agregar todas :');
+        alert('Funcionalidad de copiar al portapapeles próximamente')
+
+        const casetasLimpias = rutaSeleccionada[1]?.map(casetaINEGI => {
+            casetaINEGI.lat = JSON.parse(casetaINEGI.geojson)?.coordinates[1];
+            casetaINEGI.lng = JSON.parse(casetaINEGI.geojson)?.coordinates[0];
+            casetaINEGI.costo = casetaINEGI?.costo_caseta;
+            casetaINEGI.nombre = casetaINEGI?.direccion.replace('Cruce la caseta ', '');
+            const casetaLimpia = {
+                lat: casetaINEGI.lat,
+                lng: casetaINEGI.lng,
+                costo: casetaINEGI.costo,
+                nombre: casetaINEGI.nombre,
+            };
+            return casetaLimpia;
+        });
+
+        const response = await axios.post(
+            `${API_URL}/api/casetas/rutas/casetas-tusa-coincidentes`,
+            { casetasLimpias: casetasLimpias }
+        );
+        
+        const casetasConCoincidencias = response.data.data?.casetas || [];
+        let casetasAgregadasCount = 0;
+
+        for (const casetaOrigen of casetasConCoincidencias) {
+            // Cada caseta tiene un array 'resultado' con sus coincidencias
+            const coincidencias = casetaOrigen.resultado || [];
+            
+            for (const casetaAAgregarModal of coincidencias) {   
+                const casetaNormalizada = {
+                    ...casetaAAgregarModal,
+                    latitud: casetaAAgregarModal.latitud || casetaAAgregarModal.lat,
+                    longitud: casetaAAgregarModal.longitud || casetaAAgregarModal.lng,
+                    consecutivo: (casetasEnRutaTusa || []).length + casetasAgregadasCount + 1
+                };
+
+                // Agregar la caseta que coincide con el ID_Caseta a la lista visible con el consecutivo correcto
+                setCasetasEnRutaTusa(prev => [
+                    ...prev,
+                    casetaNormalizada
+                ]);
+                // Agregar a la lista de casetas agregadas
+                setCasetasAgregadas(prev => [...prev, casetaNormalizada]);
+                setHayCambiosPendientes(true);
+                console.log('➕ Caseta agregada:', casetaNormalizada);
+                casetasAgregadasCount++;
+            }
+        }
+
+        if (casetasAgregadasCount > 0) {
+            setCasetaAAgregar(null);
+            alert(`✅ ${casetasAgregadasCount} caseta(s) agregada(s) exitosamente`);
+        } else {
+            alert('⚠️ No se encontraron casetas coincidentes');
+        }
+    };
+
+
+
     // ===== FUNCIONES DE API =====
     const getRouteDetails = useCallback(async (tipoDetalleOoL) => {
         if (!origen?.id_dest || !destino?.id_dest) {
@@ -697,7 +766,15 @@ const RutasModule = () => {
             const crearFormDataINEGI = (idOrigen, idDestino) => new URLSearchParams({
                 dest_i: idOrigen,
                 dest_f: idDestino,
-                v: tipoVehiculo,
+                v: "5", // Fijo a 2 ejes para cálculo de ruta óptima y libre
+                e: '0',
+                type: 'json',
+                key: API_KEY
+            });
+            const crearFormDataINEGIPeaje3Ejes = (idOrigen, idDestino) => new URLSearchParams({
+                dest_i: idOrigen,
+                dest_f: idDestino,
+                v: "6", // Fijo a 3 ejes para cálculo de peaje
                 e: '0',
                 type: 'json',
                 key: API_KEY
@@ -766,6 +843,7 @@ const RutasModule = () => {
                 }
             };
 
+            //Vamos a hacer una petición extra para obtener el peaje de 3 ejes entre el origen y el destino (o punto intermedio)
             const fetchRutaINEGI = async (formData, tipoRuta) => {
                 const response = await fetch(
                     `https://gaia.inegi.org.mx/sakbe_v3.1/${tipoRuta}`,
@@ -814,7 +892,7 @@ const RutasModule = () => {
                 cargarCasetasRuta(casetasEnTUSA.data);
             }
 
-            if (dataTusa.total > 0) {
+            if (dataTusa.total > 1) {
                 setIsModalOpen(true);
             }
 
@@ -1058,7 +1136,7 @@ const RutasModule = () => {
                                 <label className='py-0 my-0'>Origen</label>
                                 <input
                                     type="text"
-                                    className="form-control-RC pt-1 pb-2"
+                                    className="form-control-RC py-2"
                                     name='txtOrigen'
                                     placeholder="Huehuetoca, Huehuetoca"
                                     ref={focusRef}
@@ -1067,7 +1145,7 @@ const RutasModule = () => {
                                 />
                                 <select
                                     id="SelectOrigen"
-                                    className="form-select form-select-sm custom-select"
+                                    className="form-select form-select-sm custom-select py-2 mb-3"
                                     style={{ width: '100%' }}
                                     disabled={loadingOrigen || origenes.length === 0}
                                     onChange={handleChange}
@@ -1099,7 +1177,7 @@ const RutasModule = () => {
                                 <label className='py-0 my-0'>Destino</label>
                                 <input
                                     type="text"
-                                    className="form-control-RC pt-1 pb-2"
+                                    className="form-control-RC py-2"
                                     placeholder="Hermosillo, Hermosillo"
                                     value={txtDestino}
                                     onChange={handleChange}
@@ -1107,7 +1185,7 @@ const RutasModule = () => {
                                 />
                                 <select
                                     id="SelectDestino"
-                                    className="form-select form-select-sm custom-select"
+                                    className="form-select form-select-sm custom-select py-2 mb-3"
                                     style={{ width: '100%' }}
                                     disabled={loadingDestino || destinos.length === 0}
                                     onChange={handleChange}
@@ -1134,32 +1212,13 @@ const RutasModule = () => {
                                 </select>
                             </div>
 
-                            <div className="form-group py-0 mb-1" style={{ justifySelf: 'center' }}>
-                                <label className='py-0 my-0 mr-2'>Tipo de unidad:</label>
-                                <select
-                                    className='form-select form-select-sm custom-select'
-                                    name="selectTipoVehiculo"
-                                    onChange={handleChange}
-                                    value={tipoVehiculo}
-                                    id='selectTipoVehiculo'
-                                    style={{ width: 'auto', height: '2.5rem' }}
-                                >
-                                    <option value="1">Automovil</option>
-                                    <option value="2">Bus 2 Ejes</option>
-                                    <option value="5">Camion 2 Ejes</option>
-                                    <option value="6">Camion 3 Ejes</option>
-                                    <option value="8">Camion 5 Ejes</option>
-                                    <option value="12">Camion 9 Ejes</option>
-
-                                </select>
-                            </div>
 
                             {/* Punto intermedio */}
                             <div className="form-group-RC py-0">
                                 <label className='py-0 my-0'>Punto Intermedio</label>
                                 <input
                                     type="text"
-                                    className="form-control-RC pt-1 pb-2"
+                                    className="form-control-RC py-2"
                                     placeholder="Guadalajara, Jalisco"
                                     value={txtPuntoIntermedio}
                                     onChange={handleChange}
@@ -1167,7 +1226,7 @@ const RutasModule = () => {
                                 />
                                 <select
                                     id="SelectIntermedio"
-                                    className="form-select form-select-sm custom-select"
+                                    className="form-select form-select-sm custom-select py-2 mb-3"
                                     style={{ width: '100%' }}
                                     disabled={loadingPuntoIntermedio || puntosIntermedios.length === 0}
                                     onChange={handleChange}
@@ -1406,7 +1465,7 @@ const RutasModule = () => {
                                     {item?.direccion.replace('Cruce la caseta ', '')}
                                     <br />
                                     <strong style={{ color: 'green' }}>${item?.costo_caseta.toFixed(2)}</strong>
-                                    <span className='btn btn-outline-success ml-2 ' style={{ width: '1.5rem', height: '1.5rem', padding: '0', margin: '0', fontSize: '.8rem', textAlign: 'center', borderRadius: '40%', alignContent: 'center' }} onClick={() => handleAddCaseta(item)}>➕</span>
+                                    <span className='btn btn-outline-success ml-2' style={{ width: '1.5rem', height: '1.5rem', padding: '0', margin: '0', fontSize: '.8rem', textAlign: 'center', borderRadius: '40%', alignContent: 'center' }} onClick={() => handleAddCaseta(item)}>➕</span>
                                 </Popup>
                             </Marker>
                         ))}
@@ -1484,7 +1543,7 @@ const RutasModule = () => {
                             <div className="form-group py-0" style={{ justifySelf: 'center' }}>
                                 <label className='py-0 my-0 mr-2'>Tipo de traslado:</label>
                                 <select
-                                    className='form-select form-select-sm custom-select'
+                                    className='form-select form-select-sm custom-select py-2 mb-3'
                                     name="selectTipoTraslado"
                                     id='selectTipoTraslado'
                                     style={{ width: 'auto', height: '2.5rem' }}
@@ -1561,13 +1620,29 @@ const RutasModule = () => {
                         </div>
 
                         <div className="route-table-RC">
-                            <div className="table-header-RC text-center py-0" style={{ fontSize: '1.2rem', lineHeight: '2.5rem' }}>
-                                {rutaSeleccionada[1]?.length ? `${rutaSeleccionada[1].length} ` : ' '}Casetas en la ruta seleccionada:
+                            <div className="table-header-RC pl-4 py-0" style={{ fontSize: '1.2rem', lineHeight: '2.5rem' }}>
+                                {rutaSeleccionada[1]?.length ? `${rutaSeleccionada[1].length} ` : ' '}Casetas en la ruta INEGI:
+                                {rutaSeleccionada[1]?.length &&
+                                    <Button variant="success"
+                                        style={{
+                                            borderRadius: '40%',
+                                            justifyContent: 'center',
+                                            alignItems: 'center',
+                                            display: 'flex',
+                                            float: 'right'
+                                        }}
+                                        size="sm"
+                                        className='btn btn-success py-1 pl-2 pr-1 mt-2'
+                                        title='Agregar todas las casetas a la ruta'
+                                        onClick={handleAgregarTodasLasCasetas}>
+                                        <CopyPlus size={16} className='mr-1 py-0 px-0'></CopyPlus>
+                                    </Button>}
                             </div>
                             <div className="table-container" style={{ maxHeight: '24vh' }}>
                                 <table className="table table-bordered table-scroll table-sm table-hover align-middle">
                                     <thead className="table-hover">
                                         <tr className='text-center'>
+                                            <th>IDx</th>
                                             <th>Caseta</th>
                                             <th>Importes</th>
                                             <th>¿TAG?</th>
@@ -1576,6 +1651,11 @@ const RutasModule = () => {
                                     <tbody>
                                         {rutaSeleccionada[1]?.map((item, index) => (
                                             <tr key={item?.id || item?.cve_caseta || index} className='text-center align-middle'>
+                                                <td className='align-middle'>
+                                                    <div className="d-flex" style={{ textAlign: 'left' }}>
+                                                        {index + 1}
+                                                    </div>
+                                                </td>
                                                 <td className='align-middle'>
                                                     <div className="d-flex" style={{ textAlign: 'left' }}>
                                                         {item?.direccion.replace('Cruce la caseta ', '')}
@@ -1588,7 +1668,7 @@ const RutasModule = () => {
                                                 </td>
                                                 <td className='align-middle'>
                                                     <div className="text-center">
-                                                        <button className="btn btn-sm btn-outline-success" onClick={() => handleAddCaseta(item)}>
+                                                        <button className="btn btn-sm btn-outline-success" onClick={() => handleAddCaseta(item)} title='Agregar caseta INEGI a la ruta TUSA.'>
                                                             <MapPinPlus size={20} className='mr-1 py-0 px-0'></MapPinPlus>
                                                         </button>
                                                     </div>
@@ -1818,4 +1898,4 @@ const RutasModule = () => {
     );
 };
 
-export default RutasModule
+export default RutasModule;

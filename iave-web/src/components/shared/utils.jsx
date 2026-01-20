@@ -953,13 +953,15 @@ const ModalConfirmacion = ({ isOpen, onClose, onSelect, mensaje, color, casetaAA
             `${API_URL}/api/casetas/casetaINEGI`,
             casetaAAgregar
           );
-          console.log('Respuesta de casetas INEGI:', response.data);
+          console.log('Respuesta recibida:', response.data);
           setLista(response.data);
         }
       } catch (error) {
         console.error('Error fetching casetas:', error);
         setLista([]);
       } finally {
+        console.log('Caseta a agregar:', casetaAAgregar);
+        console.log('URL de la API:', `${API_URL}/api/casetas/casetaINEGI`);
         setLoadingCasetas(false);
       }
     };
@@ -1084,6 +1086,17 @@ const ModalConfirmacion = ({ isOpen, onClose, onSelect, mensaje, color, casetaAA
                 )}
               </div>
             }
+            {lista?.length === 0 && !loadingCasetas && (
+              <div className="form-group px-4">
+                <div className="alert alert-warning py-2" role="alert">
+                  <i className="fas fa-exclamation-triangle mr-2"></i>
+                  No se encontraron casetas TUSA asociadas a la caseta INEGI proporcionada.
+                  
+                </div>
+                <span>Ampliar rango</span>
+                <span>Busqueda especifica</span>
+              </div>
+            )}
 
 
 
