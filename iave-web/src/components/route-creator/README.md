@@ -79,7 +79,7 @@ Route-Creator.jsx (componente principal)
 
 ## 🔄 Flujo de Funcionamiento
 
-### **Paso 1: El Usuario Abre Route-Creator**
+### **Paso 1: Tráfico/Personal de IAVE Abre Route-Creator**
 ```
 Usuario accede a la herramienta
     ↓
@@ -130,7 +130,7 @@ Se combinan resultados
 Se muestran en mapa + tabla
 ```
 
-### **Paso 6: Visualizar Resultados**
+### **Paso 6: Visualizar Resultados INEGI y busqueda de información en TUSA**
 ```
 Se muestra en pantalla:
 
@@ -151,6 +151,21 @@ Se muestra en pantalla:
 │             │  - Tiempo: 7 horas   │
 └─────────────┴──────────────────────┘
 ```
+Adicionalmente, si la ruta existe en TUSA, se indica "Ruta existente" y se pueden ver las casetas asociadas.
+```
+En la parte superior se muestra una tabla con los datos de las casetas en la ruta TUSA, con la opción de reordenar, eliminar o agregar casetas.
+En la tabla se muestra:
+┌──────────────┬──────────┬────────────────┬──────────────────┐
+│ Nombre Caseta│ Ubicación│ Costo          │ Consecutivo TUSA │
+├──────────────┼──────────┼────────────────┼──────────────────┤
+│ Caseta 1     │ Estado   │ $120           │    1             │
+│ Caseta 2     │ y coords │ $150           │    2             │
+│ ...          │ ...      │ ...            │    ...           │
+└──────────────┴──────────┴────────────────┴──────────────────┘
+
+---
+
+```
 
 ### **Paso 7: Seleccionar Ruta**
 ```
@@ -162,7 +177,7 @@ Se recibe lista de casetas con costos individuales
     ↓
 Se muestra en panel derecho:
   - Resumen completo de la ruta
-  - Tabla de casetas
+  - Tabla de casetas (con la opción de agregar la caseta a la ruta TUSA)
   - Opciones para guardar
 ```
 

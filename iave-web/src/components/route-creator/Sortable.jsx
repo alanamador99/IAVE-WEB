@@ -71,13 +71,7 @@ function Ordenamiento({
 
             {/* Estado - con onClick funcional */}
             <td
-                onClick={(e) => {
-                    e.stopPropagation();
-                    alert('Hola desde ' + caseta.Estado);
-                }}
-                className='py-1 tabla-ordenamiento'
-                style={{ cursor: 'pointer' }}
-            >
+                className='py-1 tabla-ordenamiento'>
                 {caseta.Estado}
             </td>
 
