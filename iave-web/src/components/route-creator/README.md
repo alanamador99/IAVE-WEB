@@ -225,17 +225,27 @@ Proporciona datos de rutas y geografía de México:
 | Función | ¿Para qué? | Entrada | Salida |
 |---------|-----------|---------|--------|
 | `buscadestino` | Buscar ciudades | Nombre ciudad | Lista de ciudades con coordenadas |
-| `optima` | Ruta más rápida | Origen + Destino | Distancia, tiempo, polyline de ruta |
-| `libre` | Ruta sin peaje | Origen + Destino | Distancia, tiempo, polyline de ruta |
+| `optima` | Ruta más rápida (sin peaje) | Origen + Destino + Tipo Vehículo | Distancia, tiempo, costo, polyline |
+| `libre` | Ruta libre (sin peaje o alterno) | Origen + Destino + Tipo Vehículo | Distancia, tiempo, costo, polyline |
+| `detalle_o` | Detalles completos ruta de cuota | Origen + Destino + Tipo Vehículo | Info casetas, peajes, geometría |
+| `detalle_l` | Detalles completos ruta libre | Origen + Destino + Tipo Vehículo | Info casetas (si aplica), geometría |
 
-### **API de Backend TUSA (Casetas)**
-Proporciona información sobre casetas y rutas registradas:
+**Base URL:** `https://gaia.inegi.org.mx/sakbe_v3.1/`
 
-| Endpoint | ¿Para qué? | Entrada | Salida |
-|----------|-----------|---------|--------|
-| `/api/casetas/rutas/BuscarRutaPorOrigen_Destino` | ¿Ruta registrada? | Origen + Destino | Lista de casetas en esa ruta |
-| `/api/casetas/detalle_o` | Detalles ruta cuota | Origen + Destino | Tabla de casetas con costos |
-| `/api/casetas/detalle_l` | Detalles ruta libre | Origen + Destino | Tabla de casetas sin costo (si aplica) |
+### **API de Backend - TUSA (Casetas)**
+Proporciona información sobre casetas y rutas registradas en la base de datos local:
+
+| Endpoint | Método | ¿Para qué? | Entrada | Salida |
+|----------|--------|-----------|---------|--------|
+| `/api/casetas/rutas/BuscarRutaPorOrigen_Destino` | POST | Buscar si existe ruta en TUSA | Origen normalizado + Destino | Array de rutas coincidentes con ID |
+| `/api/casetas/rutas/:IDTipoRuta/casetasPorRuta` | GET | Obtener casetas de una ruta | ID de tipo de ruta | Lista de casetas con ubicación y costo |
+| `/api/casetas/rutas/:Poblacion/RutasConCoincidencia` | GET | Rutas por población | Nombre población | Rutas que contienen esa población |
+| `/api/casetas/rutas/near-directorio` | GET | Casetas cercanas | Coordenadas (lat, lng) | Casetas próximas al punto |
+| `/api/casetas/rutas/crear-nueva-ruta` | POST | Crear ruta nueva | Datos ruta | Ruta creada con ID asignado |
+| `/api/casetas/rutas/guardar-cambios` | POST | Guardar cambios en ruta | ID ruta + datos | Confirmación de actualización |
+| `/api/casetas/rutas/casetas-tusa-coincidentes` | POST | Casetas que coinciden con ruta | Origen + Destino | Casetas en TUSA para esa ruta |
+
+**Base URL:** Configurada en `API_URL` (por defecto: `http://localhost:3001`)
 
 ---
 
