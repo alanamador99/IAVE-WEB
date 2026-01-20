@@ -108,21 +108,13 @@ Usuario escribe "Veracruz"
 
 ### **Paso 4: Opcional - Buscar Punto Intermedio**
 ```
-Usuario escribe ciudad de parada (o deja vacío)
+Usuario escribe ciudad de punto intermedio (o deja vacío) <útil para forzar un cambio en la ruta>
     ↓
 [Mismo proceso que Paso 2 - pero opcional]
 ```
 
-### **Paso 5: Seleccionar Tipo de Vehículo**
-```
-Usuario elige en dropdown:
-- Automóvil
-- Autobús 2 Ejes
-- Camión 2 Ejes
-- Camión 3 Ejes (etc.)
-```
 
-### **Paso 6: Calcular Ruta**
+### **Paso 5: Calcular Ruta**
 ```
 Usuario hace clic en botón "Calcular Ruta"
     ↓
@@ -138,7 +130,7 @@ Se combinan resultados
 Se muestran en mapa + tabla
 ```
 
-### **Paso 7: Visualizar Resultados**
+### **Paso 6: Visualizar Resultados**
 ```
 Se muestra en pantalla:
 
@@ -160,7 +152,7 @@ Se muestra en pantalla:
 └─────────────┴──────────────────────┘
 ```
 
-### **Paso 8: Seleccionar Ruta**
+### **Paso 7: Seleccionar Ruta**
 ```
 Usuario hace clic en "Cuota" o "Libre"
     ↓
