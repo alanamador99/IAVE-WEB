@@ -20,7 +20,7 @@ const Dashboard = () => {
 
   // Configuración para Presupuesto
   const presupuestoData = {
-    labels: ['TUSA', 'Sesgos',  'Aclaraciones', 'Abusos'],
+    labels: ['TUSA', 'Sesgos', 'Aclaraciones', 'Abusos'],
     datasets: [{
       data: [122.2, 132.3, 99.8, 45.7],
       backgroundColor: ['#1599f1ff', '#36b9cc', '#f6c23e', '#df1313ff'],
@@ -405,10 +405,10 @@ const Dashboard = () => {
               </div>
             </div>
 
-            {/* DataTable - Cruces sin Justificación */}
+            {/* DataTable - Cruces sin Justificación (Abusos) */}
             <div className="card shadow mb-4">
               <div className="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-                <h6 className="m-0 font-weight-bold text-primary">Cruces sin Justificación - Top 3</h6>
+                <h6 className="m-0 font-weight-bold text-primary">Cruces sin Justificación (Abusos) - Top 3</h6>
                 <a href="#" className="d-none d-sm-inline-block btn btn-sm btn-primary shadow-sm">
                   <i className="fas fa-list fa-sm text-white-50 mr-1"></i> Ver todos
                 </a>
@@ -445,14 +445,6 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Footer */}
-        <footer className="sticky-footer bg-white">
-          <div className="container my-auto">
-            <div className="copyright text-center my-auto">
-              <span>© 2025 ATM IAVE-WEB.</span>
-            </div>
-          </div>
-        </footer>
       </div>
     </div>
   );

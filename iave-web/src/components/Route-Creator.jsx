@@ -595,8 +595,7 @@ const RutasModule = () => {
 
 
     const handleAgregarTodasLasCasetas = async () => {
-        console.log('Casetas a agregar todas :');
-        alert('Funcionalidad de copiar al portapapeles próximamente')
+        alert('Funcionalidad de copiar al portapapeles ejecutandose. Por favor, espere...');
 
         const casetasLimpias = rutaSeleccionada[1]?.map(casetaINEGI => {
             casetaINEGI.lat = JSON.parse(casetaINEGI.geojson)?.coordinates[1];
