@@ -68,3 +68,5 @@ yarn-error.log*
 *.env.*
 /iave-web/.env
 /iave-web-api/.env
+
+/docs/docs.ignored/
