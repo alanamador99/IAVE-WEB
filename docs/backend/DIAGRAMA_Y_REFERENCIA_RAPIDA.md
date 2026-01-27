@@ -546,4 +546,4 @@ PATCH /api/abusos/stats
 
 **Versión:** 1.0  
 **Última actualización:** 3 de Diciembre de 2025  
-**Proyecto:** IAVE WEB - Sistema de Gestión de Peajes
+**Proyecto:** IAVE WEB 

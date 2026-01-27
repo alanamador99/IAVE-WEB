@@ -38,6 +38,7 @@ function App() {
               <Route path="/rutas-testing" element={<RutasModule />} />
               <Route path="/mapas-testing" element={<MapaContent />} />
               <Route path="/casetas" element={<Casetas />} />
+              <Route path="/casetas/actualizarCaseta/:idCaseta" element={<Casetas />} />
               <Route path="/tags" element={<Tags />} />
               <Route path="/sesgos" element={<Sesgos />} />
               <Route path="/nuevocomponente" element={<Nuevocomponente />} />

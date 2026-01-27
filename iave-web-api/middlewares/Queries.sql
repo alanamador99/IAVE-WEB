@@ -68,8 +68,8 @@ VALUES
 
 
 --Ejemplo de consulta de los primeros 10 registros de las casetas por ruta
-SELECT 
-    *   
+SELECT
+    *
 from PCasetasporruta
 WHERE id_Tipo_ruta = '1709'
 ORDER BY ID DESC;
@@ -98,9 +98,13 @@ VALUES
     ( '4982', '8112', '8346', 0, 1, 0, 0, 0, 'Ruta de prueba', DATEFROMPARTS(2025,12,30), '1514', '1506', 200.5, 210.0, 205.0, 208.0, 150.00, 250.00, 0);
 
 
-SELECT TOP 1 * FROM Tipo_de_ruta_N ORDER BY Id_Ruta DESC;
+SELECT TOP 1
+    *
+FROM Tipo_de_ruta_N
+ORDER BY Id_Ruta DESC;
 
-SELECT TOP(10) CPorRuta.consecutivo, Casetas.Nombre_IAVE, PobO.Poblacion as 'Origen', PobD.Poblacion as 'Destino', TRN.*, TRN.id_Tipo_ruta
+SELECT TOP(10)
+    CPorRuta.consecutivo, Casetas.Nombre_IAVE, PobO.Poblacion as 'Origen', PobD.Poblacion as 'Destino', TRN.*, TRN.id_Tipo_ruta
 FROM Tipo_de_ruta_N as TRN
     INNER JOIN
     Poblaciones PobO ON PobO.ID_poblacion=TRN.PoblacionOrigen
@@ -123,20 +127,26 @@ SELECT DISTINCT YEAR(Fecha) as 'AÑO'
 FROM cruces
 
 
-SELECT
-    pcr.*
-FROM PCasetasporruta as PCR
-    INNER JOIN
-    Tipo_de_ruta_N TRN ON PCR.id_Tipo_ruta = TRN.id_Tipo_ruta
-    INNER JOIN
-    Poblaciones PobO ON TRN.id_origen = PobO.ID_poblacion
-    INNER JOIN
-    Poblaciones PobD ON TRN.id_destino = PobD.ID_poblacion
-    INNER JOIN
-    casetas_Plantillas CP ON CP.ID_Caseta = PCR.Id_Caseta
-WHERE TRN.Id_Ruta =4982 AND TRN.id_Tipo_ruta=4901
+SELECT TOP(1)
+    
 
 
+FROM Tipo_de_ruta_N as TRN
+    INNER JOIN
+    Directorio Dir ON Dir.ID_entidad = TRN.PoblacionOrigen
+    INNER JOIN
+    Poblaciones Pob ON Pob.ID_poblacion = Dir.ID_poblacion
+    INNER JOIN
+
+    WHERE TRN  .id_Tipo_ruta = 14
+
+
+
+SELECT *
+from Cat_EntidadCaseta
+
+
+-- OrigenInmediato  DestinoInmediato
 
 -- DELETE FROM PCasetasporruta WHERE Id_Ruta =4982 AND id_Tipo_ruta=4901 AND PCasetasporruta.ID IN 
 SELECT DISTINCT PCasetasporruta.id_Tipo_ruta, COUNT(Id_Caseta)
@@ -174,7 +184,7 @@ SELECT
     casetas_Plantillas.longitud,
     casetas_Plantillas.Nombre_IAVE,
     casetas_Plantillas.Notas,
-          (
+    (
             6371 * ACOS(
               COS(RADIANS(@latitud)) 
               * COS(RADIANS(TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(latitud)), CHAR(9), ''), ' ', '') AS FLOAT))) 
@@ -198,3 +208,45 @@ WHERE TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(latitud)), CHAR(9), ''), ' ', '') AS 
     AND (casetas_Plantillas.Camion2Ejes - @costo) BETWEEN -20 AND 20
 
 ORDER BY distancia_km
+
+
+
+
+DECLARE @idCaseta INT = 66;
+DECLARE @costoActualizadoAutomovil FLOAT = 50.00;
+DECLARE @costoActualizadoCamion2Ejes FLOAT = 80.00;
+DECLARE @costoActualizadoCamion3Ejes FLOAT = 120.00;
+DECLARE @costoActualizadoCamion5Ejes FLOAT = 150.00;
+DECLARE @costoActualizadoCamion9Ejes FLOAT = 200.00;
+DECLARE @costoActualizadoAutobus2Ejes FLOAT = 90.00;
+DECLARE @OrigenINEGI INT = 1506;
+DECLARE @DestinoINEGI INT = 1514;
+UPDATE casetas_Plantillas 
+      SET   
+        Automovil = @costoActualizadoAutomovil,
+        Camion2Ejes = @costoActualizadoCamion2Ejes,
+        Camion3Ejes = @costoActualizadoCamion3Ejes,
+        Camion5Ejes = @costoActualizadoCamion5Ejes,
+        Camion9Ejes = @costoActualizadoCamion9Ejes,
+        Autobus2Ejes = @costoActualizadoAutobus2Ejes
+      WHERE ID_Caseta = @idCaseta;
+
+UPDATE Cat_EntidadCaseta
+      SET 
+        DestinoInmediato = @DestinoINEGI, 
+        OrigenInmediato = @OrigenINEGI
+      WHERE Id_caseta = @idCaseta;
+
+    -- Ejemplo de consulta para verificar la actualización
+SELECT *
+FROM Cat_EntidadCaseta as CEC
+WHERE CEC.Id_caseta = 1;
+
+-- OTORGAMOS PERMISOS DE UPDATE E INSERCIÓN AL USUARIO DE LA APLICACIÓN
+GRANT UPDATE, INSERT ON Cat_EntidadCaseta TO IAVE;
+
+
+
+
+
+select * from Cat_EntidadCaseta where Id_caseta=11;

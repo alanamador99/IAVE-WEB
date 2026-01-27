@@ -283,94 +283,42 @@ export const getCasetas = async (req, res) => {
 };
 
 
-
-/**
- * Obtiene casetas con información enriquecida de INEGI para cada ruta.
- * Consulta las casetas y mapea origen/destino a IDs del INEGI.
- * @async
- * @function getCasetasByID
- * @param {Object} req - Objeto de solicitud
- * @param {Object} res - Objeto de respuesta
- * @returns {Promise<void>} Responde con array de casetas enriquecidas
- * @throws {Error} Error 500 si falla la consulta
- * @description
- * Proceso:
- * 1. Obtiene todas las casetas con sus rutas asociadas (primera por fecha)
- * 2. Normaliza origen/destino a IDs del INEGI
- * 3. Consulta API INEGI para cada par origen-destino
- * @example
- * // GET /api/casetas/byid
- * // Response
- * [
- *   {
- *     "ID_Caseta": 1,
- *     "Nombre_IAVE": "Tlanalapa",
- *     "Origen": "HIDALGO",
- *     "Destino": "MEXICO DF",
- *     "OrigenINEGI": 30655,
- *     "DestinoINEGI": 2486,
- *     "ID_orden": "OT-12345",
- *     "Camion2Ejes": 100.00
- *   }
- * ]
- */
-export const getCasetasByID = async (req, res) => {
+export const getCasetaByID = async (req, res) => {
   try {
+    const IDcaseta = req.params.IDcaseta;
+
+    // ✅ Validar parámetro
+    if (!IDcaseta || isNaN(IDcaseta)) {
+      return res.status(400).json({ error: "ID_Caseta inválido" });
+    }
+
     const pool = await getConnection();
 
-    const result = await pool.request().query(`
-      WITH CasetaRutas AS (
+    // ✅ Selecciona SOLO las columnas que necesitas
+    const result = await pool.request()
+      .input('id', sql.Int, IDcaseta)
+      .query(`
         SELECT 
-            CP.ID_Caseta,
-            CP.Nombre_IAVE,
-            CP.Camion2Ejes,
-            PB.Ciudad_SCT AS Origen,
-            PBD.Ciudad_SCT AS Destino,
-            OT.ID_orden,
-            ROW_NUMBER() OVER (PARTITION BY CP.ID_Caseta ORDER BY OT.Fecha_traslado) AS rn
-        FROM Cat_EntidadCaseta CEC
-        INNER JOIN casetas_Plantillas CP ON CP.ID_Caseta = CEC.Id_caseta
-        INNER JOIN PCasetasporruta PCR ON CP.ID_Caseta = PCR.Id_Caseta
-        INNER JOIN Tipo_de_ruta_N TRN ON PCR.Id_Ruta = TRN.Id_Ruta
-        INNER JOIN Orden_traslados OT ON OT.Id_tipo_ruta = TRN.Id_Tipo_ruta
-        INNER JOIN Poblaciones PB ON TRN.id_origen = PB.ID_poblacion
-        INNER JOIN Poblaciones PBD ON TRN.id_destino = PBD.ID_poblacion
-      )
-      SELECT ID_Caseta, Nombre_IAVE,ID_orden, Camion2Ejes, Origen, Destino
-      FROM CasetaRutas
-      WHERE rn = 1
-      ORDER BY ID_Caseta;
-    `);
+          CP.*, CEC.OrigenInmediato, CEC.DestinoInmediato
+        FROM casetas_Plantillas  CP
+        INNER JOIN 
+        Cat_EntidadCaseta as CEC
+        ON CP.ID_Caseta = CEC.Id_caseta
+        WHERE CP.ID_Caseta = @id
 
-    // Aquí ya tienes una lista [{ ID_Caseta, Nombre_IAVE, Origen, Destino }]
-    const casetas = result.recordset;
+      `);
 
+    if (result.recordset.length === 0) {
+      return res.status(404).json({ error: "Caseta no encontrada" });
+    }
 
-    // 🔹 Paso siguiente: obtener el ID del INEGI para cada origen/destino
-    // Hacemos el map async para poder usar await
-    const casetasConINEGI = await Promise.all(casetas.map(async (c, idx) => {
-      const origenID = obtenerIdINEGI(c.Origen);
-      const destinoID = obtenerIdINEGI(c.Destino);
-      const l = await getCasetasINEGI(origenID, destinoID);
-      if (idx % 200 === 0) {
-        l.array.forEach(element => {
-          console.log(element);
-        });
-      }
-      return {
-        ...c,
-        OrigenINEGI: origenID,
-        DestinoINEGI: destinoID,
-      };
-    }));
-
-    res.json(casetasConINEGI);
+    res.json(result.recordset[0]); // Una caseta, no array
 
   } catch (error) {
-    console.error(error);
-    res.status(500).send(error.message);
+    res.status(500).json({ error: error.message });
   }
 };
+
 
 
 
@@ -383,54 +331,71 @@ export const getCasetasByID = async (req, res) => {
  * @returns {Promise<void>} Responde con casetas configuradas
  * @throws {Error} Error 500 si falla
  * @note Esta función está en construcción y no tiene implementación completa
+ * 
+ * 
+ * 
  */
-export const setCasetasByID = async (req, res) => {
+export const updateCasetaByID = async (req, res) => {
   try {
+    const {
+      ID_Caseta,
+      API_peajeAutomovil,
+      API_peajeBusDosEjes,
+      API_peajeCincoEjes,
+      API_peajeDosEjes,
+      API_peajeNueveEjes,
+      API_peajeTresEjes,
+      API_OrigenINEGI,
+      API_DestinoINEGI
+    } = req.body;
+
     const pool = await getConnection();
 
-    const result = await pool.request().query(`
-      WITH CasetaRutas AS (
-        SELECT 
-            CP.ID_Caseta,
-            CP.Nombre_IAVE,
-            CP.Camion2Ejes,
-            PB.Ciudad_SCT AS Origen,
-            PBD.Ciudad_SCT AS Destino,
-            OT.ID_orden,
-            ROW_NUMBER() OVER (PARTITION BY CP.ID_Caseta ORDER BY OT.Fecha_traslado) AS rn
-        FROM Cat_EntidadCaseta CEC
-        INNER JOIN casetas_Plantillas CP ON CP.ID_Caseta = CEC.Id_caseta
-        INNER JOIN PCasetasporruta PCR ON CP.ID_Caseta = PCR.Id_Caseta
-        INNER JOIN Tipo_de_ruta_N TRN ON PCR.Id_Ruta = TRN.Id_Ruta
-        INNER JOIN Orden_traslados OT ON OT.Id_tipo_ruta = TRN.Id_Tipo_ruta
-        INNER JOIN Poblaciones PB ON TRN.id_origen = PB.ID_poblacion
-        INNER JOIN Poblaciones PBD ON TRN.id_destino = PBD.ID_poblacion
-      )
-      SELECT ID_Caseta, Nombre_IAVE,ID_orden, Camion2Ejes, Origen, Destino
-      FROM CasetaRutas
-      WHERE rn = 1
-      ORDER BY ID_Caseta;
+    const result = await pool.request()
+      .input('idCaseta', sql.Int, ID_Caseta)
+      .input('costoActualizadoAutomovil', sql.Float, API_peajeAutomovil)
+      .input('costoActualizadoCamion2Ejes', sql.Float, API_peajeDosEjes)
+      .input('costoActualizadoCamion3Ejes', sql.Float, API_peajeTresEjes)
+      .input('costoActualizadoCamion5Ejes', sql.Float, API_peajeCincoEjes)
+      .input('costoActualizadoCamion9Ejes', sql.Float, API_peajeNueveEjes)
+      .input('costoActualizadoAutobus2Ejes', sql.Float, API_peajeBusDosEjes)
+      .input('OrigenINEGI', sql.Int, API_OrigenINEGI || null)
+      .input('DestinoINEGI', sql.Int, API_DestinoINEGI || null)
+      .query(`
+      UPDATE casetas_Plantillas 
+      SET   
+        Automovil = @costoActualizadoAutomovil,
+        Camion2Ejes = @costoActualizadoCamion2Ejes,
+        Camion3Ejes = @costoActualizadoCamion3Ejes,
+        Camion5Ejes = @costoActualizadoCamion5Ejes,
+        Camion9Ejes = @costoActualizadoCamion9Ejes,
+        Autobus2Ejes = @costoActualizadoAutobus2Ejes
+      WHERE ID_Caseta = @idCaseta;
+        -- Actualizamos el valor de Destino y origen inmediato en Cat_EntidadCaseta solo si tienen información
+        
+        ${(API_OrigenINEGI && API_DestinoINEGI) ? `
+      UPDATE Cat_EntidadCaseta
+      SET 
+        DestinoInmediato = @DestinoINEGI, 
+        OrigenInmediato = @OrigenINEGI
+      WHERE Id_caseta = @idCaseta;` : ''}
     `);
 
-    // Aquí ya tienes una lista [{ ID_Caseta, Nombre_IAVE, Origen, Destino }]
-    const casetas = result.recordset;
 
-    // 🔹 Paso siguiente: obtener el ID del INEGI para cada origen/destino
-    const casetasConINEGI = casetas.map(c => {
-      const origenID = obtenerIdINEGI(c.Origen);
-      const destinoID = obtenerIdINEGI(c.Destino);
-      return {
-
-      };
+    res.json({
+      message: "Caseta actualizada correctamente.",
+      affectedRows: result.rowsAffected,
+      result: result
     });
-
-    res.json(casetasConINEGI);
 
   } catch (error) {
     console.error(error);
     res.status(500).send(error.message);
   }
 };
+
+
+
 /**
  * Obtiene el ID del INEGI correspondiente a una ciudad.
  * @function obtenerIdINEGI
@@ -1477,7 +1442,7 @@ export const getCoincidenciasPoblacion = async (req, res) => {
       }
     });
     if (result.recordset.length === 0) {
-      return res.status(404).json({ message: "No se encontraron casetas para la ruta proporcionada. → " + Poblacion });
+      return res.status(204).json({ message: "No se encontraron casetas para la ruta proporcionada. → " + Poblacion, recordset: [] });
     }
     res.status(200).json(result.recordset);
   } catch (error) {
@@ -1576,7 +1541,7 @@ export const getNearDirectorios = async (req, res) => {
               + SIN(RADIANS(@latitud)) 
               * SIN(RADIANS(TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(latitud)), CHAR(9), ''), ' ', '') AS FLOAT)))
             )
-          ) <= 3
+          ) <= 10
         ORDER BY distancia_km
       `);
 
@@ -1761,7 +1726,7 @@ export const getCasetasTUSACoincidentes = async (req, res) => {
   console.log('📥 Solicitud de casetas TUSA coincidentes recibida');
   const pool = await getConnection();
   const vehiculoColumn = switchTipoVehiculo("5"); // Se deja fijo el tipo de vehiculo en 5 (Camion de 2 ejes) para este ejemplo
-  
+
   try {
     const { casetasLimpias } = req.body;
 

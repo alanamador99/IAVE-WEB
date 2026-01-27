@@ -19,13 +19,34 @@ import React, { useState, useRef, useEffect, useCallback, use } from 'react';
 import { Toast } from 'react-bootstrap';
 import { NumericFormat } from 'react-number-format';
 import axios from 'axios';
+import markerCaseta from 'leaflet/dist/images/MapPinGreen.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 
-import { MapPin, Mail, Phone, User, Calendar, Building, Clipboard, LocateFixed } from 'lucide-react';
+
+
+
+import { MapPin, Mail, Phone, User, Calendar, Building, Clipboard, LocateFixed, RefreshCcwDot } from 'lucide-react';
 
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { set } from 'lodash';
+
+
+// ===== CONSTANTES =====
+const testNombreCaseta = 'Caseta Tlanalapa';
+const API_KEY = 'Jq92BpFD-tYae-BBj2-rEMc-MnuytuOB30ST';
+const API_URL = process.env.REACT_APP_API_URL;
+// Iconos de marcadores (fuera del componente para evitar re-creación)
+const markerIcons = {
+  caseta: L.icon({
+    iconUrl: markerCaseta,
+    shadowUrl: markerShadow,
+    iconSize: [24, 24],
+    shadowSize: [40, 40],
+  })
+};
+
 
 const switchTipoVehiculo = (tvehiculo) => {
   let resultado;
@@ -67,7 +88,6 @@ const switchTipoVehiculo = (tvehiculo) => {
   return resultado;
 }
 
-const API_URL = process.env.REACT_APP_API_URL;
 /**
  * Componente para copiar el TAG de un cruce al portapapeles
  * @component
@@ -254,7 +274,7 @@ const CasetaMapModal = ({ isOpen, onClose, nombreCaseta, lat, lng }) => {
         <MapContainer center={[lat, lng]} zoom={14} style={{ height: "400px", width: "100%" }}>
           <TileLayer
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            attribution="&copy; OpenStreetMap contributors"
+            attribution='&copy; OpenStreetMap contributors || IAVE-WEB ⭐🚌'
           />
           <Marker position={[lat, lng]}>
             <Popup>{nombreCaseta}</Popup>
@@ -1091,7 +1111,7 @@ const ModalConfirmacion = ({ isOpen, onClose, onSelect, mensaje, color, casetaAA
                 <div className="alert alert-warning py-2" role="alert">
                   <i className="fas fa-exclamation-triangle mr-2"></i>
                   No se encontraron casetas TUSA asociadas a la caseta INEGI proporcionada.
-                  
+
                 </div>
                 <span>Ampliar rango</span>
                 <span>Busqueda especifica</span>
@@ -1139,7 +1159,699 @@ const ModalConfirmacion = ({ isOpen, onClose, onSelect, mensaje, color, casetaAA
 
 
 
+const ModalUpdateCaseta = ({ isOpen, onClose, onConfirm, idCaseta }) => {
 
+
+  const [loadingCasetas, setLoadingCasetas] = useState(false);
+  const [nombreCaseta, setNombreCaseta] = useState('');
+  const [peajeAutomovil, setPeajeAutomovil] = useState('');
+  const [peajeBusDosEjes, setPeajeBusDosEjes] = useState('');
+  const [peajeDosEjes, setPeajeDosEjes] = useState('');
+  const [peajeTresEjes, setPeajeTresEjes] = useState('');
+  const [peajeCincoEjes, setPeajeCincoEjes] = useState('');
+  const [peajeNueveEjes, setPeajeNueveEjes] = useState('');
+  const [coordenadasCaseta, setCoordenadasCaseta] = useState({ lat: '', lng: '' });
+  const [nombreCasetaINEGI, setNombreCasetaINEGI] = useState('');
+
+
+  const [IDOrigenINEGI, setIDOrigenINEGI] = useState('');
+  const [IDDestinoINEGI, setIDDestinoINEGI] = useState('');
+  const [peajeAutomovilINEGI, setPeajeAutomovilINEGI] = useState('');
+  const [peajeBusDosEjesINEGI, setPeajeBusDosEjesINEGI] = useState('');
+  const [peajeDosEjesINEGI, setPeajeDosEjesINEGI] = useState('');
+  const [peajeTresEjesINEGI, setPeajeTresEjesINEGI] = useState('');
+  const [peajeCincoEjesINEGI, setPeajeCincoEjesINEGI] = useState('');
+  const [peajeNueveEjesINEGI, setPeajeNueveEjesINEGI] = useState('');
+
+  useEffect(() => {
+    const fetchCasetaData = async () => {
+      try {
+        setLoadingCasetas(true);
+        if (!idCaseta) return;
+
+        // 1. Obtener datos de la caseta local
+        const responseCaseta = await fetch(
+          `${API_URL}/api/casetas/${idCaseta}/getCasetaByID`,
+          {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' }
+          }
+        );
+        const dataCaseta = await responseCaseta.json();
+
+        // 2. Actualizar estados locales inmediatamente
+        setNombreCaseta(dataCaseta?.Nombre || '');
+        setCoordenadasCaseta({
+          lat: dataCaseta?.latitud || '',
+          lng: dataCaseta?.longitud || ''
+        });
+
+        // Seteamos valores iniciales
+        setPeajeAutomovil(parseFloat(dataCaseta?.Automovil) || '');
+        setPeajeBusDosEjes(parseFloat(dataCaseta?.Autobus2Ejes) || '');
+        setPeajeDosEjes(parseFloat(dataCaseta?.Camion2Ejes) || '');
+        setPeajeTresEjes(parseFloat(dataCaseta?.Camion3Ejes) || '');
+        setPeajeCincoEjes(parseFloat(dataCaseta?.Camion5Ejes) || '');
+        setPeajeNueveEjes(parseFloat(dataCaseta?.Camion9Ejes) || '');
+        setIDOrigenINEGI(dataCaseta?.OrigenInmediato || '');
+        setIDDestinoINEGI(dataCaseta?.DestinoInmediato || '');
+        if (dataCaseta?.OrigenInmediato && dataCaseta?.DestinoInmediato) {
+          console.log("Origen y destino inmediatos disponibles para INEGI:", dataCaseta?.OrigenInmediato, dataCaseta?.DestinoInmediato);
+          // Consultas a INEGI en PARALELO (Optimización)
+          const tiposVehiculo = [
+            { v: '1', nombre: 'Automovil' },
+            { v: '2', nombre: 'Autobus 2 Ejes' },
+            { v: '5', nombre: 'Camion 2 Ejes' },
+            { v: '6', nombre: 'Camion 3 Ejes' },
+            { v: '8', nombre: 'Camion 5 Ejes' },
+            { v: '12', nombre: 'Camion 9 Ejes' }
+          ];
+
+          const inegiPromises = tiposVehiculo.map(async (tipo) => {
+            const formData = new URLSearchParams({
+              dest_i: dataCaseta.OrigenInmediato,
+              dest_f: dataCaseta.DestinoInmediato,
+              v: tipo.v,
+              type: 'json',
+              key: API_KEY
+            });
+
+            const res = await fetch(`https://gaia.inegi.org.mx/sakbe_v3.1/detalle_o`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: formData
+            });
+            const data = await res.json();
+            return data.data.filter(obj => obj.costo_caseta !== 0);
+          });
+
+          // Esperamos todas las respuestas juntas (mucho más rápido)
+          const resultadosInegi = await Promise.all(inegiPromises);
+
+          console.log("Datos INEGI cargados:", resultadosInegi);
+
+          // Función local para calcular distancia en KM (Haversine)
+          const getDistanciaKm = (lat1, lon1, lat2, lon2) => {
+            const R = 6371; // Radio de la Tierra
+            const dLat = (lat2 - lat1) * (Math.PI / 180);
+            const dLon = (lon2 - lon1) * (Math.PI / 180);
+            const a =
+              Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+          };
+
+          // Asignamos los costos obtenidos buscando la caseta correcta por geolocalización
+          resultadosInegi.forEach((resultado, index) => {
+            let casetaEncontrada = null;
+            let minDist = 5.0; // Tolerancia de 5km para encontrar la caseta
+
+            resultado.forEach(item => {
+              try {
+                // Parseamos las coordenadas del geojson o punto_caseta de la respuesta
+                const geo = JSON.parse(item.punto_caseta || item.geojson);
+                const [lon, lat] = geo.coordinates;
+
+                // Comparamos con las coordenadas de nuestra caseta local
+                const dist = getDistanciaKm(parseFloat(dataCaseta.latitud), parseFloat(dataCaseta.longitud), lat, lon);
+
+                if (dist < minDist) {
+                  minDist = dist;
+                  casetaEncontrada = item;
+                }
+              } catch (e) {
+                console.warn("Error calculando distancia de caseta:", e);
+              }
+            });
+
+            const tipo = tiposVehiculo[index];
+            const costoCaseta = casetaEncontrada ? parseFloat(casetaEncontrada.costo_caseta) : 0;
+
+            if (casetaEncontrada) {
+              setNombreCasetaINEGI(casetaEncontrada.direccion ? casetaEncontrada.direccion.replace('Cruce la caseta ', '') : '');
+            }
+
+            switch (tipo.nombre) {
+              case 'Automovil':
+                setPeajeAutomovilINEGI(costoCaseta);
+                break;
+              case 'Autobus 2 Ejes':
+                setPeajeBusDosEjesINEGI(costoCaseta);
+                break;
+              case 'Camion 2 Ejes':
+                setPeajeDosEjesINEGI(costoCaseta);
+                break;
+              case 'Camion 3 Ejes':
+                setPeajeTresEjesINEGI(costoCaseta);
+                break;
+              case 'Camion 5 Ejes':
+                setPeajeCincoEjesINEGI(costoCaseta);
+                break;
+              case 'Camion 9 Ejes':
+                setPeajeNueveEjesINEGI(costoCaseta);
+                break;
+              default:
+                break;
+            }
+          });
+        }
+        else {
+          console.log("No hay origen o destino inmediatos para INEGI en la caseta:", dataCaseta);
+          // Seteamos valores INEGI (según lógica original: inicializar con valor local)
+          setPeajeAutomovilINEGI(parseFloat(dataCaseta?.Automovil) || '');
+          setPeajeBusDosEjesINEGI(parseFloat(dataCaseta?.Autobus2Ejes) || '');
+          setPeajeDosEjesINEGI(parseFloat(dataCaseta?.Camion2Ejes) || '');
+          setPeajeTresEjesINEGI(parseFloat(dataCaseta?.Camion3Ejes) || '');
+          setPeajeCincoEjesINEGI(parseFloat(dataCaseta?.Camion5Ejes) || '');
+          setPeajeNueveEjesINEGI(parseFloat(dataCaseta?.Camion9Ejes) || '');
+        }
+
+
+
+      } catch (error) {
+        console.error('Error fetching caseta data:', error);
+      } finally {
+        setLoadingCasetas(false);
+      }
+    };
+
+    fetchCasetaData();
+  }, [idCaseta]);
+
+
+
+  const validarCamposLlenos = () => {
+    return (
+      peajeAutomovil &&
+      peajeBusDosEjes &&
+      peajeDosEjes &&
+      peajeTresEjes &&
+      peajeCincoEjes &&
+      peajeNueveEjes
+    );
+  };
+
+
+
+  const handleChange = useCallback((e) => {
+    const { name, value } = e.target;
+
+    switch (name) {
+      case 'txtPeajeAutomovil':
+        setPeajeAutomovil(value);
+        break;
+      case 'txtPeajeAutobus':
+        setPeajeBusDosEjes(value);
+        break;
+      case 'txtPeajeDosEjes':
+        setPeajeDosEjes(value);
+        break;
+      case 'txtPeajeTresEjes':
+        setPeajeTresEjes(value);
+        break;
+      case 'txtPeajeCincoEjes':
+        setPeajeCincoEjes(value);
+        break;
+      case 'txtPeajeNueveEjes':
+        setPeajeNueveEjes(value);
+        break;
+      case 'txtIDOrigenINEGI':
+        setIDOrigenINEGI(value);
+        break;
+      case 'txtIDDestinoINEGI':
+        setIDDestinoINEGI(value);
+        break;
+      default:
+        break;
+    }
+  }, []);
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  const handleConfirmar = () => {
+    const datosCompletos = {
+      API_peajeAutomovil: peajeAutomovil,
+      API_peajeBusDosEjes: peajeBusDosEjes,
+      API_peajeDosEjes: peajeDosEjes,
+      API_peajeTresEjes: peajeTresEjes,
+      API_peajeCincoEjes: peajeCincoEjes,
+      API_peajeNueveEjes: peajeNueveEjes,
+      API_OrigenINEGI: IDOrigenINEGI,
+      API_DestinoINEGI: IDDestinoINEGI,
+    };
+    onConfirm(datosCompletos);
+    onClose();
+  };
+
+
+  const handleCancelar = () => {
+    setPeajeAutomovil('');
+    setPeajeBusDosEjes('');
+    setPeajeDosEjes('');
+    setPeajeTresEjes('');
+    setPeajeCincoEjes('');
+    setPeajeNueveEjes('');
+    onClose();
+  };
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        className="modal-backdrop fade show"
+        onClick={handleCancelar}
+        style={{ zIndex: 1040 }}
+      ></div>
+
+      {/* Modal */}
+      <div
+        className="modal fade show"
+        style={{ display: 'block', zIndex: 1050 }}
+        tabIndex="-1"
+        role="dialog"
+      >
+        <div className="modal-dialog modal-dialog-centered" role="document">
+          <div className="modal-content shadow-lg">
+            {/* Header */}
+            <div className="modal-header bg-gradient-primary">
+              <h5 className="modal-title text-white">
+                <RefreshCcwDot size={20} className="mr-2" style={{ display: 'inline', verticalAlign: 'middle' }} />
+                Actualizando costos de caseta
+              </h5>
+              <button
+                type="button"
+                className="close text-white"
+                onClick={handleCancelar}
+                style={{ opacity: 0.8 }}
+              >
+                <span aria-hidden="true">&times;</span>
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="modal-body">
+
+              {loadingCasetas &&
+                <div className="container-fluid pb-3"
+                  style={{
+                    zIndex: 999999,
+                    backgroundColor: 'none',
+                    width: '60%',
+                    height: '8vh',
+                    textAlign: 'center',
+                    padding: '0px',
+                    margin: '0px',
+                    display: 'block',
+                    alignContent: 'center',
+                    placeSelf: 'anchor-center',
+                  }}>
+                  <div className='row text-center container-fluid py-1' style={{ justifyContent: 'center', color: '#045e13ff', alignContent: 'center' }}>
+                    <div className="spinner-border text-primary" role="status" style={{ width: "2.8rem", height: "2.8rem" }}>
+                      <span className="visually-hidden"></span>
+                    </div>
+                  </div>
+                </div>}
+              {!loadingCasetas && <div className="form-group">
+                <label className="font-weight-bold text-gray-800">
+                  Actualizando los costos de la caseta de "{nombreCaseta}" <span className="text-danger">*</span>
+                </label>
+                {/*Se contempla un input para cada uno de los campos de la caseta que se está actualizando en TUSA. Los cargos se precargan con los datos que se obtienen del INEGI.
+                */}
+
+
+                <div className="form-group">
+
+                  <div className="row mt-2" style={{ justifyContent: 'center' }}>
+                    <div className="form-floating" style={{ maxWidth: '8rem', }}>
+
+                      {/* Input para Peaje Automovil */}
+                      <NumericFormat
+                        name="txtPeajeAutomovil"
+                        className="form-control form-control-sm border-left-primary"
+                        placeholder='Peaje 2 Ejes'
+                        onValueChange={(values) => {
+                          handleChange({ target: { name: 'txtPeajeAutomovil', value: values.floatValue || '' } });
+                        }}
+                        value={peajeAutomovil}
+                        id='txtPeajeAutomovil'
+                        thousandSeparator=","
+                        decimalSeparator="."
+                        prefix="$"
+                        decimalScale={2}
+                        fixedDecimalScale={true}
+                        allowNegative={false}
+                      />
+                      <label className="form-label" htmlFor='txtPeajeAutomovil'>Automovil</label>
+
+                    </div>
+                    <div className="form-floating pr-2" style={{ maxWidth: '6rem', }}>
+                      {/* Input para Peaje Automovil INEGI */}
+                      <NumericFormat
+                        name="txtPeajeAutomovilINEGI"
+                        className="form-control form-control-sm border-left-success"
+                        placeholder='Peaje 2 Ejes'
+                        onValueChange={(values) => {
+                          handleChange({ target: { name: 'txtPeajeAutomovilINEGI', value: values.floatValue || '' } });
+                        }}
+                        value={peajeAutomovilINEGI}
+                        id='txtPeajeAutomovilINEGI'
+                        thousandSeparator=","
+                        decimalSeparator="."
+                        prefix="$"
+                        decimalScale={2}
+                        fixedDecimalScale={true}
+                        allowNegative={false}
+                        disabled={true}
+                      />
+                      <label className="form-label" htmlFor='txtPeajeAutomovilINEGI'>INEGI</label>
+
+                    </div>
+                    <div className="form-floating" style={{ maxWidth: '8rem', }}>
+                      {/* Input para Peaje Autobus */}
+                      <NumericFormat
+                        name="txtPeajeAutobus"
+                        className="form-control form-control-sm border-left-primary"
+                        placeholder='Peaje 2 Ejes'
+                        onValueChange={(values) => {
+                          handleChange({ target: { name: 'txtPeajeAutobus', value: values.floatValue || '' } });
+                        }}
+                        value={peajeBusDosEjes}
+                        id='txtPeajeAutobus'
+                        thousandSeparator=","
+                        decimalSeparator="."
+                        prefix="$"
+                        decimalScale={2}
+                        fixedDecimalScale={true}
+                        allowNegative={false}
+                      />
+                      <label className="form-label" htmlFor='txtPeajeAutobus'>Autobus</label>
+
+                    </div>
+                    <div className="form-floating pr-2" style={{ maxWidth: '6rem', }}>
+                      {/* Input para Peaje Autobus INEGI */}
+                      <NumericFormat
+                        name="txtPeajeAutobusINEGI"
+                        className="form-control form-control-sm border-left-success"
+                        placeholder='Peaje 2 Ejes'
+                        onValueChange={(values) => {
+                          handleChange({ target: { name: 'txtPeajeAutobusINEGI', value: values.floatValue || '' } });
+                        }}
+                        value={peajeBusDosEjesINEGI}
+                        id='txtPeajeAutobusINEGI'
+                        thousandSeparator=","
+                        decimalSeparator="."
+                        prefix="$"
+                        decimalScale={2}
+                        fixedDecimalScale={true}
+                        allowNegative={false}
+                        disabled={true}
+                      />
+                      <label className="form-label" htmlFor='txtPeajeAutobusINEGI'>INEGI</label>
+                    </div>
+
+                  </div>
+
+                  <div className="row mt-2" style={{ justifyContent: 'center' }}>
+
+                    <div className="form-floating" style={{ maxWidth: '8rem', }}>
+                      {/* Input para Peaje Camion 2 Ejes */}
+                      <NumericFormat
+                        name="txtPeaje2Ejes"
+                        className="form-control form-control-sm border-left-primary"
+                        placeholder='Peaje 2 Ejes'
+                        onValueChange={(values) => {
+                          handleChange({ target: { name: 'txtPeaje2Ejes', value: values.floatValue || '' } });
+                        }}
+                        value={peajeDosEjes}
+                        id='txtPeaje2Ejes'
+                        thousandSeparator=","
+                        decimalSeparator="."
+                        prefix="$"
+                        decimalScale={2}
+                        fixedDecimalScale={true}
+                        allowNegative={false}
+                      />
+                      <label className="form-label" htmlFor='txtPeaje2Ejes'>C_2ejes</label>
+                    </div>
+                    <div className="form-floating pr-2" style={{ maxWidth: '6rem', }}>
+                      {/* Input para Peaje Camion 2 Ejes INEGI */}
+                      <NumericFormat
+                        name="txtPeaje2EjesINEGI"
+                        className="form-control form-control-sm border-left-success"
+                        placeholder='Peaje 2 Ejes'
+                        onValueChange={(values) => {
+                          handleChange({ target: { name: 'txtPeaje2EjesINEGI', value: values.floatValue || '' } });
+                        }}
+                        value={peajeDosEjesINEGI}
+                        id='txtPeaje2EjesINEGI'
+                        thousandSeparator=","
+                        decimalSeparator="."
+                        prefix="$"
+                        decimalScale={2}
+                        fixedDecimalScale={true}
+                        allowNegative={false}
+                        disabled={true}
+                      />
+                      <label className="form-label" htmlFor='txtPeaje2EjesINEGI'>INEGI</label>
+                    </div>
+
+
+
+                    <div className="form-floating" style={{ maxWidth: '8rem', }}>
+                      {/* Input para Peaje Camion 3 Ejes */}
+                      <NumericFormat
+                        name="txtPeajeTresEjes"
+                        className="form-control form-control-sm border-left-primary"
+                        placeholder='Peaje 3 Ejes'
+                        onValueChange={(values) => {
+                          handleChange({ target: { name: 'txtPeajeTresEjes', value: values.floatValue || '' } });
+                        }}
+                        value={peajeTresEjes}
+                        id='txtPeajeTresEjes'
+                        thousandSeparator=","
+                        decimalSeparator="."
+                        prefix="$"
+                        decimalScale={2}
+                        fixedDecimalScale={true}
+                        allowNegative={false}
+                      />
+                      <label className="form-label" htmlFor='txtPeajeTresEjes'>C_3ejes</label>
+                    </div>
+                    <div className="form-floating pr-2" style={{ maxWidth: '6rem', }}>
+                      {/* Input para Peaje Camion 3 Ejes INEGI */}
+                      <NumericFormat
+                        name="txtPeajeTresEjesINEGI"
+                        className="form-control form-control-sm border-left-success"
+                        placeholder='Peaje 3 Ejes'
+                        onValueChange={(values) => {
+                          handleChange({ target: { name: 'txtPeajeTresEjesINEGI', value: values.floatValue || '' } });
+                        }}
+                        value={peajeTresEjesINEGI}
+                        id='txtPeajeTresEjesINEGI'
+                        thousandSeparator=","
+                        decimalSeparator="."
+                        prefix="$"
+                        decimalScale={2}
+                        fixedDecimalScale={true}
+                        allowNegative={false}
+                        disabled={true}
+                      />
+                      <label className="form-label" htmlFor='txtPeajeTresEjesINEGI'>INEGI</label>
+                    </div>
+                  </div>
+
+                  <div className="row mt-2" style={{ justifyContent: 'center' }}>
+
+                    <div className="form-floating" style={{ maxWidth: '8rem', }}>
+                      {/* Input para Peaje Camion 5 Ejes */}
+                      <NumericFormat
+                        name="txtPeajeCincoEjes"
+                        className="form-control form-control-sm border-left-primary"
+                        placeholder='Peaje 5 Ejes'
+                        onValueChange={(values) => {
+                          handleChange({ target: { name: 'txtPeajeCincoEjes', value: values.floatValue || '' } });
+                        }}
+                        value={peajeCincoEjes}
+                        id='txtPeajeCincoEjes'
+                        thousandSeparator=","
+                        decimalSeparator="."
+                        prefix="$"
+                        decimalScale={2}
+                        fixedDecimalScale={true}
+                        allowNegative={false}
+                      />
+                      <label className="form-label" htmlFor='txtPeajeCincoEjes'>C_5ejes</label>
+
+                    </div>
+                    <div className="form-floating pr-2" style={{ maxWidth: '6rem', }}>
+                      {/* Input para Peaje Camion 5 Ejes INEGI */}
+                      <NumericFormat
+                        name="txtPeajeCincoEjesINEGI"
+                        className="form-control form-control-sm border-left-success"
+                        placeholder='Peaje 5 Ejes'
+                        onValueChange={(values) => {
+                          handleChange({ target: { name: 'txtPeajeCincoEjesINEGI', value: values.floatValue || '' } });
+                        }}
+                        value={peajeCincoEjesINEGI}
+                        id='txtPeajeCincoEjesINEGI'
+                        thousandSeparator=","
+                        decimalSeparator="."
+                        prefix="$"
+                        decimalScale={2}
+                        fixedDecimalScale={true}
+                        allowNegative={false}
+                        disabled={true}
+                      />
+                      <label className="form-label" htmlFor='txtPeajeCincoEjesINEGI'>INEGI</label>
+                    </div>
+
+                    <div className="form-floating" style={{ maxWidth: '8rem', }}>
+                      {/* Input para Peaje Camion 9 Ejes */}
+                      <NumericFormat
+                        name="txtPeajeNueveEjes"
+                        className="form-control form-control-sm border-left-primary"
+                        placeholder='Peaje 9 Ejes'
+                        onValueChange={(values) => {
+                          handleChange({ target: { name: 'txtPeajeNueveEjes', value: values.floatValue || '' } });
+                        }}
+                        value={peajeNueveEjes}
+                        id='txtPeajeNueveEjes'
+                        thousandSeparator=","
+                        decimalSeparator="."
+                        prefix="$"
+                        decimalScale={2}
+                        fixedDecimalScale={true}
+                        allowNegative={false}
+                      />
+                      <label className="form-label" htmlFor='txtPeajeNueveEjes'>C_9ejes</label>
+                    </div>
+                    <div className="form-floating pr-2" style={{ maxWidth: '6rem', }}>
+                      {/* Input para Peaje Camion 9 Ejes INEGI */}
+                      <NumericFormat
+                        name="txtPeajeNueveEjesINEGI"
+                        className="form-control form-control-sm border-left-success"
+                        placeholder='Peaje 9 Ejes'
+                        onValueChange={(values) => {
+                          handleChange({ target: { name: 'txtPeajeNueveEjesINEGI', value: values.floatValue || '' } });
+                        }}
+                        value={peajeNueveEjesINEGI}
+                        id='txtPeajeNueveEjesINEGI'
+                        thousandSeparator=","
+                        decimalSeparator="."
+                        prefix="$"
+                        decimalScale={2}
+                        fixedDecimalScale={true}
+                        allowNegative={false}
+                        disabled={true}
+                      />
+                      <label className="form-label" htmlFor='txtPeajeNueveEjesINEGI'>INEGI</label>
+                    </div>
+
+                  </div>
+                </div>
+
+                {!loadingCasetas && <MapContainer
+                  center={[coordenadasCaseta.lat, coordenadasCaseta.lng]}
+                  zoom={13}
+                  style={{ height: '200px', width: '100%', marginTop: '15px' }}
+                >
+                  <TileLayer
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    attribution='&copy; OpenStreetMap contributors || IAVE-WEB ⭐🚌'
+                  />
+                  <Marker position={[coordenadasCaseta.lat, coordenadasCaseta.lng]}>
+                    <Popup>
+                      Ubicación TUSA de la caseta "{nombreCaseta}".
+                    </Popup>
+                  </Marker>
+                </MapContainer>}
+
+                <div className="form-group">
+                  <div className="row mt-2" style={{ justifyContent: 'center' }}>
+
+                    {/* Inputs para las coordenadas de la caseta, por si se decide igualarlas a las coordenadas del INEGI */}
+                    <div className="form-floating pr-2" >
+                      <input type="number" name="txtLatitudTUSA" className="form-control form-control-sm border-left-info" placeholder='Latitud TUSA' onChange={handleChange} value={coordenadasCaseta.lat} id='txtLatitudTUSA' />
+                      <label className="form-label" htmlFor='txtLatitudTUSA'>Latitud TUSA</label>
+                    </div>
+                    <div className="form-floating pr-2" >
+                      <input type="number" name="txtLongitudTUSA" className="form-control form-control-sm border-left-info" placeholder='Longitud TUSA' onChange={handleChange} value={coordenadasCaseta.lng} id='txtLongitudTUSA' />
+                      <label className="form-label" htmlFor='txtLongitudTUSA'>Longitud TUSA</label>
+                    </div>
+
+
+
+                    {/* Inputs para el origen inmediato, que viene sobre la respuesta de la API de TUSA*/}
+                    <div className="row mt-2">
+                      <div className="form-floating pr-2" >
+                        <input name="txtNombreCaseta" className="form-control form-control-sm border-left-info" placeholder='Origen Inmediato' onChange={handleChange} value={nombreCasetaINEGI} id='txtOrigenInmediato' />
+                        <label className="form-label" htmlFor='txtOrigenInmediato'>Caseta</label>
+                      </div>
+                    </div>
+
+
+                    <div className="row mt-2">
+                      <div className="form-floating pr-2" >
+                        <input type="number" min="0" step="1" name="txtIDOrigenINEGI" className="form-control form-control-sm border-left-info" placeholder='ID Origen INEGI' onChange={handleChange} value={IDOrigenINEGI} id='txtIDOrigenINEGI' />
+                        <label className="form-label" htmlFor='txtIDOrigenINEGI'>ID Origen INEGI</label>
+                      </div>
+
+                      <div className="form-floating pr-2" >
+                        <input type="number" min="0" step="1" name="txtIDDestinoINEGI" className="form-control form-control-sm border-left-info" placeholder='ID Destino INEGI' onChange={handleChange} value={IDDestinoINEGI} id='txtIDDestinoINEGI' />
+                        <label className="form-label" htmlFor='txtIDDestinoINEGI'>ID Destino INEGI</label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {!validarCamposLlenos() && (
+                  <small className="form-text text-muted">
+                    <i className="fas fa-info-circle mr-1"></i>
+                    Completa todos los campos para continuar.
+                  </small>
+                )}
+              </div>}
+
+            </div>
+
+            {/* Footer */}
+            <div className="modal-footer bg-light">
+              <button
+                type="button"
+                onClick={handleCancelar}
+                className="btn btn-secondary"
+              >
+                <i className="fas fa-times mr-2"></i>
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmar}
+                disabled={!validarCamposLlenos()}
+                className="btn btn-success"
+                style={{ cursor: validarCamposLlenos() ? 'pointer' : 'not-allowed' }}
+              >
+                <i className="fas fa-check mr-2"></i>
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div >
+      </div >
+    </>
+  );
+};
 
 
 
@@ -1680,5 +2392,6 @@ export {
   ModalSelector,
   ModalSelectorOrigenDestino,
   ModalConfirmacion,
-  ModalFillCreation
+  ModalFillCreation,
+  ModalUpdateCaseta
 };

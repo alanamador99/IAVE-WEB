@@ -75,6 +75,8 @@ const normalizarNombre = (lugar) => {
     const sinAcentos = tmp.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     const mayusculas = sinAcentos.replace(/[^a-zA-Z0-9\s]/g, '').toUpperCase();
     if (mayusculas === 'FRAY BERNARDINO DE SAHAGUN') return 'Cd Sahagún';
+    if (mayusculas === 'CULIACAN ROSALES') return 'Culiacan';
+    if (mayusculas === 'TORREON') return 'Torreón';
     return mayusculas;
 };
 
@@ -386,9 +388,9 @@ const RutasModule = () => {
             }
 
 
-            const data = await responseDirectoriosCoincidentes.json();
+            const data = (responseDirectoriosCoincidentes.status === 204) ? [] : await responseDirectoriosCoincidentes.json();
             //data1 tiene un campo adicional a data que es: "distancia": 1234 (en kms), vamos a unir ambos arreglos en uno solo
-            const data1 = await responseDirectoriosCercanos.json();
+            const data1 = (responseDirectoriosCercanos.status === 204) ? [] : await responseDirectoriosCercanos.json();
 
             // Unir ambos arreglos en uno solo
             data1.push(...data);

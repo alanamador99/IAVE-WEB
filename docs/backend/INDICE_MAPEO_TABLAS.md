@@ -469,5 +469,4 @@ Estos documentos deben actualizarse cuando:
 
 **Creado:** 3 de Diciembre de 2025  
 **Versión:** 1.0  
-**Proyecto:** IAVE WEB - Sistema de Gestión de Peajes  
-**Actualización:** Automática
+**Proyecto:** IAVE WEB

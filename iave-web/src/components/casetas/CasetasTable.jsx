@@ -1,6 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+
 import axios from 'axios';
 import { RefreshCcw } from 'lucide-react';
+import {ModalUpdateCaseta} from '../shared/utils';
+import { set } from 'lodash';
+
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -17,6 +22,8 @@ const claveToImporteField = {
 
 
 function CasetasTable() {
+  const navigate = useNavigate();
+  const { idCaseta } = useParams();
   const colores = useRef();
 
   const [costos, setCostos] = useState([]);
@@ -31,6 +38,8 @@ function CasetasTable() {
   const [vClase, setvClase] = useState('A'); //Clase de vehiculo, por defecto Automovil
   const [sortColumn, setSortColumn] = useState(null); //Columna mandante para el ordenamiento
   const [sortDirection, setSortDirection] = useState('asc'); // Tipo de ordenamiento
+  const [isModalHandleActualizarCaseta, setIsModalHandleActualizarCaseta] = useState(false);
+  const [selectedCasetaId, setSelectedCasetaId] = useState(null);
 
 
   const handleCheckboxChange = (id) => {
@@ -103,6 +112,14 @@ function CasetasTable() {
 
   }, []);
 
+  // Efecto para abrir el modal si hay un idCaseta en la URL
+  useEffect(() => {
+    if (idCaseta) {
+      setSelectedCasetaId(parseInt(idCaseta));
+      setIsModalHandleActualizarCaseta(true);
+    }
+  }, [idCaseta]);
+
 
 
   const handleChange = e => {
@@ -117,6 +134,14 @@ function CasetasTable() {
       default:
         break;
     }
+  };
+  const handleActualizarCaseta = (idCaseta) => {
+    //Agregamos a la URL el id de la caseta a actualizar
+    //
+
+    navigate(`/casetas/actualizarCaseta/${idCaseta}`); // Cambia la URL al id de la caseta
+    setSelectedCasetaId(idCaseta);
+    setIsModalHandleActualizarCaseta(true);
   };
   async function getRouteDetails(OriginId, FinalId, VehicleType) {
     const token = 'Jq92BpFD-tYae-BBj2-rEMc-MnuytuOB30ST';
@@ -158,15 +183,6 @@ function CasetasTable() {
       console.log('Datos obtenidos:', data);
       console.log('Status:', response.status);
       console.log('Body:', text);
-
-      if (!text || !text.length) {
-        alert('No se encontraron datos para la ruta especificada.');
-        return;
-      }
-
-      const resultDiv = document.getElementById('routeResult');
-      resultDiv.style.display = 'block';
-      resultDiv.textContent = JSON.stringify(data, null, 2);
 
     } catch (error) {
       alert('Error: ' + error.message);
@@ -278,7 +294,7 @@ function CasetasTable() {
                       checked={selectedCruces.includes(caseta.ID_Caseta)}
                       onChange={() => handleCheckboxChange(caseta.ID_Caseta)}
                     /></td>
-                    <td className='px-0 pl-2'>{idx + 1}</td>
+                    <td className='px-0 pl-2' style={{cursor:'pointer'}} onClick={() => handleActualizarCaseta(caseta.ID_Caseta)}>{caseta.ID_Caseta}</td>
                     <td>{caseta.Nombre}</td>
                     <td>{caseta.Notas}</td>
                     <td>{caseta.Estado}</td>
@@ -291,6 +307,35 @@ function CasetasTable() {
             </tbody>
           </table>
         </div>
+        <ModalUpdateCaseta 
+      isOpen={isModalHandleActualizarCaseta}
+      onConfirm={(datosAGuardar) => {
+        setIsModalHandleActualizarCaseta(false);
+        // Lógica para actualizar la caseta con los datos proporcionados
+        const updatedCostos = costos.map(caseta => {
+          if (caseta.ID_Caseta === selectedCasetaId) {
+            return { ...caseta, ...datosAGuardar };
+          }
+          return caseta;
+        });
+        console.log('Datos a guardar para la caseta ID:', selectedCasetaId, datosAGuardar);
+        // Mandamos un patch para actualizar la caseta en el backend
+        axios.patch(`${API_URL}/api/casetas/updateCasetaByID`, {
+          ID_Caseta: selectedCasetaId,
+          ...datosAGuardar
+        })
+        .then(response => { 
+          console.log('Caseta actualizada en el backend:', response.data);
+        })
+        setCostos(updatedCostos);
+        setFiltered(updatedCostos);
+
+
+
+      }}
+      onClose={() => {setIsModalHandleActualizarCaseta(false); navigate('/casetas');}}
+      idCaseta={selectedCasetaId}
+        />
       </div>
       {/* Paginación */}
       <div className='assignMe'>
