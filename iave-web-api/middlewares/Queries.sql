@@ -234,7 +234,7 @@ UPDATE casetas_Plantillas
 UPDATE Cat_EntidadCaseta
       SET 
         DestinoInmediato = @DestinoINEGI, 
-        OrigenInmediato = @OrigenINEGI
+        OrigenInmediato = @OigenINEGI
       WHERE Id_caseta = @idCaseta;
 
     -- Ejemplo de consulta para verificar la actualización
@@ -250,3 +250,58 @@ GRANT UPDATE, INSERT ON Cat_EntidadCaseta TO IAVE;
 
 
 select * from Cat_EntidadCaseta where Id_caseta=11;
+
+
+Select COUNT (Estatus) from cruces WHERE Estatus='Vacío'
+
+
+
+SELECT * FROM casetas_Plantillas WHERE ID_Caseta=66
+
+SELECT SUM (CR.Importe) AS Importe, SUM (CR.ImporteOficial) AS ImporteOficial, CP.Nombre, CR.idCaseta, count(*) AS totalCruces, CR.No_Economico
+      FROM cruces CR
+      INNER JOIN Orden_traslados OT
+          ON CR.id_orden = OT.ID_orden
+      INNER JOIN casetas_Plantillas CP
+          ON CR.idCaseta = CP.ID_Caseta
+      GROUP BY CP.Nombre, CR.idCaseta, CR.No_Economico
+      ORDER BY   totalCruces DESC, CP.Nombre
+
+SELECT COUNT(Orden_traslados.Id_tipo_ruta) as Recuento, DIR_DESTINO.Nombre AS NombreDestino, DIR_ORIGEN.Nombre AS NombreOrigen  
+from cruces CR
+INNER JOIN
+Orden_traslados ON CR.id_orden=Orden_traslados.ID_orden
+INNER JOIN 
+Tipo_de_ruta_N TRN ON Orden_traslados.Id_tipo_ruta=TRN.id_Tipo_ruta
+INNER JOIN
+Directorio DIR_DESTINO ON TRN.PoblacionOrigen=DIR_DESTINO.ID_entidad
+INNER JOIN
+Directorio DIR_ORIGEN ON TRN.PoblacionDestino=DIR_ORIGEN.ID_entidad
+WHERE Orden_traslados.Id_tipo_ruta IS NOT NULL AND Orden_traslados.Id_tipo_ruta<>'' GROUP BY Orden_traslados.Id_tipo_ruta, DIR_DESTINO.Nombre, DIR_ORIGEN.Nombre HAVING COUNT(Orden_traslados.Id_tipo_ruta) >1
+
+SELECT Id_tipo_ruta FROM Orden_traslados WHERE Id_tipo_ruta IS NULL OR Id_tipo_ruta=''
+
+SELECT top (10) * FROM cruces WHERE id_orden IS NULL OR Id_tipo_ruta=''
+
+
+
+--      List of tables in the database
+--      Casetas
+--      casetas_Plantillas
+--      Cat_EntidadCaseta
+--      Control_Tags
+--      Control_Tags_Historico
+--      cruces
+--      Directorio
+--      Estado_del_personal
+--      geo_op
+--      ImportacionesCruces
+--      orden_status
+--      Orden_traslados
+--      PCasetasporruta
+--      Personal
+--      Poblaciones
+--      Ruta
+--      Tipo_de_ruta_N
+
+SELECT * FROM casetas

@@ -8,6 +8,7 @@ import aclaracionesRoutes from "./routes/aclaraciones.routes.js";
 import sesgosRoutes from "./routes/sesgos.routes.js";
 import casetasRoutes from "./routes/rutas_casetas.routes.js";
 import tagsRoutes from "./routes/tags.routes.js";
+import dashboardRoutes from "./routes/dashboard.routes.js";
 
 
 // Se inicializa la aplicación, sobre el puerto 3001.
@@ -30,6 +31,7 @@ app.use("/api/aclaraciones", aclaracionesRoutes);
 app.use("/api/sesgos", sesgosRoutes);
 app.use("/api/casetas", casetasRoutes);
 app.use("/api/tags", tagsRoutes);
+app.use("/api/dashboard", dashboardRoutes); // Nueva ruta para el dashboard
 
 
 
