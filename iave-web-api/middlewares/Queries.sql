@@ -1,307 +1,118 @@
-CREATE TABLE cruces
-(
-    ID VARCHAR(24) NOT NULL PRIMARY KEY,
-    Caseta VARCHAR(64),
-    No_Economico VARCHAR(15),
-    Fecha DATETIME,
-    Importe NUMERIC(12,3),
-    Tag VARCHAR(15),
-    Carril VARCHAR(50),
-    Clase VARCHAR(15),
-    Consecar VARCHAR(20),
-    FechaAplicacion DATETIME,
-    Estatus VARCHAR(30) DEFAULT 'Pendiente',
-    id_orden VARCHAR(30),
-    observaciones VARCHAR(255),
-    Estatus_Secundario VARCHAR(100),
-    Aplicado BIT DEFAULT 'false',
-    FechaDictamen date,
-    ImporteOficial NUMERIC(12,3),
-    NoAclaracion varchar(20),
-    montoDictaminado NUMERIC(12,3),
-    idCaseta VARCHAR (10)
-);
-CREATE TABLE ImportacionesCruces
-(
-    Id int IDENTITY(1,1) NOT NULL,
-    Usuario nvarchar(50),
-    FechaImportacion datetime,
-    TotalInsertados int
-)
-
-
-SELECT *
-FROM cruces
-WHERE Estatus = 'Abuso'
-
-SELECT *
-FROM personal
-
-
-
-SELECT TOP(10)
-    *
-FROM Poblaciones
-
-
-DECLARE @Poblacion NVARCHAR(100) = '%Tepeapulco%';
-SELECT
-    Dir.*, Pob.Poblacion as ID_poblacion
-FROM Directorio as Dir
+SELECT COUNT(Orden_traslados.Id_tipo_ruta) as Recuento, DIR_DESTINO.Nombre AS NombreDestino, DIR_ORIGEN.Nombre AS NombreOrigen, Orden_traslados.Id_tipo_ruta
+FROM cruces CR
     INNER JOIN
-    Poblaciones Pob ON Pob.ID_poblacion = Dir.ID_poblacion
-WHERE Dir.Direccion LIKE @Poblacion or Pob.Poblacion LIKE @Poblacion
-
-
-
-SELECT TOP(10)
-    *
-from PCasetasporruta
-ORDER BY ID DESC;
-
--- Ejemplo de inserción en la tabla de PCasetasporruta
-INSERT INTO PCasetasporruta
-    ( Id_Ruta, Id_Caseta, F_Captura, Captor, id_Tipo_ruta)
-VALUES
-    ( '4982', '66', DATEFROMPARTS(2027,01,08), 'IAVE', 4901);
-
-
-
---Ejemplo de consulta de los primeros 10 registros de las casetas por ruta
-SELECT
-    *
-from PCasetasporruta
-WHERE id_Tipo_ruta = '1709'
-ORDER BY ID DESC;
--- Ejemplo de Actualización en la tabla de PCasetasporruta
-UPDATE PCasetasporruta
-SET Captor = '65'
-WHERE ID = 57916;
-
-
-
---Ejemplo de consulta de los primeros 10 registros de Tipo_de_ruta_N
-SELECT TOP(10)
-    *
-from casetas_Plantillas;
-SELECT TOP(10)
-    *
-from Tipo_de_ruta_N;
-SELECT TOP(10)
-    *
-from PCasetasporruta
-ORDER BY PCasetasporruta.ID DESC;
--- Ejemplo de inserción en la tabla de Tipo_de_ruta_N
-INSERT INTO
-    ( Id_Ruta, PoblacionOrigen, PoblacionDestino, Latinos, Nacionales, Exportacion, Otros, Alterna, observaciones, fecha_Alta, id_destino, id_origen, Km_reales, Km_oficiales, Km_de_pago, Km_Tabulados,Peaje_Dos_Ejes,Peaje_Tres_Ejes, Cemex)
-VALUES
-    ( '4982', '8112', '8346', 0, 1, 0, 0, 0, 'Ruta de prueba', DATEFROMPARTS(2025,12,30), '1514', '1506', 200.5, 210.0, 205.0, 208.0, 150.00, 250.00, 0);
-
-
-SELECT TOP 1
-    *
-FROM Tipo_de_ruta_N
-ORDER BY Id_Ruta DESC;
-
-SELECT TOP(10)
-    CPorRuta.consecutivo, Casetas.Nombre_IAVE, PobO.Poblacion as 'Origen', PobD.Poblacion as 'Destino', TRN.*, TRN.id_Tipo_ruta
-FROM Tipo_de_ruta_N as TRN
+    Orden_traslados ON CR.id_orden=Orden_traslados.ID_orden
     INNER JOIN
-    Poblaciones PobO ON PobO.ID_poblacion=TRN.PoblacionOrigen
+    Tipo_de_ruta_N TRN ON Orden_traslados.Id_tipo_ruta=TRN.id_Tipo_ruta
     INNER JOIN
-    Poblaciones PobD ON PobD.ID_poblacion=TRN.PoblacionDestino
-    LEFT JOIN
-    PCasetasporruta CPorRuta ON CPorRuta.id_Tipo_ruta=TRN.id_Tipo_ruta
-    LEFT JOIN
-    casetas_Plantillas Casetas ON Casetas.ID_Caseta=CPorRuta.Id_Caseta
-
-ORDER BY TRN.Id_Ruta DESC
-
--- Ejemplo de Actualización en la tabla de PCasetasporruta
-UPDATE Tipo_de_ruta_N
-SET Observaciones = 'Ruta de prueba actualizada'
-WHERE id_Tipo_ruta = 4903;
-
-
-SELECT DISTINCT YEAR(Fecha) as 'AÑO'
-FROM cruces
-
-
-SELECT TOP(1)
-    
-
-
-FROM Tipo_de_ruta_N as TRN
+    Directorio DIR_DESTINO ON TRN.PoblacionOrigen=DIR_DESTINO.ID_entidad
     INNER JOIN
-    Directorio Dir ON Dir.ID_entidad = TRN.PoblacionOrigen
+    Directorio DIR_ORIGEN ON TRN.PoblacionDestino=DIR_ORIGEN.ID_entidad
+WHERE Orden_traslados.Id_tipo_ruta IS NOT NULL AND Orden_traslados.Id_tipo_ruta<>''
+    AND Orden_traslados.Fecha_solicitud_cte BETWEEN DATEFROMPARTS(2026, 01, 01) AND DATEFROMPARTS(2026, 01, 28)
+GROUP BY Orden_traslados.Id_tipo_ruta, DIR_DESTINO.Nombre, DIR_ORIGEN.Nombre
+HAVING COUNT(Orden_traslados.Id_tipo_ruta) >1
+ORDER BY Recuento DESC;
+
+SELECT TOP 10
+    *
+FROM Orden_traslados OT
+ORDER BY OT.Fecha_solicitud_cte DESC;
+
+
+SELECT distinct
+    COUNT(distinct OT.ID_orden) AS Recuento,
+    TRN.id_Tipo_ruta,
+    TRN.Id_Ruta,
+    PO.Poblacion AS PoblacionOrigen,
+    PD.Poblacion AS PoblacionDestino,
+    OT.ID_orden,
+
+    --Parseamos la fecha a un formato legible
+    CONVERT(varchar, (OT.Fecha_solicitud_cte), 23) as FechaSolicitud
+FROM Orden_traslados OT
     INNER JOIN
-    Poblaciones Pob ON Pob.ID_poblacion = Dir.ID_poblacion
+    orden_status OS ON OS.fk_orden = OT.ID_orden
     INNER JOIN
-
-    WHERE TRN  .id_Tipo_ruta = 14
-
-
-
-SELECT *
-from Cat_EntidadCaseta
-
-
--- OrigenInmediato  DestinoInmediato
-
--- DELETE FROM PCasetasporruta WHERE Id_Ruta =4982 AND id_Tipo_ruta=4901 AND PCasetasporruta.ID IN 
-SELECT DISTINCT PCasetasporruta.id_Tipo_ruta, COUNT(Id_Caseta)
-FROM PCasetasporruta
-WHERE consecutivo IS NULL
-GROUP BY id_Tipo_ruta;
-
-SELECT COUNT(PCasetasporruta.Id_Caseta)
-FROM PCasetasporruta
-SELECT *
-FROM PCasetasporruta
-WHERE id_Tipo_ruta = 600
-
-
-
-
-DECLARE @latitud FLOAT = 17.9101386;
-DECLARE @longitud FLOAT = -94.93727412;
-DECLARE @costo FLOAT = 320;
-DECLARE @nombre VARCHAR(100) = 'Ocozocoautla';
-
-SELECT
-    casetas_Plantillas.ID_Caseta,
-    casetas_Plantillas.Nombre,
-    casetas_Plantillas.Carretera,
-    casetas_Plantillas.Estado,
-    casetas_Plantillas.Automovil,
-    casetas_Plantillas.Autobus2Ejes,
-    casetas_Plantillas.Camion2Ejes,
-    casetas_Plantillas.Camion3Ejes,
-    casetas_Plantillas.Camion5Ejes,
-    casetas_Plantillas.Camion9Ejes,
-    casetas_Plantillas.IAVE,
-    casetas_Plantillas.latitud,
-    casetas_Plantillas.longitud,
-    casetas_Plantillas.Nombre_IAVE,
-    casetas_Plantillas.Notas,
-    (
-            6371 * ACOS(
-              COS(RADIANS(@latitud)) 
-              * COS(RADIANS(TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(latitud)), CHAR(9), ''), ' ', '') AS FLOAT))) 
-              * COS(RADIANS(TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(longitud)), CHAR(9), ''), ' ', '') AS FLOAT)) - RADIANS(@longitud)) 
-              + SIN(RADIANS(@latitud)) 
-              * SIN(RADIANS(TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(latitud)), CHAR(9), ''), ' ', '') AS FLOAT)))
-            )
-          ) AS distancia_km
-FROM casetas_Plantillas
-WHERE TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(latitud)), CHAR(9), ''), ' ', '') AS FLOAT) IS NOT NULL
-    AND TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(longitud)), CHAR(9), ''), ' ', '') AS FLOAT) IS NOT NULL
-    AND (
-            6371 * ACOS(
-              COS(RADIANS(@latitud)) 
-              * COS(RADIANS(TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(latitud)), CHAR(9), ''), ' ', '') AS FLOAT))) 
-              * COS(RADIANS(TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(longitud)), CHAR(9), ''), ' ', '') AS FLOAT)) - RADIANS(@longitud)) 
-              + SIN(RADIANS(@latitud)) 
-              * SIN(RADIANS(TRY_CAST(REPLACE(REPLACE(LTRIM(RTRIM(latitud)), CHAR(9), ''), ' ', '') AS FLOAT)))
-            )
-          ) <= 100
-    AND (casetas_Plantillas.Camion2Ejes - @costo) BETWEEN -20 AND 20
-
-ORDER BY distancia_km
-
-
-
-
-DECLARE @idCaseta INT = 66;
-DECLARE @costoActualizadoAutomovil FLOAT = 50.00;
-DECLARE @costoActualizadoCamion2Ejes FLOAT = 80.00;
-DECLARE @costoActualizadoCamion3Ejes FLOAT = 120.00;
-DECLARE @costoActualizadoCamion5Ejes FLOAT = 150.00;
-DECLARE @costoActualizadoCamion9Ejes FLOAT = 200.00;
-DECLARE @costoActualizadoAutobus2Ejes FLOAT = 90.00;
-DECLARE @OrigenINEGI INT = 1506;
-DECLARE @DestinoINEGI INT = 1514;
-UPDATE casetas_Plantillas 
-      SET   
-        Automovil = @costoActualizadoAutomovil,
-        Camion2Ejes = @costoActualizadoCamion2Ejes,
-        Camion3Ejes = @costoActualizadoCamion3Ejes,
-        Camion5Ejes = @costoActualizadoCamion5Ejes,
-        Camion9Ejes = @costoActualizadoCamion9Ejes,
-        Autobus2Ejes = @costoActualizadoAutobus2Ejes
-      WHERE ID_Caseta = @idCaseta;
-
-UPDATE Cat_EntidadCaseta
-      SET 
-        DestinoInmediato = @DestinoINEGI, 
-        OrigenInmediato = @OigenINEGI
-      WHERE Id_caseta = @idCaseta;
-
-    -- Ejemplo de consulta para verificar la actualización
-SELECT *
-FROM Cat_EntidadCaseta as CEC
-WHERE CEC.Id_caseta = 1;
-
--- OTORGAMOS PERMISOS DE UPDATE E INSERCIÓN AL USUARIO DE LA APLICACIÓN
-GRANT UPDATE, INSERT ON Cat_EntidadCaseta TO IAVE;
+    Tipo_de_ruta_N TRN ON OT.Id_tipo_ruta=TRN.id_Tipo_ruta
+    INNER JOIN
+    Poblaciones PO ON PO.ID_poblacion=TRN.id_origen
+    INNER JOIN
+    Poblaciones PD ON PD.ID_poblacion=TRN.id_destino
+WHERE OT.ID_orden LIKE 'OT-6%' AND OT.Fecha_solicitud_cte BETWEEN  DATEFROMPARTS(2025, 01, 01) AND DATEFROMPARTS(2026, 01, 28)
+GROUP BY
+            TRN.id_Tipo_ruta, TRN.Id_Ruta, PO.Poblacion, PD.Poblacion, OT.Fecha_solicitud_cte, OT.ID_orden
+ORDER BY Recuento DESC;
 
 
 
 
 
-select * from Cat_EntidadCaseta where Id_caseta=11;
 
 
-Select COUNT (Estatus) from cruces WHERE Estatus='Vacío'
+SELECT COUNT(Orden_traslados.Id_tipo_ruta) as Recuento,Orden_traslados.ID_orden, DIR_DESTINO.Nombre AS NombreDestino, DIR_ORIGEN.Nombre AS NombreOrigen, Orden_traslados.Id_tipo_ruta, CONVERT(varchar, (Orden_traslados.Fecha_solicitud_cte), 23) as FechaSolicitud
+FROM cruces CR
+    INNER JOIN
+    Orden_traslados ON CR.id_orden=Orden_traslados.ID_orden
+    INNER JOIN
+    Tipo_de_ruta_N TRN ON Orden_traslados.Id_tipo_ruta=TRN.id_Tipo_ruta
+    INNER JOIN
+    Directorio DIR_DESTINO ON TRN.PoblacionOrigen=DIR_DESTINO.ID_entidad
+    INNER JOIN
+    Directorio DIR_ORIGEN ON TRN.PoblacionDestino=DIR_ORIGEN.ID_entidad
+WHERE Orden_traslados.Id_tipo_ruta IS NOT NULL AND Orden_traslados.Id_tipo_ruta<>''
+GROUP BY Orden_traslados.Id_tipo_ruta, DIR_DESTINO.Nombre, DIR_ORIGEN.Nombre, Orden_traslados.Fecha_solicitud_cte, Orden_traslados.ID_orden
+ORDER BY Recuento DESC
 
 
 
-SELECT * FROM casetas_Plantillas WHERE ID_Caseta=66
+SELECT distinct
+            COUNT(distinct OT.ID_orden) AS Recuento,
+            TRN.id_Tipo_ruta,
+            TRN.Id_Ruta,
+            PO.Poblacion AS PoblacionOrigen,
+            PD.Poblacion AS PoblacionDestino,
+            --Parseamos la fecha a un formato legible
+            CONVERT(varchar, (OT.Fecha_solicitud_cte), 23) as FechaSolicitud
+        FROM Orden_traslados OT
+            INNER JOIN
+            orden_status OS ON OS.fk_orden = OT.ID_orden
+            INNER JOIN
+            Tipo_de_ruta_N TRN ON OT.Id_tipo_ruta=TRN.id_Tipo_ruta
+            INNER JOIN
+            Poblaciones PO ON PO.ID_poblacion=TRN.id_origen
+            INNER JOIN
+            Poblaciones PD ON PD.ID_poblacion=TRN.id_destino
+        WHERE OT.ID_orden LIKE 'OT-6%' AND OT.Fecha_solicitud_cte BETWEEN  DATEFROMPARTS(2025, 01, 01) AND DATEFROMPARTS(2026, 01, 28)
+        GROUP BY
+            TRN.id_Tipo_ruta, TRN.Id_Ruta, PO.Poblacion, PD.Poblacion, OT.Fecha_solicitud_cte
+        ORDER BY Recuento DESC
 
-SELECT SUM (CR.Importe) AS Importe, SUM (CR.ImporteOficial) AS ImporteOficial, CP.Nombre, CR.idCaseta, count(*) AS totalCruces, CR.No_Economico
+        SELECT * FROM Tipo_de_ruta_N
+
+SELECT SUM (CR.Importe) AS Importe, SUM (CR.ImporteOficial) AS ImporteOficial, CP.Nombre, CR.idCaseta, count(*) AS totalCruces, CR.No_Economico, CONVERT(varchar, CR.Fecha, 23) AS Fecha
       FROM cruces CR
       INNER JOIN Orden_traslados OT
-          ON CR.id_orden = OT.ID_orden
+          ON CR.id_orden = OT.ID_orden  
       INNER JOIN casetas_Plantillas CP
           ON CR.idCaseta = CP.ID_Caseta
-      GROUP BY CP.Nombre, CR.idCaseta, CR.No_Economico
-      ORDER BY   totalCruces DESC, CP.Nombre
 
-SELECT COUNT(Orden_traslados.Id_tipo_ruta) as Recuento, DIR_DESTINO.Nombre AS NombreDestino, DIR_ORIGEN.Nombre AS NombreOrigen  
-from cruces CR
-INNER JOIN
-Orden_traslados ON CR.id_orden=Orden_traslados.ID_orden
-INNER JOIN 
-Tipo_de_ruta_N TRN ON Orden_traslados.Id_tipo_ruta=TRN.id_Tipo_ruta
-INNER JOIN
-Directorio DIR_DESTINO ON TRN.PoblacionOrigen=DIR_DESTINO.ID_entidad
-INNER JOIN
-Directorio DIR_ORIGEN ON TRN.PoblacionDestino=DIR_ORIGEN.ID_entidad
-WHERE Orden_traslados.Id_tipo_ruta IS NOT NULL AND Orden_traslados.Id_tipo_ruta<>'' GROUP BY Orden_traslados.Id_tipo_ruta, DIR_DESTINO.Nombre, DIR_ORIGEN.Nombre HAVING COUNT(Orden_traslados.Id_tipo_ruta) >1
-
-SELECT Id_tipo_ruta FROM Orden_traslados WHERE Id_tipo_ruta IS NULL OR Id_tipo_ruta=''
-
-SELECT top (10) * FROM cruces WHERE id_orden IS NULL OR Id_tipo_ruta=''
+      GROUP BY CP.Nombre, CR.idCaseta, CR.No_Economico, CONVERT(varchar, CR.Fecha, 23)
+      ORDER BY Importe DESC, totalCruces DESC
 
 
+SELECT SUM(Importe) FROM cruces
 
---      List of tables in the database
---      Casetas
---      casetas_Plantillas
---      Cat_EntidadCaseta
---      Control_Tags
---      Control_Tags_Historico
---      cruces
---      Directorio
---      Estado_del_personal
---      geo_op
---      ImportacionesCruces
---      orden_status
---      Orden_traslados
---      PCasetasporruta
---      Personal
---      Poblaciones
---      Ruta
---      Tipo_de_ruta_N
 
-SELECT * FROM casetas
+SELECT [TRN].[id_Tipo_ruta], OT.ID_orden, PO.Poblacion AS Origen, PD.Poblacion AS Destino
+FROM Tipo_de_ruta_N AS TRN
+INNER JOIN Orden_traslados OT
+    ON TRN.id_Tipo_ruta = OT.Id_tipo_ruta
+    INNER JOIN Poblaciones PO
+        ON TRN.id_origen = PO.ID_poblacion
+    INNER JOIN Poblaciones PD
+        ON TRN.id_destino = PD.ID_poblacion
+    WHERE OT.ID_orden = 'OT-5101319'
+
+
+    

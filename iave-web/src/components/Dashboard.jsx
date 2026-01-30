@@ -1,30 +1,101 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title, PointElement, LineElement } from 'chart.js';
 import { Doughnut, Bar } from 'react-chartjs-2';
 import { DollarSign, Users, TrendingUp, AlertCircle, Calendar, FunnelX } from 'lucide-react';
+import { set } from 'lodash';
 
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title, PointElement, LineElement);
 
+const API_URL = process.env.REACT_APP_API_URL;
 const Dashboard = () => {
-  const [selectedMonth] = useState('Agosto 2025');
-  const [filters, setFilters] = useState({ fechaInicio: '', fechaFin: '', vOT: '', mat_OP: '', Caseta: '', Estatus: '', tagID: '' });
-  const { fechaInicio: vFechaInicio, fechaFin: vFechaFin, vOT, mat_OP: vmat_OP, Caseta: vCaseta, Estatus: vEstatus, tagID: vtagID } = filters;
+  const [filters, setFilters] = useState({ fechaInicio: '', fechaFin: '', vOT: '', mat_OP: '', Caseta: '', Estatus: '', rutaSeleccionada: '' });
+  const { fechaInicio: vFechaInicio, fechaFin: vFechaFin, vOT, mat_OP: vmat_OP, Caseta: vCaseta, Estatus: vEstatus, rutaSeleccionada } = filters;
+  const [rutasData, setRutasData] = useState([]);
+  const [filtradoData, setFiltradoData] = useState([]);
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [importeTotalCasetas, setImporteTotalCasetas] = useState(0);
+  const [totalCasetasCruzadas, setTotalCasetasCruzadas] = useState(0);
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFilters((prev) => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    console.log(`Filter changed: ${name} = ${value}`);
+    const val = type === 'checkbox' ? checked : value;
+    setFilters((prev) => ({ ...prev, [name]: val }));
   };
   const resetFiltros = () => {
-    setFilters({ fechaInicio: '', fechaFin: '', vOT: '', mat_OP: '', Caseta: '', Estatus: '', tagID: '' });
+    setFilters({ fechaInicio: '', fechaFin: '', vOT: '', mat_OP: '', Caseta: '', Estatus: '', rutaSeleccionada: '' });
   };
 
+  useEffect(() => {
+    try {
+      axios.post(`${API_URL}/api/dashboard/getDashboardData/`, {
+        idOrden: vOT,
+        Matricula: vmat_OP,
+        FechaInicio: vFechaInicio,
+        FechaFin: vFechaFin,
+        id_Tipo_ruta: rutaSeleccionada
+      })
+        .then(res => {
+          setData(res.data);
+        })
+        .catch(err => console.error('Error al cargar cruces:', err));
+      axios.get(`${API_URL}/api/dashboard/getRutasInfo/`).then(res => {
+        setRutasData(res.data);
+      }).catch(err => console.error('Error al cargar las rutas:', err));
 
+    } catch (error) {
+      console.log("Error al cargar los cruces:", error)
+    }
+    finally {
+      setLoading(false);
+    }
+
+  }, []);
+
+
+  useEffect(() => {
+    
+    
+    // Optimización: Calcular comparadores fuera del bucle
+    const inicio = vFechaInicio ? new Date(vFechaInicio) : null;
+    const fin = vFechaFin ? new Date(vFechaFin) : null;
+    const casetaLower = vCaseta ? vCaseta.toLowerCase() : '';
+    const matOpLower = vmat_OP ? vmat_OP.toLowerCase() : '';
+    // Si es "ALL", ignoramos el filtro de ruta
+    const shouldFilterRuta = rutaSeleccionada && rutaSeleccionada !== 'ALL';
+
+    const gastosFiltrados = data?.gastosCrucesAgrupados?.filter(item => {
+      // Comparaciones básicas primero para evitar instanciar Date si no es necesario
+      if (vEstatus && item.Estatus !== vEstatus) return false;
+      if (shouldFilterRuta && String(item.Id_tipo_ruta) !== String(rutaSeleccionada)) return false;
+      if (casetaLower && !item.Nombre.toLowerCase().includes(casetaLower)) return false;
+      if (matOpLower && !item.No_Economico.toLowerCase().includes(matOpLower)) return false;
+
+      // Validación de fecha al final (más costosa)
+      if (inicio || fin) {
+          const fechaCruce = new Date(item.Fecha);
+          if (inicio && fechaCruce < inicio) return false;
+          if (fin && fechaCruce > fin) return false;
+      }
+      return true;
+    });
+
+    const total = gastosFiltrados?.reduce((sum, item) => sum + item.Importe, 0) || 0;
+
+// Datos filtrados
+    console.log("GASTOS CRUCES AGRUPADOS FILTRADOS:", gastosFiltrados);
+    setFiltradoData(gastosFiltrados || []);
+    setImporteTotalCasetas(total);
+    setTotalCasetasCruzadas(gastosFiltrados?.length || 0);
+  }, [data, vFechaInicio, vFechaFin, vCaseta, vEstatus, vOT, vmat_OP, rutaSeleccionada]);
 
   // Configuración para Resúmenes Mensual
   const resumenMensualData = {
     labels: ['Casetas Cruzadas', 'Sin Justificación', 'Pendientes', 'Procesadas'],
     datasets: [{
-      data: [1234, 1200, 850, 5558],
+      data: [totalCasetasCruzadas, 1200, 850, 5558],
       backgroundColor: ['#1cc88a', '#4e73df', '#6f42c1', '#36b9cc'],
       borderWidth: 0,
     }]
@@ -273,12 +344,12 @@ const Dashboard = () => {
     <div id="content-wrapper" className="d-flex flex-column" style={{ backgroundColor: '#f8f9fc' }}>
       <div id="content">
 
-        {/* Page Content */}
+        {/* Contenido principal */}
         <div className="container-fluid">
-          {/* Page Heading */}
+          {/* Encabezado de la página */}
           <div className="d-sm-flex align-items-center justify-content-between mb-4">
             <div className="container-fluid py-4 pb-0">
-              <h1 className="h3 mb-0 text-gray-800">Dashboard Principal</h1>
+              <h1 className="h3 mb-0 text-gray-800">Dashboard Principal {rutaSeleccionada || ''}</h1>
               <p className="mb-0 text-gray-600">Resumen general de operaciones y estadísticas</p>
             </div>
           </div>
@@ -304,7 +375,7 @@ const Dashboard = () => {
 
 
 
-            
+
 
             {/* DIV para el filtro de OT */}
             <div className="form-floating pr-2" style={{ maxWidth: '9rem', }}>
@@ -345,6 +416,18 @@ const Dashboard = () => {
               </label>
             </div>
 
+            <div className='col-md-2 ml-2  p-2 input-group-text mb-0 ' style={{ maxWidth: 'min-content', }}>
+              <label htmlFor='rutaSeleccionada' className='d-flex align-items-center'>
+                <span className='text-muted'>Ruta:</span>
+                <select className='mx-3 p-2' name="rutaSeleccionada" onChange={handleChange} value={rutaSeleccionada} id='rutaSeleccionada' style={{ width: 'auto', height: '2.5rem' }}>
+                  <option value="">Todos</option>
+                  {data?.rutasActivas && [...new Map(data.rutasActivas.map(item => [item.Id_tipo_ruta, item])).values()].map((ruta) => (
+                    <option key={ruta.Id_tipo_ruta || ruta.ID_orden} value={ruta.Id_tipo_ruta}>  {ruta.Origen} - {ruta.Destino} ({ruta.Recuento} OTs)  </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
 
             <div className="ml-3 pr-1 pt-1 d-flex">
               <button className="btn btn-sm btn btn-outline-dark rounded-3" onClick={resetFiltros}>
@@ -359,7 +442,7 @@ const Dashboard = () => {
             <div className="col-xl-3 col-md-6 mb-4">
               <StatCard
                 title="Importe de Casetas"
-                value="$1,139,970"
+                value={`$${importeTotalCasetas.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                 subtitle="Período seleccionado"
                 icon={DollarSign}
                 color="#1cc88a"
@@ -370,8 +453,8 @@ const Dashboard = () => {
             <div className="col-xl-3 col-md-6 mb-4">
               <StatCard
                 title="Casetas Cruzadas"
-                value="7,608"
-                subtitle="Total del mes"
+                value={totalCasetasCruzadas.toLocaleString()}
+                subtitle="Período seleccionado"
                 icon={TrendingUp}
                 color="#4e73df"
                 borderColor="#4e73df"

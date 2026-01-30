@@ -15,7 +15,7 @@ const Topbar = () => {
 
     const fetchTags = async () => {
       try {
-        const { data } = await axios.get(`${API_URL}/api/tags/01-08-2025/unavailableOPs`);
+        const { data } = await axios.get(`${API_URL}/api/tags/${dayjs().format('DD-MM-YYYY')}/unavailableOPs`);
         if (isMounted) {
           setTagsAInactivar(data);
         }
@@ -73,7 +73,7 @@ const Topbar = () => {
           </div>
         </li>
       </ul>
-      <span className="float-right">Bienvenido <b>Amador Martínez, José Alan</b> {formatearFecha('08-01-2025') || formatearFecha(dayjs())}</span>
+      <span className="float-right">Bienvenido <b>Amador Martínez, José Alan</b> {formatearFecha(dayjs())}</span>
       <ul className="navbar-nav ml-auto  sticky-top">
         <li className="nav-item dropdown no-arrow mx-1 ">
 

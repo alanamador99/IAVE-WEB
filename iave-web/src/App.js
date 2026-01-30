@@ -8,7 +8,7 @@ import AbusosModule from "./components/Abusos";
 
 import Tags from "./components/Tags.jsx";
 import Sesgos from "./components/Sesgos.jsx";
-import Home from "./components/home.jsx";
+import Home from "./components/Dashboard.jsx";
 import NotFound from "./components/NotFound.jsx";
 import RutasModule from "./components/Rutas.jsx";
 import RouteCreator from "./components/Route-Creator.jsx";

@@ -56,7 +56,7 @@ function CrucesTable() {
   });
   const [eventSource, setEventSource] = useState(null);
 
-  const [paginaActual, setPaginaActual] = useState(1); //Pagúna act ual, obviamente inicia en la primer página
+  const [paginaActual, setPaginaActual] = useState(1); //P2ágina actual, obviamente inicia en la primer página
   const [registrosPorPagina, setRegistrosPorPagina] = useState(250); //Filas por página.
 
 
