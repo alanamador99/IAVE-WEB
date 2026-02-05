@@ -7,18 +7,18 @@ export const getGeneralDashboardData = async (req, res) => {
         const pool = await getConnection();
 
         let query = `
-      SELECT SUM (CR.Importe) AS Importe, SUM (CR.ImporteOficial) AS ImporteOficial, CP.Nombre, CR.idCaseta, count(*) AS totalCruces, CR.No_Economico, OT.Id_tipo_ruta, CR.Fecha, CR.Estatus
+      SELECT SUM (CR.Importe) AS Importe, SUM (CR.ImporteOficial) AS ImporteOficial, CP.Nombre, CR.idCaseta, count(*) AS totalCruces, CR.No_Economico, OT.Id_tipo_ruta, CR.Fecha, CR.Estatus, OT.ID_orden, CR.Estatus_Secundario
       FROM cruces CR
-      INNER JOIN Orden_traslados OT
+      LEFT JOIN Orden_traslados OT
           ON CR.id_orden = OT.ID_orden  
-      INNER JOIN casetas_Plantillas CP
+      LEFT JOIN casetas_Plantillas CP
           ON CR.idCaseta = CP.ID_Caseta
-      GROUP BY CP.Nombre, CR.idCaseta, CR.No_Economico, OT.Id_tipo_ruta, CR.Fecha, CR.Estatus
+      GROUP BY CP.Nombre, CR.idCaseta, CR.No_Economico, OT.Id_tipo_ruta, CR.Fecha, CR.Estatus, OT.ID_orden, CR.Estatus_Secundario
       ORDER BY   totalCruces DESC, CP.Nombre`;
 
         const gastosCrucesAgrupados = await pool.request()
             .query(query);
-        
+
         let sobrecostoNoReclamado = 0;
 
         for (const detalleDeGasto of gastosCrucesAgrupados.recordset) {
@@ -41,6 +41,9 @@ export const getGeneralDashboardData = async (req, res) => {
             if (diferencia === 0) {
                 detalleDeGasto.casetaOK = true;
                 continue;
+            }
+            if(detalleDeGasto.Estatus === 'Pendiente'){
+                detalleDeGasto.Estatus = 'Error';
             }
         }
         //Este query obtiene las rutas activas conforme a los cruces registrados.
@@ -131,3 +134,50 @@ export const getRutasFromTUSA = async (req, res) => {
         
     }
 };
+
+
+export const getPrincipalesRutasConDiferencia = async (req, res) => {
+    //const { idOrden, Matricula, FechaInicio, FechaFin, idRuta } = req.body;
+    try {
+        const pool = await getConnection();
+
+        let query = `
+        SELECT distinct
+            COUNT(distinct OT.ID_orden) AS Recuento,
+            TRN.id_Tipo_ruta,
+            TRN.Id_Ruta,
+            PO.Poblacion AS Origen,
+            PD.Poblacion AS Destino,
+            --Parseamos la fecha a un formato legible
+            CONVERT(varchar, (OT.Fecha_solicitud_cte), 23) as FechaSolicitud
+        FROM Orden_traslados OT
+            INNER JOIN
+            orden_status OS ON OS.fk_orden = OT.ID_orden
+            INNER JOIN
+            Tipo_de_ruta_N TRN ON OT.Id_tipo_ruta=TRN.id_Tipo_ruta
+            INNER JOIN
+            Poblaciones PO ON PO.ID_poblacion=TRN.id_origen
+            INNER JOIN
+            Poblaciones PD ON PD.ID_poblacion=TRN.id_destino
+        WHERE OT.ID_orden LIKE 'OT-6%' AND OT.Fecha_solicitud_cte BETWEEN  DATEFROMPARTS(2025, 01, 01) AND DATEFROMPARTS(2026, 01, 28)
+        GROUP BY
+            TRN.id_Tipo_ruta, TRN.Id_Ruta, PO.Poblacion, PD.Poblacion, OT.Fecha_solicitud_cte
+        ORDER BY Recuento DESC
+        `;
+
+        //Pendiente de ajustar esta consulta para que tome en cuenta los filtros enviados desde el front-end.
+        const rutasDelPeriodoSeleccionado = await pool.request()
+            .query(query);
+
+        res.json({ data: rutasDelPeriodoSeleccionado.recordset });
+    } catch (error) {
+        console.log(error);
+        res.status(500);
+        res.send(error.message);
+        
+    }
+};
+
+export const getSomeOtherDashboardData = async (req, res) => {
+    // Implementación futura
+}

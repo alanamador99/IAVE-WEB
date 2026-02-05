@@ -1,6 +1,6 @@
 // src/components/CrucesTable.js
 import Papa from 'papaparse';
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback,  } from 'react';
 import axios from 'axios';
 import dayjs from 'dayjs';
 import { FunnelX, Grid2X2Check } from 'lucide-react';

@@ -108,7 +108,7 @@ const estatusMap = {
   },
 };
 
-const AbusosTable = () => {
+const AbusosTable = ({ NotifyUpdateToParent }) => {
   const checkboxes = useRef();
   const tableRef = useRef(null);
   const [showModal, setShowModal] = useState(false);
@@ -378,9 +378,14 @@ const AbusosTable = () => {
             abusosAPEnviar.includes(cruce.ID) ? { ...cruce, Estatus_Secundario: "reporte_enviado_todo_pendiente" } : cruce
           )
         );
+        NotifyUpdateToParent(); // Notify parent component about the update
         setSelectedCruces([]); // Limpiar selección después de la acción masiva
       } catch (error) {
         console.error("Error al enviar correo:", error);
+      }
+      finally {
+        setSelectedCruces([]); // Limpiar selección después de la acción masiva
+        NotifyUpdateToParent(); // Notify parent component about the update
       }
     }
 

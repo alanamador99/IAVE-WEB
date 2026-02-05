@@ -15,6 +15,7 @@ import markerCaseta from 'leaflet/dist/images/MapPinGreen.png';
 import markerB from 'leaflet/dist/images/B.png';
 import markerPin from 'leaflet/dist/images/pin_intermedio.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+import markerCasetaHover from 'leaflet/dist/images/marker-hover.png';
 import { Button, Container } from 'react-bootstrap';
 import { result, set } from 'lodash';
 import { AlertTriangle, MapPinPlus, GripVertical, CopyPlus, AlignVerticalJustifyCenter } from 'lucide-react';
@@ -57,6 +58,12 @@ const markerIcons = {
         shadowUrl: markerShadow,
         iconSize: [24, 24],
         shadowSize: [64, 40],
+    }),
+        casetaHover: L.icon({
+        iconUrl: markerCasetaHover,
+        shadowUrl: markerShadow,
+        iconSize: [32, 32],
+        shadowSize: [40, 40],
     }),
 };
 
@@ -248,6 +255,7 @@ const RutasModule = () => {
     const [loadingRutas, setLoadingRutas] = useState(false);
     const [loadingRutaSeleccionada, setLoadingRutaSeleccionada] = useState(false);
     const [boolExiste, setBoolExiste] = useState('Consultando ruta');
+    const [casetaHover, setCasetaHover] = useState(null);
 
     // Custom hooks para búsqueda
     const { results: origenes, loading: loadingOrigen } = useDestinationSearch(txtOrigen, 'Origen');
@@ -1458,7 +1466,7 @@ const RutasModule = () => {
                             <Marker
                                 key={item?.id || item?.cve_caseta || index}
                                 position={[JSON.parse(item?.geojson).coordinates[1], JSON.parse(item?.geojson).coordinates[0]]}
-                                icon={markerIcons.caseta}
+                                icon={casetaHover === item ? markerIcons.casetaHover : markerIcons.caseta}
                             >
                                 <Popup>
                                     <span style={{ marginTop: '5px', fontSize: '0.8rem', color: 'green', fontWeight: 'bold' }}>(INEGI)</span>
@@ -1651,7 +1659,7 @@ const RutasModule = () => {
                                     </thead>
                                     <tbody>
                                         {rutaSeleccionada[1]?.map((item, index) => (
-                                            <tr key={item?.id || item?.cve_caseta || index} className='text-center align-middle'>
+                                            <tr key={item?.id || item?.cve_caseta || index} className='text-center align-middle' onMouseOver={()=>{setCasetaHover(item)}} onMouseOut={()=>{setCasetaHover(null)}}>
                                                 <td className='align-middle'>
                                                     <div className="d-flex" style={{ textAlign: 'left' }}>
                                                         {index + 1}
