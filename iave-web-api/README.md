@@ -1,53 +1,41 @@
-# RESUMEN (MAPEO COMPLETO DEL PROYECTO IAVE WEB)
+# IAVE WEB API - Backend
 
-- **Fecha:** 4 de Diciembre de 2025
-- **Versión:** 1.0
+Este repositorio contiene la lógica del negocio y API REST para el proyecto IAVE WEB.
 
----
+## 📚 Documentación
 
-## OBJETIVO 🎯
+La documentación completa del proyecto se encuentra en el directorio `docs/`.
 
-La presente documentación tiene como objetivo resumir las documentaciones del backend existentes (Toda la parte del backend es considerada como la lógica del negocio).
-Este documento tiene la intención de ser presentado a la coordinación y gerencia, así como al equipo de sistemas del equipo de trabajo actual.
+- **[Índice de Documentación](./docs/README.md)**: Punto de entrada principal.
+- **[Controladores](./docs/controllers/INDICE_CONTROLADORES.md)**: Documentación de endpoints y lógica.
+- **[Base de Datos](./docs/database/INDICE_TABLAS.md)**: Esquemas y diccionario de datos.
 
+## 🚀 Instalación y Ejecución
 
----
+```bash
+# Instalar dependencias
+npm install
 
+# Ejecutar en desarrollo
+npm run dev
 
-
-##  **INDICE DE ESTE DOCUMENTO**
+# Ejecutar en producción
+npm start
 ```
 
-Resumen:
-├─ 1) Objetivo
-├─ 2) Indice
-   └─ 2.1) 🗂️ Directorio completo del proyecto
-├─ 3) Atributos con tipos de datos
-├─ 4) Mapeo por módulo (6 módulos)
-├─ 5) Operaciones por tabla
-├─ 6) Flujos de datos
-├─ 7) Matriz de relaciones
-├─ 8) Estadísticas de volumen
-└─ 9) Recomendaciones de mejora
-```
-
-
----
-
-
-
-## 🗂️ Directorio completo del proyecto
+## 🛠️ Estructura del Proyecto
 
 ```
-Proyecto IAVE WEB/
-│
-├── 📊 MAPEO_COMPLETO_TABLAS_ATRIBUTOS.md      (PRINCIPAL)
-├── 📋 RESUMEN_TABLAS_ATRIBUTOS.md             (QUICK REF)
-├── 🔗 MATRIZ_OPERACIONES_DETALLADA.md         (TÉCNICO)
-├── 🗺️ DIAGRAMA_Y_REFERENCIA_RAPIDA.md        (VISUAL)
-├── 📚 INDICE_MAPEO_TABLAS.md                  (NAVEGACIÓN)
-│
-└── iave-web-api/ (Documentación existente del backend)
+iave-web-api/
+├── docs/           # Documentación técnica organizada
+├── src/
+│   ├── controllers/ # Lógica de negocio
+│   ├── routes/      # Endpoints API
+│   ├── database/    # Conexión a BD
+│   └── utils/       # Utilidades
+├── middlewares/    # Custom middlewares
+└── plantillas/     # Templates para correos/documentos
+```
     ├── DOCUMENTACION_ABUSOS.md
     ├── DOCUMENTACION_ACLARACIONES.md
     ├── DOCUMENTACION_CASETAS.md

@@ -29,7 +29,7 @@ Resumen:
 └─ Recomendaciones de mejora
 ```
 
-### **RESUMEN_TABLAS_ATRIBUTOS.md**
+### **RESUMEN_TABLAS.md**
 ```
 Contiene:
 ├─ Resumen de 8 tablas (formato compacto)
@@ -44,7 +44,7 @@ Contiene:
 └─ Consultas SQL comunes
 ```
 
-### 3️⃣ **MATRIZ_OPERACIONES_DETALLADA.md** (TÉCNICO)
+### 3️⃣ **MATRIZ_OPERACIONES.md** (TÉCNICO)
 ```
 Tamaño: ~600+ líneas
 Secciones: 8
@@ -60,7 +60,7 @@ Contiene:
 └─ Valores permitidos (enumerados)
 ```
 
-### 4️⃣ **DIAGRAMA_Y_REFERENCIA_RAPIDA.md** (VISUAL)
+### 4️⃣ **DIAGRAMA_Y_REFERENCIA.md** (VISUAL)
 ```
 Tamaño: ~500+ líneas
 Secciones: 11
@@ -80,7 +80,7 @@ Contiene:
 └─ Ejemplo flujo completo
 ```
 
-### 5️⃣ **INDICE_MAPEO_TABLAS.md** (ÍNDICE NAVEGABLE)
+### 5️⃣ **INDICE_TABLAS.md** (ÍNDICE NAVEGABLE)
 ```
 Tamaño: ~400 líneas
 Secciones: 12

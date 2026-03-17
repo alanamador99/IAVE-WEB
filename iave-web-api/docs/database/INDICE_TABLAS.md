@@ -11,7 +11,7 @@
 
 Se han creado **4 documentos complementarios** que cubren todos los aspectos del mapeo de tablas y atributos:
 
-### 1. 📊 **MAPEO_COMPLETO_TABLAS_ATRIBUTOS.md** (PRINCIPAL)
+### 1. 📊 **MAPEO_TABLAS.md** (PRINCIPAL)
    
    **Contenido:**
    - ✅ Descripción completa de todas las 8 tablas principales
@@ -27,7 +27,7 @@ Se han creado **4 documentos complementarios** que cubren todos los aspectos del
 
 ---
 
-### 2. 📋 **RESUMEN_TABLAS_ATRIBUTOS.md** (QUICK REFERENCE)
+### 2. 📋 **RESUMEN_TABLAS.md** (QUICK REFERENCE)
    
    **Contenido:**
    - ✅ Resumen ejecutivo de 8 tablas principales
@@ -45,7 +45,7 @@ Se han creado **4 documentos complementarios** que cubren todos los aspectos del
 
 ---
 
-### 3. 🔗 **MATRIZ_OPERACIONES_DETALLADA.md** (TÉCNICO)
+### 3. 🔗 **MATRIZ_OPERACIONES.md** (TÉCNICO)
    
    **Contenido:**
    - ✅ Matriz completa por tabla y atributo
@@ -64,7 +64,7 @@ Se han creado **4 documentos complementarios** que cubren todos los aspectos del
 
 ---
 
-### 4. 🗺️ **DIAGRAMA_Y_REFERENCIA_RAPIDA.md** (VISUAL)
+### 4. 🗺️ **DIAGRAMA_Y_REFERENCIA.md** (VISUAL)
    
    **Contenido:**
    - ✅ Diagrama ASCII de arquitectura de datos
