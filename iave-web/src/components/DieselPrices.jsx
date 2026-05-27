@@ -2,12 +2,24 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Card, Table, Button, Form, Spinner, Alert, Badge, Pagination } from 'react-bootstrap';
 import * as XLSX from 'xlsx';
 
+const API_URL = process.env.REACT_APP_API_URL;
+
 const DieselPrices = () => {
     const [loading, setLoading] = useState(false);
     const [results, setResults] = useState([]);
     const [error, setError] = useState(null);
-    const [filterText, setFilterText] = useState('');
+    const [filters, setFilters] = useState({
+        entidad: '',
+        municipio: '',
+        razonSocial: '',
+        producto: '',
+        descripcion: '',
+        direccion: ''
+    });
+    const [sortConfig, setSortConfig] = useState({ key: null, direction: 'ascending' });
     
+
+    const API_URL = process.env.REACT_APP_API_URL;
     // Pagination state
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(50);
@@ -20,7 +32,7 @@ const DieselPrices = () => {
 
         try {
             // Llamada al endpoint backend que maneja la concurrencia
-            const response = await fetch('http://localhost:3001/api/diesel/fetch-all');
+            const response = await fetch(`${API_URL}/api/diesel/fetch-all`);
             
             if (!response.ok) {
                 const errData = await response.json();
@@ -46,23 +58,98 @@ const DieselPrices = () => {
     // Reset pagination when filter changes
     useEffect(() => {
         setCurrentPage(1);
-    }, [filterText]);
+    }, [filters]);
 
-    // Filtrado de resultados
-    const filteredResults = useMemo(() => {
-        return results.filter(item => {
-            if (!filterText) return true;
-            const search = filterText.toLowerCase();
-            return (
-                (item.entidadId && item.entidadId.toLowerCase().includes(search)) ||
-                (item.Nombre && item.Nombre.toLowerCase().includes(search)) ||
-                (item.Producto && item.Producto.toLowerCase().includes(search)) ||
-                (item.PrecioVigente && item.PrecioVigente.toString().includes(search)) ||
-                (item.Direccion && item.Direccion.toLowerCase().includes(search)) ||
-                (item.SubProducto && item.SubProducto.toLowerCase().includes(search))
-            );
+    const handleFilterChange = (e) => {
+        const { name, value } = e.target;
+        setFilters(prev => ({ ...prev, [name]: value }));
+    };
+
+    const clearFilters = () => {
+        setFilters({
+            entidad: '',
+            municipio: '',
+            razonSocial: '',
+            producto: '',
+            descripcion: '',
+            direccion: ''
         });
-    }, [results, filterText]);
+    };
+
+    const requestSort = (key) => {
+        let direction = 'ascending';
+        if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+            direction = 'descending';
+        }
+        setSortConfig({ key, direction });
+    };
+
+    // Filtrado y ordenamiento de resultados
+    const filteredResults = useMemo(() => {
+        let items = results.filter(item => {
+            const entMatch = !filters.entidad || 
+                             (item.entidadNombre && item.entidadNombre.toLowerCase().includes(filters.entidad.toLowerCase())) ||
+                             (item.entidadId && item.entidadId.toString().includes(filters.entidad));
+            
+            const munMatch = !filters.municipio || 
+                             (item.municipioNombre && item.municipioNombre.toLowerCase().includes(filters.municipio.toLowerCase())) ||
+                             (item.municipioId && item.municipioId.toString().includes(filters.municipio));
+            
+            const prodMatch = !filters.producto || 
+                              (item.Producto && item.Producto.toLowerCase().includes(filters.producto.toLowerCase()));
+            
+            const descMatch = !filters.descripcion || 
+                              (item.SubProducto && item.SubProducto.toLowerCase().includes(filters.descripcion.toLowerCase()));
+
+            const dirMatch = !filters.direccion || 
+                              (item.Direccion && item.Direccion.toLowerCase().includes(filters.direccion.toLowerCase()));
+
+            const razonMatch = !filters.razonSocial ||
+                               (item.Nombre && item.Nombre.toLowerCase().includes(filters.razonSocial.toLowerCase()));
+                              
+            return entMatch && munMatch && prodMatch && descMatch && dirMatch && razonMatch;
+        });
+
+        if (sortConfig.key !== null) {
+            items.sort((a, b) => {
+                let aValue = a[sortConfig.key];
+                let bValue = b[sortConfig.key];
+
+                // Manejo especial para columnas compuestas (Entidad/Municipio)
+                if (sortConfig.key === 'entidadId') {
+                    aValue = a.entidadNombre || a.entidadId;
+                    bValue = b.entidadNombre || b.entidadId;
+                } else if (sortConfig.key === 'municipioId') {
+                    aValue = a.municipioNombre || a.municipioId;
+                    bValue = b.municipioNombre || b.municipioId;
+                }
+
+                // Manejo de nulos
+                if (aValue === null || aValue === undefined) aValue = '';
+                if (bValue === null || bValue === undefined) bValue = '';
+
+                // Comparación numérica para Precio
+                if (sortConfig.key === 'PrecioVigente' || sortConfig.key === 'Numero') {
+                    return sortConfig.direction === 'ascending' 
+                        ? parseFloat(aValue) - parseFloat(bValue)
+                        : parseFloat(bValue) - parseFloat(aValue);
+                }
+
+                // Comparación de texto
+                aValue = aValue.toString().toLowerCase();
+                bValue = bValue.toString().toLowerCase();
+
+                if (aValue < bValue) {
+                    return sortConfig.direction === 'ascending' ? -1 : 1;
+                }
+                if (aValue > bValue) {
+                    return sortConfig.direction === 'ascending' ? 1 : -1;
+                }
+                return 0;
+            });
+        }
+        return items;
+    }, [results, filters, sortConfig]);
 
     // Pagination logic
     const indexOfLastItem = currentPage * itemsPerPage;
@@ -80,8 +167,8 @@ const DieselPrices = () => {
         // Formatear datos para exportación
         const dataToExport = filteredResults.map((row, index) => ({
             '#': index + 1,
-            'Entidad': row?.entidadId,
-            'Municipio': row?.municipioId,
+            'Entidad': row?.entidadNombre || row?.entidadId,
+            'Municipio': row?.municipioNombre || row?.municipioId,
             'Razón Social': row?.Nombre,
             'Producto': row?.Producto,
             'Precio': row?.PrecioVigente,
@@ -94,6 +181,13 @@ const DieselPrices = () => {
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Precios Diesel");
         XLSX.writeFile(wb, "Precios_Diesel_Nacional.xlsx");
+    };
+
+    const renderSortIcon = (key) => {
+        if (sortConfig.key !== key) return <i className="fas fa-sort text-muted ml-1" style={{opacity: 0.3}}></i>;
+        return sortConfig.direction === 'ascending' 
+            ? <i className="fas fa-sort-up ml-1"></i>
+            : <i className="fas fa-sort-down ml-1"></i>;
     };
 
     return (
@@ -126,12 +220,73 @@ const DieselPrices = () => {
                     {error && <Alert variant="danger">{error}</Alert>}
 
                     <div className="mb-3">
-                        <Form.Control 
-                            type="text" 
-                            placeholder="Filtrar por Razón Social, Producto, Dirección..." 
-                            value={filterText}
-                            onChange={(e) => setFilterText(e.target.value)}
-                        />
+                        <div className="row">
+                            <div className="col-md-2 mb-2">
+                                <Form.Control 
+                                    type="text" 
+                                    name="entidad"
+                                    placeholder="Entidad" 
+                                    value={filters.entidad}
+                                    onChange={handleFilterChange}
+                                    size="sm"
+                                />
+                            </div>
+                            <div className="col-md-2 mb-2">
+                                <Form.Control 
+                                    type="text" 
+                                    name="municipio"
+                                    placeholder="Municipio" 
+                                    value={filters.municipio}
+                                    onChange={handleFilterChange}
+                                    size="sm"
+                                />
+                            </div>
+                            <div className="col-md-2 mb-2">
+                                <Form.Control 
+                                    type="text" 
+                                    name="razonSocial"
+                                    placeholder="Razón Social" 
+                                    value={filters.razonSocial}
+                                    onChange={handleFilterChange}
+                                    size="sm"
+                                />
+                            </div>
+                            <div className="col-md-2 mb-2">
+                                <Form.Control 
+                                    type="text" 
+                                    name="producto"
+                                    placeholder="Producto" 
+                                    value={filters.producto}
+                                    onChange={handleFilterChange}
+                                    size="sm"
+                                />
+                            </div>
+                            <div className="col-md-2 mb-2">
+                                <Form.Control 
+                                    type="text" 
+                                    name="descripcion"
+                                    placeholder="Descripción" 
+                                    value={filters.descripcion}
+                                    onChange={handleFilterChange}
+                                    size="sm"
+                                />
+                            </div>
+                            <div className="col-md-3 mb-2">
+                                <Form.Control 
+                                    type="text" 
+                                    name="direccion"
+                                    placeholder="Dirección" 
+                                    value={filters.direccion}
+                                    onChange={handleFilterChange}
+                                    size="sm"
+                                />
+                            </div>
+                            <div className="col-md-1 mb-2">
+                                <Button variant="outline-secondary" size="sm" onClick={clearFilters} block>
+                                    <i className="fas fa-times"></i>
+                                </Button>
+                            </div>
+                        </div>
                     </div>
 
                     <div className="table-responsive table-container">
@@ -139,14 +294,14 @@ const DieselPrices = () => {
                             <thead>
                                 <tr>
                                     <th>#</th>
-                                    <th>Entidad</th>
-                                    <th>Municipio</th>
-                                    <th>Razón Social</th>
-                                    <th>Producto</th>
-                                    <th>Precio</th>
-                                    <th>Dirección</th>
-                                    <th>Descripción</th>
-                                    <th>Indicador</th>
+                                    <th onClick={() => requestSort('entidadId')} style={{cursor: 'pointer'}}>Entidad {renderSortIcon('entidadId')}</th>
+                                    <th onClick={() => requestSort('municipioId')} style={{cursor: 'pointer'}}>Municipio {renderSortIcon('municipioId')}</th>
+                                    <th onClick={() => requestSort('Nombre')} style={{cursor: 'pointer'}}>Razón Social {renderSortIcon('Nombre')}</th>
+                                    <th onClick={() => requestSort('Producto')} style={{cursor: 'pointer'}}>Producto {renderSortIcon('Producto')}</th>
+                                    <th onClick={() => requestSort('PrecioVigente')} style={{cursor: 'pointer'}}>Precio {renderSortIcon('PrecioVigente')}</th>
+                                    <th onClick={() => requestSort('Direccion')} style={{cursor: 'pointer'}}>Dirección {renderSortIcon('Direccion')}</th>
+                                    <th onClick={() => requestSort('SubProducto')} style={{cursor: 'pointer'}}>Descripción {renderSortIcon('SubProducto')}</th>
+                                    <th onClick={() => requestSort('Numero')} style={{cursor: 'pointer'}}>Indicador {renderSortIcon('Numero')}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -156,7 +311,7 @@ const DieselPrices = () => {
                                             <Spinner animation="border" role="status">
                                                 <span className="sr-only">Cargando...</span>
                                             </Spinner>
-                                            <p className="mt-2">Consultando ~3000 endpoints gubernamentales. Esto puede tomar unos minutos...</p>
+                                            <p className="mt-2">Consultando API. Esto puede tomar unos minutos...</p>
                                         </td>
                                     </tr>
                                 )}
@@ -168,8 +323,8 @@ const DieselPrices = () => {
                                 {currentItems.map((row, index) => (
                                     <tr key={index}>
                                         <td>{indexOfFirstItem + index + 1}</td>
-                                        <td>{row?.entidadId}</td>
-                                        <td>{row?.municipioId}</td>
+                                        <td>{row?.entidadNombre || row?.entidadId}</td>
+                                        <td>{row?.municipioNombre || row?.municipioId}</td>
                                         <td>{row?.Nombre}</td>
                                         <td>{row?.Producto}</td>
                                         <td className="font-weight-bold text-success">${row?.PrecioVigente}</td>

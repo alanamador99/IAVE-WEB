@@ -4,10 +4,9 @@ import {
   getStatsTags,
   getTotalStatsTags,
   generarResponsivaDesdePlantilla,
-  getUnavailableOps
-
-
-
+  getUnavailableOps,
+  getNotifications,
+  updateTagStatus
 } from "../controllers/tags.controllers.js";
 
 
@@ -18,7 +17,9 @@ const router = Router();
 router.get("/", getTags);
 router.get("/stats", getStatsTags);
 router.get("/TotalStatsTags", getTotalStatsTags);
-router.get("/:fechaBuscada/unavailableOPs", getUnavailableOps)
+router.get("/notifications", getNotifications);
+router.put('/update-status', updateTagStatus);
+router.get("/:fechaBuscada/unavailableOPs", getUnavailableOps);
 router.post("/exportar-responsiva", generarResponsivaDesdePlantilla);
 
 export default router;

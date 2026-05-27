@@ -12,7 +12,10 @@ import {
   actualizarEstatusMasivoCruces,
   getYearsFromCruces,
   conciliarCrucesMasivo,
+  vincularCrucesManual,
   updateCruce,
+  getCrucesByOT,
+  getCrucesByTag,
 } from "../controllers/cruces.controllers.js";
 
 
@@ -21,6 +24,8 @@ const router = Router();
 
 
 router.get("/", getCruces);
+router.get("/ot/:IDOrden", getCrucesByOT);
+router.get("/tag/:tag", getCrucesByTag);
 router.get("/years", getYearsFromCruces);
 router.get("/stats", getStats);
 router.get('/progress', getImportProgress);
@@ -33,6 +38,7 @@ router.patch('/:id/editar', updateCruce);
 
 router.patch('/masivo-estatus', actualizarEstatusMasivoCruces);
 router.patch('/conciliacionMasiva', conciliarCrucesMasivo);
+router.put('/vincularManual', vincularCrucesManual);
 
 
 //Ruta de prueba para obtener la caseta asociada a un cruce específico.

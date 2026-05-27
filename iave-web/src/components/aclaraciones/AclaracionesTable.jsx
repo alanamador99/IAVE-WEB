@@ -3,6 +3,7 @@ import Papa from 'papaparse';
 import { Modal, Button, ProgressBar } from 'react-bootstrap';
 import {
   BanknoteArrowUp,
+  Download,
   Info,
   TicketX,
   ChartNoAxesGantt,
@@ -17,6 +18,9 @@ import {
   User,
   FileUser,
   ReceiptText,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
 } from 'lucide-react';
 import { CopiarTag } from '../shared/utils';
 import axios from 'axios';
@@ -40,12 +44,7 @@ const ESTATUS_MAP = {
   },
   dictaminado: {
     label: 'Dictaminado',
-    color: 'text-success font-weight-bold',
-    icon: CheckCircle
-  },
-  aprobado: {
-    label: 'Aprobado',
-    color: 'text-success font-weight-bold',
+    color: 'text-info font-weight-bold',
     icon: CheckCircle
   },
   Rechazado: {
@@ -104,7 +103,7 @@ const abrirPortalPASE = () => {
   );
 };
 
-const AclaracionesTable = () => {
+const AclaracionesTable = ({ onDataFiltered, filtroExterno, onDataWidget }) => {
   const { canEdit } = useAuth();
   // Estados principales
   const [aclaraciones, setAclaraciones] = useState([]);
@@ -112,6 +111,37 @@ const AclaracionesTable = () => {
   //Estados de UI
   const [loading, setLoading] = useState(true);
   const [filtros, setFiltros] = useState(FILTROS_INICIALES);
+
+  useEffect(() => {
+    if (filtroExterno) {
+      if (filtroExterno.clear) {
+        setFiltros(prev => ({
+          ...prev,
+          caseta: '',
+          ejesCobrados: '',
+          estatus: 'todos'
+        }));
+      } else {
+        setFiltros(prev => ({
+          ...prev,
+          caseta: filtroExterno.caseta,
+          ejesCobrados: filtroExterno.clase,
+          estatus: 'pendiente_aclaracion'
+        }));
+      }
+    }
+  }, [filtroExterno]);
+//En formato dd-mmm-yyyy para que sea más amigable visualmente y al mismo tiempo permita copiar el valor de la fecha con ese formato para levantar la aclaración en el portal del proveedor.
+  const formatoPASE = (fecha) => {
+    if (!fecha) return '';
+    const d = new Date(fecha);
+    if (isNaN(d)) return '';
+    const dia = String(d.getDate()).padStart(2, '0');
+    const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    const mes = meses[d.getMonth()];
+    const anio = d.getFullYear();
+    return `${dia}-${mes}-${anio}`;
+  };
   const [progreso, setProgreso] = useState(null); // % de carga (0-100)
   const [eventSource, setEventSource] = useState(null);
   const [progressDetails, setProgressDetails] = useState({
@@ -122,6 +152,7 @@ const AclaracionesTable = () => {
     remaining: 0,
     message: ''
   });
+  const [estatusPosiblesAclaraciones, setEstatusPosiblesAclaraciones] = useState([]);
 
   // Estados del modal principal
   const [showModal, setShowModal] = useState(false);
@@ -131,6 +162,7 @@ const AclaracionesTable = () => {
   const [isDictaminado, setIsDictaminado] = useState(false);
   const [vMontoAclaracion, setvMontoAclaracion] = useState(0);
   const [fechaDictamen, setFechaDictamen] = useState(dayjs().format('YYYY-MM-DD'));
+  const [copiadoFecha, setCopiadoFecha] = useState(false);
 
   // Estados del modal de mapa
   const [modalAbierto, setModalAbierto] = useState(false);
@@ -140,12 +172,24 @@ const AclaracionesTable = () => {
   const [paginaActual, setPaginaActual] = useState(1);
   const [registrosPorPagina, setRegistrosPorPagina] = useState(100);
 
+  // Estados para ordenamiento
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+
+  const handleSort = useCallback((key) => {
+    setSortConfig((prev) => {
+      let direction = 'asc';
+      if (prev.key === key && prev.direction === 'asc') direction = 'desc';
+      return { key, direction };
+    });
+  }, []);
+
   // ✅ FIX: useEffect sin dependencias circulares
   useEffect(() => {
     const cargarAclaraciones = async () => {
       try {
         const { data } = await axios.get(`${API_URL}/api/aclaraciones`);
         setAclaraciones(data);
+        setEstatusPosiblesAclaraciones([...new Set(data.map(c => c.Estatus_Secundario))]);
       } catch (err) {
         console.error('Error al cargar aclaraciones:', err);
       } finally {
@@ -158,8 +202,25 @@ const AclaracionesTable = () => {
   // ✅ Memorizar aclaraciones filtradas
   // En los filtros de estado secundario se consideran como "rechazados" aquellas aclaraciones dictaminadas cuyo monto dictaminado sea 0, mientras que aquellas con monto dictaminado mayor a 0 se consideran "aprobadas", permitiendo así filtrar por estatus de dictamen de manera más granular.
 
-  const aclaracionesFiltrados = useMemo(() => {
+  const aclaracionesParaWidget = useMemo(() => {
     return aclaraciones.filter(c => {
+      const fechaOK = (!filtros.fechaInicio || c.Fecha >= filtros.fechaInicio) &&
+        (!filtros.fechaFin || c.Fecha <= filtros.fechaFin);
+      const opOK = !filtros.operador || (c.No_Economico && c.No_Economico.toLowerCase().includes(filtros.operador.toLowerCase()));
+      // Ignoramos el filtro de caseta, estatus y clase para poder mostrar siempre el breakdown total de pendientes
+      // respetando las búsquedas por fechas y operador.
+      return fechaOK && opOK;
+    });
+  }, [aclaraciones, filtros.fechaInicio, filtros.fechaFin, filtros.operador]);
+
+  useEffect(() => {
+    if (onDataWidget) {
+      onDataWidget(aclaracionesParaWidget);
+    }
+  }, [aclaracionesParaWidget, onDataWidget]);
+
+  const aclaracionesFiltrados = useMemo(() => {
+    let filtrados = aclaraciones.filter(c => {
       const fechaOK = (!filtros.fechaInicio || c.Fecha >= filtros.fechaInicio) &&
         (!filtros.fechaFin || c.Fecha <= filtros.fechaFin);
       const opOK = !filtros.operador || (c.No_Economico && c.No_Economico.toLowerCase().includes(filtros.operador.toLowerCase()));
@@ -169,14 +230,38 @@ const AclaracionesTable = () => {
       if (filtros.estatus === 'todos') {
         estOK = true;
       } else {
-        // Otros estados directo (pendiente_aclaracion, etc.)
+        // Otros estados directo (pendiente_aclaracion, aclaracion_levantada, Aprobado, Rechazado)
         estOK = c.Estatus_Secundario === filtros.estatus;
       }
       const ejesOK = !filtros.ejes || (c.ID_clave && c.ID_clave.toLowerCase().trim().includes(filtros.ejes.toLowerCase()));
       const ejesCobradosOK = !filtros.ejesCobrados || (c.Clase && c.Clase.toLowerCase().trim().includes(filtros.ejesCobrados.toLowerCase()));
       return fechaOK && opOK && casOK && estOK && ejesOK && ejesCobradosOK;
     });
-  }, [aclaraciones, filtros]);
+
+    if (sortConfig.key) {
+      filtrados.sort((a, b) => {
+        let aValue = a[sortConfig.key];
+        let bValue = b[sortConfig.key];
+
+        if (aValue === null || aValue === undefined) aValue = '';
+        if (bValue === null || bValue === undefined) bValue = '';
+
+        if (['Importe', 'diferencia', 'montoDictaminado'].includes(sortConfig.key)) {
+          aValue = parseFloat(aValue) || 0;
+          bValue = parseFloat(bValue) || 0;
+        } else if (typeof aValue === 'string') {
+          aValue = aValue.toLowerCase();
+          bValue = typeof bValue === 'string' ? bValue.toLowerCase() : bValue;
+        }
+
+        if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return filtrados;
+  }, [aclaraciones, filtros, sortConfig]);
 
 
 
@@ -185,6 +270,12 @@ const AclaracionesTable = () => {
   const indiceInicio = (paginaActual - 1) * registrosPorPagina;
   const indiceFin = indiceInicio + registrosPorPagina;
   const paginaDatos = aclaracionesFiltrados.slice(indiceInicio, indiceFin);
+
+  useEffect(() => {
+    if (onDataFiltered) {
+      onDataFiltered(aclaracionesFiltrados);
+    }
+  }, [aclaracionesFiltrados, onDataFiltered]);
 
   const connectToProgressStream = () => {
     const es = new EventSource(`${API_URL}/api/aclaraciones/progress`);
@@ -465,6 +556,30 @@ const AclaracionesTable = () => {
     reader.readAsText(file);
   };
 
+  const exportarOmitidosCSV = useCallback(() => {
+    if (!progressDetails.omitidos?.detalles || progressDetails.omitidos.detalles.length === 0) return;
+
+    // Preparamos los datos
+    const datosExportar = progressDetails.omitidos.detalles.map(d => ({
+      'Folio (JSON)': d.folio,
+      'ID Buscado (Cruce)': d.idBuscado,
+      'Motivo de Omisión': d.motivo,
+      'Detalles': d.comentario || ' N/A'
+    }));
+
+    // Generamos el CSV usando PapaParse
+    const csv = Papa.unparse(datosExportar);
+    
+    // Agregamos BOM para que Excel detecte correctamente los acentos y muestre bien el formato UTF-8
+    const blob = new Blob(["\ufeff", csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Aclaraciones_Omitidas_${dayjs().format('YYYYMMDD_HHmmss')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }, [progressDetails.omitidos]);
 
 
 
@@ -515,39 +630,44 @@ const AclaracionesTable = () => {
       alert('El monto debe ser un número válido');
       return;
     }
+    const evtEstatus = parseFloat(nuevoValor) > 0 ? 'Aprobado' : 'Rechazado';
 
     setAclaraciones(prev => prev.map(c =>
       c.ID === aclaracion.ID
-        ? { ...c, montoDictaminado: nuevoValor, Estatus_Secundario: 'dictaminado' }
+        ? { ...c, montoDictaminado: nuevoValor, Estatus_Secundario: evtEstatus }
         : c
     ));
 
     await actualizarAclaracionAPI(aclaracion.ID, {
       montoDictaminado: nuevoValor,
-      estatusSecundario: 'dictaminado'
+      estatusSecundario: evtEstatus
     });
   }, [actualizarAclaracionAPI]);
 
   // ✅ Aplicar dictamen al hacer blur (desenfoque) en el monto, para evitar múltiples llamadas mientras se escribe
   const handleMontoBlur = useCallback(async (aclaracion) => {
     if (aclaracion.montoDictaminado) {
+      const evtEstatus = parseFloat(aclaracion.montoDictaminado) > 0 ? 'Aprobado' : 'Rechazado';
       setAclaraciones(prev => prev.map(c =>
         c.ID === aclaracion.ID ? { ...c, Aplicado: 1 } : c
       ));
       await actualizarAclaracionAPI(aclaracion.ID, {
-        estatusSecundario: 'dictaminado',
+        estatusSecundario: evtEstatus,
         Aplicado: 1
       });
     }
   }, [actualizarAclaracionAPI]);
 
   const abrirModal = useCallback((aclaracion) => {
+    
     setAclaracionSeleccionado(aclaracion);
+    setvMontoAclaracion(aclaracion.montoDictaminado || 0);
     setvNoAclaracion(aclaracion.NoAclaracion || '');
     setvComentarios(aclaracion.observaciones || '');
     setIsDictaminado(!!aclaracion.Aplicado);
-    setFechaDictamen(aclaracion.FechaDictamen ? aclaracion.FechaDictamen.split('T')[0] : dayjs().format('YYYY-MM-DD'));
+    setFechaDictamen(aclaracion.FechaDictamen ? aclaracion.FechaDictamen?.split('T')[0] : dayjs().format('YYYY-MM-DD'));
     setShowModal(true);
+    console.log('Aclaración seleccionada para modal:', aclaracion);
   }, []);
 
   const cerrarModal = useCallback(() => {
@@ -561,7 +681,8 @@ const AclaracionesTable = () => {
     }
 
     const id = aclaracionSeleccionado.ID;
-    const nuevoEstatus = isDictaminado ? 'dictaminado' : 'aclaracion_levantada';
+    const estatusAprobado = parseFloat(vMontoAclaracion || 0) > 0 ? 'Aprobado' : 'Rechazado';
+    const nuevoEstatus = isDictaminado ? estatusAprobado : 'aclaracion_levantada';
     const payload = {
       noAclaracion: vNoAclaracion,
       FechaDictamen: fechaDictamen,
@@ -571,11 +692,11 @@ const AclaracionesTable = () => {
       montoDictaminado: vMontoAclaracion || 0
     };
 
-    const exito = await actualizarAclaracionAPI(id, payload);
-    if (exito) {
+    const response = await actualizarAclaracionAPI(id, payload);
+    if (response) {
       setAclaraciones(prev => prev.map(c =>
         c.ID === id
-          ? { ...c, ...payload, Estatus_Secundario: nuevoEstatus, Aplicado: payload.dictaminado }
+          ? { ...c, ...payload, NoAclaracion: vNoAclaracion, Estatus_Secundario: nuevoEstatus, Aplicado: payload.dictaminado }
           : c
       ));
     }
@@ -592,7 +713,7 @@ const AclaracionesTable = () => {
     setAclaracionSeleccionado(aclaracion);
   }, []);
 
-  const handleModalChange = useCallback(({ target: { name, value, checked, type } }) => {
+  const handleModalChange = useCallback(({ target: { name, value, checked } }) => {
     if (name === 'inAclaracionN') setvNoAclaracion(value);
     else if (name === 'inDictaminado') setIsDictaminado(checked);
     else if (name === 'inMontoAclaracion') setvMontoAclaracion(value);
@@ -601,6 +722,11 @@ const AclaracionesTable = () => {
   }, []);
 
   const getEstatusInfo = useCallback((key) => ESTATUS_MAP[key] || ESTATUS_MAP.pendiente_aclaracion, []);
+
+  const renderSortIcon = useCallback((key) => {
+    if (sortConfig.key !== key) return <ArrowUpDown size={14} className="ms-1 text-muted" />;
+    return sortConfig.direction === 'asc' ? <ArrowUp size={14} className="ms-1" /> : <ArrowDown size={14} className="ms-1" />;
+  }, [sortConfig]);
 
   if (loading) {
     return (
@@ -736,10 +862,9 @@ const AclaracionesTable = () => {
                   value={filtros.estatus}
                 >
                   <option value="todos">Todos</option>
-                  <option value="pendiente_aclaracion">Pendientes</option>
-                  <option value="aclaracion_levantada">En proceso</option>
-                  <option value="Aprobado">Aprobados</option>
-                  <option value="Rechazado">Rechazados</option>
+                  {estatusPosiblesAclaraciones.map(estatus => (
+                    <option key={estatus} value={estatus}>{ESTATUS_MAP[estatus]?.label || estatus}</option>
+                  ))} 
                 </select>
               </div>
 
@@ -784,21 +909,21 @@ const AclaracionesTable = () => {
               <table className="table table-bordered table-scroll table-sm table-hover align-middle">
                 <thead className="table-light">
                   <tr>
-                    <th>Fecha/Hora</th>
-                    <th>Operador</th>
-                    <th>Caseta</th>
-                    <th>Importes</th>
-                    <th>Diferencia</th>
-                    <th>Ejes</th>
-                    <th>Estatus</th>
-                    <th>Folio</th>
-                    <th>Devolución</th>
+                    <th onClick={() => handleSort('Fecha')} style={{cursor: 'pointer'}}>Fecha/Hora {renderSortIcon('Fecha')}</th>
+                    <th onClick={() => handleSort('No_Economico')} style={{cursor: 'pointer'}}>Operador {renderSortIcon('No_Economico')}</th>
+                    <th onClick={() => handleSort('Caseta')} style={{cursor: 'pointer'}}>Caseta {renderSortIcon('Caseta')}</th>
+                    <th onClick={() => handleSort('Importe')} style={{cursor: 'pointer'}}>Importes {renderSortIcon('Importe')}</th>
+                    <th onClick={() => handleSort('diferencia')} style={{cursor: 'pointer'}}>Diferencia {renderSortIcon('diferencia')}</th>
+                    <th onClick={() => handleSort('Clase')} style={{cursor: 'pointer'}}>Ejes {renderSortIcon('Clase')}</th>
+                    <th onClick={() => handleSort('Estatus_Secundario')} style={{cursor: 'pointer'}}>Estatus {renderSortIcon('Estatus_Secundario')}</th>
+                    <th onClick={() => handleSort('NoAclaracion')} style={{cursor: 'pointer'}}>Folio {renderSortIcon('NoAclaracion')}</th>
+                    <th onClick={() => handleSort('montoDictaminado')} style={{cursor: 'pointer'}}>Devolución {renderSortIcon('montoDictaminado')}</th>
                     <th></th>
                   </tr>
                 </thead>
                 <tbody>
                   {paginaDatos.map((aclaracion, i) => {
-                    const estatusInfo = getEstatusInfo(aclaracion.Estatus_Secundario === 'dictaminado' && Number(aclaracion.montoDictaminado) === 0 ? 'rechazado' : aclaracion.Estatus_Secundario);
+                    const estatusInfo = getEstatusInfo(aclaracion.Estatus_Secundario);
                     const IconoEstatus = estatusInfo.icon;
 
                     return (
@@ -807,8 +932,9 @@ const AclaracionesTable = () => {
                           <div className="d-flex align-items-center">
                             <Calendar className="me-2 text-secondary mr-2" size={20} />
                             <div>
-                              <div className="fw-bold">{aclaracion.Fecha.split('T')[0]}</div>
-                              <small className="text-muted">{aclaracion.Fecha.split('T')[1].split('.')[0]}</small>
+                              {/* Las fechas las vamos a mostrar en formato dd-mmm-yyyy y al darle click vamos a copiar al portapapeles el valor de la fecha con ese formato, para poder levantar la aclaración en el portal del proveedor. */}
+                              <div className="fw-bold" style={{cursor:'pointer'}} onClick={()=>{navigator.clipboard.writeText(formatoPASE(aclaracion.Fecha?.split('T')[0]));}}>{formatoPASE(aclaracion.Fecha?.split('T')[0])}</div>
+                              <small className="text-muted">{aclaracion.Fecha?.split('T')[1]?.split('.')[0]}</small>
                             </div>
                           </div>
                         </td>
@@ -817,9 +943,9 @@ const AclaracionesTable = () => {
                             <User className="me-2 text-secondary" size={20} />
                             <div>
                               <div className="fw-bold">
-                                {aclaracion["No_Economico"].split(' ')[1] + " " + (aclaracion["No_Economico"].split(' ')[2] || '')}
+                                {aclaracion["No_Economico"]?.split(' ')[1] + " " + (aclaracion["No_Economico"]?.split(' ')[2] || '')}
                               </div>
-                              <small className="text-muted">{aclaracion["No_Economico"].split(' ')[0]}</small>
+                              <small className="text-muted">{aclaracion["No_Economico"]?.split(' ')[0]}</small>
                             </div>
                           </div>
                         </td>
@@ -1006,19 +1132,28 @@ const AclaracionesTable = () => {
               <div className='form-row align-items-center'>
                 <div className="form-floating pr-2 col">
                   Fecha: <span className='ml-1 text-secondary font-weight-bolder'>
-                    <span
-                      style={{ cursor: 'pointer', fontSize: '0.85rem' }}
-                      title="Copiar FECHA al portapapeles"
-                      onClick={() => {
-                        if (aclaracionSeleccionado?.Fecha) {
-                          navigator.clipboard.writeText(formatearFecha(aclaracionSeleccionado?.Fecha));
-                        }
-                      }}
-                    >
-                      {formatearFecha(aclaracionSeleccionado?.Fecha)}
+                    <span style={{ position: 'relative', display: 'inline-block' }}>
+                      <span
+                        style={{ cursor: 'pointer', fontSize: '0.85rem' }}
+                        title="Copiar FECHA al portapapeles"
+                        onClick={() => {
+                          if (aclaracionSeleccionado?.Fecha) {
+                            navigator.clipboard.writeText(formatearFecha(aclaracionSeleccionado?.Fecha));
+                            setCopiadoFecha(true);
+                            setTimeout(() => setCopiadoFecha(false), 1000);
+                          }
+                        }}
+                      >
+                        {formatearFecha(aclaracionSeleccionado?.Fecha)}
+                      </span>
+                      {copiadoFecha && (
+                        <span className='' style={{ position: 'absolute', top: '-20px', left: '0', background: 'rgba(40, 167, 69, 0.7)', color: 'white', padding: '2px 5px', borderRadius: '3px', fontSize: '0.6rem', whiteSpace: 'nowrap', zIndex: 10, fontWeight: 'normal' }}>
+                          FECHA copiada al portapapeles ✔️
+                        </span>
+                      )}
                     </span>
                     <span className='font-weight-bolder text-primary'> | </span>
-                    {aclaracionSeleccionado?.Fecha?.split('T')[1].split('.')[0]}
+                    {aclaracionSeleccionado?.Fecha?.split('T')[1]?.split('.')[0]}
                   </span>
                   <br />
                   Matricula/Operador: <span className='ml-1 text-secondary font-weight-bolder'>
@@ -1040,6 +1175,11 @@ const AclaracionesTable = () => {
                   <br />
                   Importe Cobrado: <span className='ml-1 text-secondary font-weight-bolder'>
                     ${aclaracionSeleccionado?.Importe?.toFixed(2)}
+                  </span>
+                  {/*Vamos a colocar el campo del importeoficial o el importe que está registrado sobre la tabla de cruces */}
+                    <br />
+                  Importe Oficial: <span className='ml-1 text-secondary font-weight-bolder'>
+                    ${aclaracionSeleccionado?.ImporteOficial?.toFixed(2)}
                   </span>
                   <br />
                   Diferencia: <span className='ml-1 text-secondary font-weight-bolder'>
@@ -1177,7 +1317,7 @@ const AclaracionesTable = () => {
       {/* Modal de Progreso de Carga Masiva */}
       <Modal show={progreso !== null} onHide={() => { if (progreso === 100 || progressDetails.message?.includes('Error')) setProgreso(null) }} backdrop="static" keyboard={false}>
         <Modal.Header>
-          <Modal.Title>{progressDetails.message?.includes('Error') ? 'Error en Importación' : (progreso === 100 ? 'Importación Completada' : 'Importando Folios')}</Modal.Title>
+          <Modal.Title>{progressDetails.message?.includes('Error') ? 'Error en Importación' : (progreso === 100 ? 'Importación Completada' : 'Conciliando JSON')}</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <div className="text-center mb-3">
@@ -1208,11 +1348,48 @@ const AclaracionesTable = () => {
           {/* Mostrar detalles de omisiones si terminó */}
           {progressDetails.omitidos && (
             <div className="mt-2 alert alert-warning small py-2">
-              <strong>Detalle de omisiones:</strong>
+              <strong>Resumen de omisiones:</strong>
               <ul className="mb-0 pl-3">
                 <li>Datos incompletos/vacíos: {progressDetails.omitidos.incompletos || 0}</li>
-                <li>Duplicados (ya existen): {progressDetails.omitidos.duplicados || 0}</li>
+                <li>No encontrados en la base de datos: {progressDetails.omitidos.noEncontrados || 0}</li>
+                <li>Duplicados/Otros: {progressDetails.omitidos.duplicados || 0}</li>
               </ul>
+              
+              {progressDetails.omitidos.detalles && progressDetails.omitidos.detalles.length > 0 && (
+                <div className="mt-3">
+                  <div className="d-flex justify-content-between align-items-center mb-1">
+                    <strong>Detalle de registros omitidos:</strong>
+                    <Button variant="outline-success" size="sm" onClick={exportarOmitidosCSV} className="d-flex align-items-center py-0" style={{ fontSize: '0.8rem' }}>
+                      <Download size={14} className="me-1 mr-1" /> Exportar Excel
+                    </Button>
+                  </div>
+                  <div className="table-responsive mt-1" style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                    <table className="table table-sm table-bordered bg-white mb-0">
+                      <thead className="table-light" style={{ position: 'sticky', top: 0, zIndex: 1 }}>
+                        <tr>
+                          <th>Folio (JSON)</th>
+                          <th>ID Buscado (Cruce)</th>
+                          <th>Motivo</th>
+                          <th>Comentario<br/>PASE</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {progressDetails.omitidos.detalles.map((detalle, idx) => (
+                          <tr key={idx}>
+                            <td>{detalle.folio}</td>
+                            <td className="text-muted"><small>{detalle.idBuscado}</small></td>
+                            <td className="text-danger"><small>{detalle.motivo}</small></td>
+                            <td className="text-muted"><small>{detalle.comentario}</small></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              <hr className="my-2" />
+              <p className="mb-0 text-muted"><small>Nota: El match en backend se realiza empalmando la fecha, hora y número de cruce (YYMMDD_HHMMSS_Num).</small></p>
             </div>
           )}
 

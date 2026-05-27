@@ -18,6 +18,12 @@ import NoAuth from "./components/NoAuth.jsx";
 import NuevoComponenteTesting from "./components/NuevoComponente.jsx";
 import DieselPrices from "./components/DieselPrices.jsx";
 import CasetasPaseLinker from "./components/casetas/CasetasPaseLinker.jsx";
+import CombustibleMapaRutas from "./components/combustible/CombustibleMapaRutas.jsx";
+
+
+
+import RutasAnalyzer from "./components/rutas/RutasAnalyzer.jsx";
+import RutasHistoricoTarifas from "./components/rutas/RutasHistoricoTarifas.jsx";
 
 
 
@@ -120,9 +126,13 @@ function App() {
             <Route path="/sesgos" element={<Sesgos />} />
             <Route path="/route-creator" element={<RouteCreator />} />
             <Route path="/rutas-testing" element={<RutasModule />} />
+            <Route path="/analizador-rutas" element={<RutasAnalyzer />} />
+            <Route path="/historico-tarifas-rutas" element={<RutasHistoricoTarifas />} />
             <Route path="/mapas-testing" element={<MapaContent />} />
             <Route path="/casetas/actualizarCaseta/:idCaseta" element={<Casetas />} />
             <Route path="/casetas/linker" element={<CasetasPaseLinker />} />
+            <Route path="/combustible-mapa" element={<CombustibleMapaRutas />} />
+
           </Route>
 
           <Route path="*" element={<NotFound />} />

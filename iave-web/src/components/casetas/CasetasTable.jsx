@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import axios from 'axios';
-import { RefreshCcw } from 'lucide-react';
+import { RefreshCcw, Link2 } from 'lucide-react';
 import {ModalUpdateCaseta} from '../shared/utils';
 import { set } from 'lodash';
 
@@ -27,12 +27,10 @@ function CasetasTable() {
   const colores = useRef();
 
   const [costos, setCostos] = useState([]);
-  const [costosINEGI, setCostosINEGI] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [rowsPerPage, setRowsPerPage] = useState(50);
   const [selectedCruces, setSelectedCruces] = useState([]);
-  const [porcentaje, setPorcentaje] = useState(1);
   const [filtered, setFiltered] = useState([]);
   const [paginaActual, setPaginaActual] = useState(1); //Pagúna actual, obviamente inicia en la primer página
   const [vClase, setvClase] = useState('A'); //Clase de vehiculo, por defecto Automovil
@@ -225,16 +223,7 @@ function CasetasTable() {
         <h6 className="m-0 font-weight-bold text-primary ml-3" style={{ flex: 'auto', }}>Comparativa de costos de casetas. </h6>
 
 
-        <div className='col-md-2  pr-2 input-group-text mb-0 mr-4 ' style={{ maxWidth: 'min-content', }}>
-          <label htmlFor='selectEstatus' className='d-flex align-items-center'>
-            <span className='text-muted'>Clase:</span>
-            <select className='mx-3 p-2' name="Clase" onChange={handleChange} value={vClase} id='selectEstatus' style={{ width: 'auto', height: '2.5rem' }}>
-              <option value="A">Automovil</option>
-              <option value="B">Autobuses 2 Ejes</option>
-              <option value="C-2">Camiones 2 Ejes</option>
-            </select>
-          </label>
-        </div>
+        
 
 
         <div className='col-md-2  pr-2 input-group-text mb-0 ' style={{ maxWidth: 'min-content', }}>
@@ -250,9 +239,18 @@ function CasetasTable() {
             </select>
           </label>
         </div>
-        <div className="ml-3 pr-1 pt-1 float-right">
-          <button className="btn btn-sm btn btn-outline-dark rounded-3" onClick={() => getCostosCasetasActualizadosINEGI(103329, 150211, '')}>
-            <RefreshCcw size={25} className="me-1" />
+        <div className="ml-3 pr-1 pt-1 float-right d-flex gap-2">
+          {/* Botón para ir al linker de PASE */}
+          <button 
+            className="btn btn-sm btn-outline-primary rounded-3 d-flex align-items-center" 
+            onClick={() => navigate('/casetas/linker')}
+            title="Vincular con PASE"
+          >
+            <Link2 size={20} className="me-1" /> Vincular PASE
+          </button>
+          
+          <button className="btn btn-sm btn btn-outline-dark rounded-3 d-flex align-items-center" onClick={() => getCostosCasetasActualizadosINEGI(103329, 150211, '')}>
+            <RefreshCcw size={20} className="me-1" /> Actualizar INEGI
           </button>
         </div>
       </div>

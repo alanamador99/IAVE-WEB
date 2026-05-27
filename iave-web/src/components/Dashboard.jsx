@@ -4,6 +4,7 @@ import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearSca
 import { Doughnut, Bar } from 'react-chartjs-2';
 import { DollarSign, Users, TrendingUp, AlertCircle, Calendar, FunnelX } from 'lucide-react';
 import { formatearFecha } from '../components/shared/utils';
+import { set } from 'lodash';
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title, PointElement, LineElement);
 
 const API_URL = process.env.REACT_APP_API_URL;
@@ -20,6 +21,52 @@ const Dashboard = () => {
   const [totalCasetasCruzadas, setTotalCasetasCruzadas] = useState(0);
   const [detalleAclaracionesAgrupadas, setDetalleAclaracionesAgrupadas] = useState(0);
   const [principalesRutasConDiferencia, setPrincipalesRutasConDiferencia] = useState([]);
+  //Voy a hacer 3 botones que son fuera del proyecto IAVE, estoy probando la lógica de algo que se me ocurrió
+  const [a, setA] = useState(false);
+  const [b, setB] = useState(false);
+  const [c, setC] = useState(false);
+  const [primero, setPrimero] = useState(false);
+  const toggleA = () => {
+    setA(prev => !prev);
+    if (c && b) {
+      if (primero === 'b') {
+        setB(prev => !prev);
+        setPrimero('c');
+      }
+      else {
+        setC(prev => !prev);
+        setPrimero('b');
+      }
+    }
+  };
+  const toggleB = () => {
+    setB(prev => !prev);
+    if (a && c) {
+      if (primero === 'a') {
+        setA(prev => !prev);
+        setPrimero('c');
+      }
+      else {
+        setC(prev => !prev);
+        setPrimero('a');
+      }
+    }
+  };
+  const toggleC = () => {
+    setC(prev => !prev);
+    if (a && b) {
+      if (primero === 'a') {
+        setA(prev => !prev);
+        setPrimero('b');
+      }
+      else {
+        setB(prev => !prev);
+        setPrimero('a');
+      }
+    }
+  };
+
+
 
   const formatCompactNumber = (number) => {
     if (number === undefined || number === null) return '0';
@@ -50,7 +97,7 @@ const Dashboard = () => {
         vIdTipoRuta: rutaSeleccionada ? String(rutaSeleccionada.Id_tipo_ruta) : '',
         [name]: val
       }));
-      
+
     }
     else {
       setFilters((prev) => ({ ...prev, [name]: val }));
@@ -118,7 +165,7 @@ const Dashboard = () => {
         'Matricula / Operador': vmat_OP || 'No aplicado',
         'Caseta': vCaseta || 'No aplicado',
         'Dictamen': vEstatus || 'No aplicado',
-        'Ruta Seleccionada': rutaSeleccionada 
+        'Ruta Seleccionada': rutaSeleccionada
           ? `${data?.rutasActivas?.find(ruta => String(ruta.Id_tipo_ruta) === String(rutaSeleccionada))?.Origen} - ${data?.rutasActivas?.find(ruta => String(ruta.Id_tipo_ruta) === String(rutaSeleccionada))?.Destino}`
           : 'No aplicado',
         'Id Tipo Ruta': vIdTipoRuta || 'No aplicado',
@@ -148,8 +195,8 @@ const Dashboard = () => {
       acta_aplicada_pendiente_descuento
       NULL
       Condonado
-
-
+ 
+ 
       En proceso
       aclaracion_levantada
       pendiente_reporte
@@ -455,18 +502,18 @@ const Dashboard = () => {
     </div>
   );
 
-  
 
-  
+
+
   return (
     <div id="content-wrapper" className="d-flex flex-column" style={{ backgroundColor: '#f8f9fc' }}>
-      {(loading)&& <div className="d-flex justify-content-center align-items-center" style={{ height: '80vh' }}>
+      {(loading) && <div className="d-flex justify-content-center align-items-center" style={{ height: '80vh' }}>
         <div className="spinner-border text-primary" role="status" style={{ width: '3rem', height: '3rem' }}>
           <span className="sr-only">Cargando...</span>
         </div>
       </div>}
-      
-      {(!loading)&& <div id="content">
+
+      {(!loading) && <div id="content">
 
         {/* Contenido principal */}
         <div className="container-fluid">
@@ -487,7 +534,21 @@ const Dashboard = () => {
           </div>
           {/* DIV para los filtros */}
           <div className="d-flex flex-wrap gap-2 mb-3">
-
+            <div className="d-flex align-items-center gap-2 mb-2">
+              {/* Aquí voy a colocar los toggle buttons*/}
+              <div className="form-check form-switch">
+                <input className="form-check-input" type="checkbox" id="toggleA" checked={a} onChange={toggleA} />
+                <label className="form-check-label" htmlFor="toggleA">Toggle A</label>
+              </div>
+              <div className="form-check form-switch">
+                <input className="form-check-input" type="checkbox" id="toggleB" checked={b} onChange={toggleB} />
+                <label className="form-check-label" htmlFor="toggleB">Toggle B</label>
+              </div>
+              <div className="form-check form-switch">
+                <input className="form-check-input" type="checkbox" id="toggleC" checked={c} onChange={toggleC} />
+                <label className="form-check-label" htmlFor="toggleC">Toggle C</label>
+              </div>
+            </div>
 
             {/* DIV para el filtro de fecha */}
             <div className="form-floating pr-2">

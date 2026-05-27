@@ -531,3 +531,101 @@ ORDER BY p.ID_matricula;
     res.status(500).send(error.message);
   }
 };
+export const getNotifications = async (req, res) => {
+  try {
+    const pool = await getConnection();
+    const result = await pool.request().query(`
+SELECT DISTINCT
+    p.ID_matricula,
+    p.Nombres, p.Ap_paterno, p.Ap_materno,
+    'Orden de traslado en curso' AS Descripcion,
+    CAST(GETDATE() AS DATE) AS ID_fecha,
+    ct.Dispositivo AS Tag,
+    'REACTIVAR' AS Accion
+FROM Personal p
+INNER JOIN Control_Tags ct ON p.ID_matricula = ct.id_matricula
+CROSS APPLY (
+    SELECT TOP 1 os.iniciada, os.finalizada, os.estado
+    FROM orden_status os
+    WHERE os.fk_matricula = p.ID_matricula
+    ORDER BY COALESCE(os.iniciada, os.finalizada) DESC
+) ultimaOT
+WHERE p.Fecha_de_baja IS NULL
+  AND p.Puesto = 'O'
+  AND ct.Activa = 0
+  AND ct.Fecha_Extravio IS NULL
+  AND ct.Dispositivo IS NOT NULL
+  AND ultimaOT.iniciada IS NOT NULL
+  AND ultimaOT.finalizada IS NULL
+  AND ultimaOT.iniciada >= DATEADD(day, -7, GETDATE())
+  AND NOT EXISTS (
+      SELECT 1 FROM Estado_del_personal ep
+      WHERE ep.ID_matricula = p.ID_matricula
+        AND CAST(ep.ID_fecha AS DATE) = CAST(GETDATE() AS DATE)
+        AND (
+            ep.Descripcion LIKE '%PERMISO%' OR
+            ep.Descripcion LIKE '%VACACIONES%' OR
+            ep.Descripcion LIKE '%FALTA%' OR
+            ep.Descripcion LIKE '%DESCANSO%' OR
+            ep.Descripcion IN ('INCAPACIDAD','BAJA','PRESENTO SU RENUNCIA','CASTIGADO','QUITAR PREMIO','SE REPORTO ENFERMO','PROBLEMA FAMILIAR')
+        )
+  )
+    `);
+
+    res.json(result.recordset);
+  } catch (error) {
+    res.status(500).send(error.message);
+  }
+};
+
+
+export const updateTagStatus = async (req, res) => {
+  try {
+    const { tag, accion } = req.body;
+
+    if (!tag || !accion) {
+      return res.status(400).json({ message: 'TAG y Accion son requeridos' });
+    }
+
+    const activaBool = accion === 'REACTIVAR' ? 1 : 0;
+    const pool = await getConnection();
+
+    // Validar existencia del TAG
+    const tagQuery = await pool.request()
+      .input('tag', sql.VarChar, tag)
+      .query('SELECT TOP 1 id_control_tags, id_matricula FROM Control_Tags WHERE Dispositivo = @tag');
+
+    if (tagQuery.recordset.length === 0) {
+      return res.status(404).json({ message: 'El TAG especificado no existe.' });
+    }
+
+    const { id_control_tags, id_matricula } = tagQuery.recordset[0];
+
+    // Realizamos los UPDATES
+    if (accion === 'REACTIVAR') {
+      await pool.request()
+        .input('ID', sql.Int, id_control_tags)
+        .input('Matricula', sql.Int, id_matricula)
+        .input('Activa', sql.Bit, activaBool)
+        .query(`
+          UPDATE Control_Tags SET Activa = @Activa, Fecha_inactiva = NULL WHERE id_control_tags = @ID;
+          UPDATE Control_Tags_Historico SET Activo = @Activa, Fecha_Baja_Tag = NULL WHERE id_control_tags = @ID AND id_matricula = @Matricula;
+        `);
+    } else {
+      await pool.request()
+        .input('ID', sql.Int, id_control_tags)
+        .input('Matricula', sql.Int, id_matricula)
+        .input('Activa', sql.Bit, activaBool)
+        .query(`
+          UPDATE Control_Tags SET Activa = @Activa, Fecha_inactiva = GETDATE() WHERE id_control_tags = @ID;
+          UPDATE Control_Tags_Historico SET Activo = @Activa, Fecha_Baja_Tag = GETDATE() WHERE id_control_tags = @ID AND id_matricula = @Matricula;
+        `);
+    }
+
+    res.json({ message: 'Estatus del TAG actualizado correctamente' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).send(error.message);
+  }
+};
+

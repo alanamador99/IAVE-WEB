@@ -1,4 +1,25 @@
 // iave-web-api/src/controllers/diesel.controllers.js
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Cargar catálogo de municipios
+let entidadesData = {};
+try {
+    const jsonPath = path.join(__dirname, '../utils/EntidadesDiesel.json');
+    if (fs.existsSync(jsonPath)) {
+        const rawData = fs.readFileSync(jsonPath, 'utf8');
+        entidadesData = JSON.parse(rawData);
+    } else {
+        console.warn(`Archivo no encontrado: ${jsonPath}`);
+    }
+} catch (error) {
+    console.error("Error cargando EntidadesDiesel.json:", error);
+}
+
 /**
  * Obtiene los precios del diesel actualizados de la CNE.
  * @param {Object} req - Objeto de solicitud
@@ -51,34 +72,47 @@ export const getDieselPrices = async (req, res) => {
     }
 };
 
-// Limites aproximados de municipios por entidad (INEGI + Holgura)
-const ENTITY_LIMITS = {
-    '01': 11, '02': 5, '03': 5, '04': 13, '05': 38,
-    '06': 10, '07': 125, '08': 67, '09': 16, '10': 39,
-    '11': 46, '12': 81, '13': 84, '14': 125, '15': 125,
-    '16': 113, '17': 36, '18': 20, '19': 51, '20': 570,
-    '21': 217, '22': 18, '23': 11, '24': 58, '25': 18,
-    '26': 72, '27': 17, '28': 43, '29': 60, '30': 212,
-    '31': 106, '32': 58
-};
-
 /**
  * Obtiene TODOS los precios recorriendo las entidades y municipios configurados.
  * Maneja concurrencia para optimizar tiempo.
  */
 export const getAllDieselPrices = async (req, res) => {
-    // Generar lista de tareas (endpoints a visitar)
+    // Generar lista de tareas desde EntidadesDiesel.json o fallback
     const tasks = [];
     
-    // Nota: Iteramos del 01 al 32
-    for (let e = 1; e <= 32; e++) {
-        const entStr = e.toString().padStart(2, '0');
-        const limit = ENTITY_LIMITS[entStr] || 50; // Default 50 si no está mapeado
-        
-        for (let m = 1; m <= limit; m++) {
-            const munStr = m.toString().padStart(3, '0');
-            tasks.push({ entidadId: entStr, municipioId: munStr });
-            console.log(`Agregada tarea: Entidad ${entStr}, Municipio ${munStr}`);
+    if (entidadesData && entidadesData.Todos && entidadesData.Todos.Estados) {
+        // Usar catálogo JSON
+        entidadesData.Todos.Estados.forEach(estado => {
+            if (estado.MunicipiosDelEstado) {
+                estado.MunicipiosDelEstado.forEach(mpio => {
+                    tasks.push({
+                        entidadId: mpio.EntidadFederativaId,
+                        municipioId: mpio.MunicipioId,
+                        entidadNombre: mpio.EntidadFederativa.Nombre,
+                        municipioNombre: mpio.Nombre
+                    });
+                });
+            }
+        });
+        console.log(`Cargadas ${tasks.length} tareas desde catálogo JSON`);
+    } else {
+        // Fallback: usar límites aproximados
+        const ENTITY_LIMITS = {
+            '01': 11, '02': 5, '03': 5, '04': 13, '05': 38,
+            '06': 10, '07': 125, '08': 67, '09': 16, '10': 39,
+            '11': 46, '12': 81, '13': 84, '14': 125, '15': 125,
+            '16': 113, '17': 36, '18': 20, '19': 51, '20': 570,
+            '21': 217, '22': 18, '23': 11, '24': 58, '25': 18,
+            '26': 72, '27': 17, '28': 43, '29': 60, '30': 212,
+            '31': 106, '32': 58
+        };
+        for (let e = 1; e <= 32; e++) {
+            const entStr = e.toString().padStart(2, '0');
+            const limit = ENTITY_LIMITS[entStr] || 50; 
+            for (let m = 1; m <= limit; m++) {
+                const munStr = m.toString().padStart(3, '0');
+                tasks.push({ entidadId: entStr, municipioId: munStr });
+            }
         }
     }
 
@@ -115,7 +149,9 @@ export const getAllDieselPrices = async (req, res) => {
                     return items.map(item => ({
                         ...item,
                         entidadId: task.entidadId,
-                        municipioId: task.municipioId
+                        municipioId: task.municipioId,
+                        entidadNombre: task.entidadNombre || `Entidad ${task.entidadId}`,
+                        municipioNombre: task.municipioNombre || `Municipio ${task.municipioId}`
                     }));
                 }
             }

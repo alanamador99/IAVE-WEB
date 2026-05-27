@@ -49,29 +49,75 @@ const estatusAclaraciones = [
   }
 ];
 
-function Stats() {
+
+const formatCurrency = (amount) => {
+  return new Intl.NumberFormat("es-MX", {
+    style: "currency",
+    currency: "MXN",
+    minimumFractionDigits: 2
+  }).format(amount || 0);
+};
+
+function Stats({ datosFiltrados }) {
   const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);
 
-
-
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const res = await axios.get(`${API_URL}/api/aclaraciones/stats`);
-        setStats(res.data[0] || {});
-        console.log(res.data[0].total_monto)
+    if (datosFiltrados && Array.isArray(datosFiltrados)) {
+      const newStats = {
+        total_monto: 0,
+        total_count: 0,
+        pendiente_count: 0,
+        pendiente_monto: 0,
+        aclaracion_levantada_count: 0,
+        aclaracion_levantada_monto: 0,
+        Aprobado_count: 0,
+        Aprobado_monto: 0,
+        Rechazado_count: 0,
+        Rechazado_monto: 0
+      };
 
+      datosFiltrados.forEach(c => {
+        const diferencia = parseFloat(c.diferencia) || 0; // diferencia es (Importe - ImporteOficial) basado en el backend
+        const montoDictaminado = parseFloat(c.montoDictaminado) || 0;
+        const estatus = c.Estatus_Secundario;
 
-      } catch (error) {
-        console.error("Error al obtener estadísticcas:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
+        newStats.total_count += 1;
+        newStats.total_monto += diferencia; // El backend calcula el total gral como SUM(Importe - ImporteOficial)
 
-    fetchStats();
-  }, []);
+        if (estatus === 'pendiente_aclaracion') {
+          newStats.pendiente_count += 1;
+          newStats.pendiente_monto += diferencia;
+        } else if (estatus === 'aclaracion_levantada') {
+          newStats.aclaracion_levantada_count += 1;
+          // Backend usa: COALESCE(montoDictaminado, Importe - ImporteOficial)
+          newStats.aclaracion_levantada_monto += c.montoDictaminado !== null && c.montoDictaminado !== undefined ? montoDictaminado : diferencia;
+        } else if (estatus === 'Aprobado') {
+          newStats.Aprobado_count += 1;
+          newStats.Aprobado_monto += montoDictaminado; // Backend usa montoDictaminado explícitamente
+        } else if (estatus === 'Rechazado') {
+          newStats.Rechazado_count += 1;
+          newStats.Rechazado_monto += montoDictaminado; // Backend usa montoDictaminado explícitamente, usualmente sumará 0 o el rechazo
+        }
+      });
+      setStats(newStats);
+      setLoading(false);
+    } else {
+      const fetchStats = async () => {
+        try {
+          const res = await axios.get(`${API_URL}/api/aclaraciones/stats`);
+          setStats(res.data[0] || {});
+        } catch (error) {
+          console.error("Error al obtener estadísticas:", error);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      fetchStats();
+    }
+  }, [datosFiltrados]);
+
   if (loading) {
     return (
       <div className="d-flex justify-content-center align-items-center" style={{ height: "12vh" }}>
@@ -81,25 +127,63 @@ function Stats() {
       </div>
     );
   }
+
+  const totalMonto = stats.total_monto || 0;
+  const totalCount = stats.total_count || 0;
+
   return (
     <div className="row mt-4 pt-4 justify-content-center">
-      {estatusAclaraciones.map(({ key, titulo, descripcion, bg, icon }) => (
+      {estatusAclaraciones.map(({ key, titulo, descripcion, bg, icon }) => {
+        const count = stats[`${key}_count`] || 0;
+        const monto = stats[`${key}_monto`] || 0;
 
+        // Calcular porcentajes solo si los totales son mayores a 0 para evitar NaN
+        const porcentajeMonto = totalMonto > 0 ? (100 * monto) / totalMonto : 0;
+        const porcentajeCount = totalCount > 0 ? (100 * count) / totalCount : 0;
 
+        // Formatear valor por defecto
+        const valorDefaultContent = (
+          <span className="d-block text-center">
+            <span className="d-block fw-bold fs-5 text-dark">
+              {count} <small className="text-muted fs-6">cruces</small>
+            </span>
+            <span className="d-block fw-bold text-success">
+              {formatCurrency(monto)}
+            </span>
+          </span>
+        );
+        
+        // No mostrar porcentaje para la tarjeta de 'Total' ya que siempre sería 100%
+        const showPercentages = key !== 'total';
 
-        <DashboardCard
-          key={key}
-          titulo={titulo}
-          descripcion={descripcion}
-          valor={icon || 0}
-          valordefault={(stats[key + '_count'] === 0) ? <b> ——</b> : <b>  # {stats[key + '_count']} | $ {new Intl.NumberFormat("es-MX").format(stats[key + '_monto']) + '.00'} </b>}
-          bg={bg}
-          ruta={null}
-          grande={false}
-          bateriaSuperior={<><span className="font-weight-bolder text-info">💰 </span>{(100 * stats[key + '_monto'] / stats['total_monto']).toFixed(1) + '%'} </>}
-          bateriaSuperiorIzquierda={<><span className="font-weight-bolder text-dark fs-5">#️⃣</span>{(100 * stats[key + '_count'] / stats['total_count']).toFixed(1) + '%'}</>}
-        />
-      ))}
+        return (
+          <DashboardCard
+            key={key}
+            titulo={titulo}
+            descripcion={descripcion}
+            valor={icon}
+            valordefault={valorDefaultContent}
+            bg={bg}
+            grande={false}
+            bateriaSuperior={
+              showPercentages ? (
+                <>
+                  <span className="font-weight-bolder text-info" title="% del Monto Total">💰 </span>
+                  {porcentajeMonto.toFixed(1)}%
+                </>
+              ) : null
+            }
+            bateriaSuperiorIzquierda={
+              showPercentages ? (
+                <>
+                  <span className="font-weight-bolder text-dark fs-5" title="% del Total de Cruces">#️⃣ </span>
+                  {porcentajeCount.toFixed(1)}%
+                </>
+              ) : null
+            }
+          />
+        );
+      })}
     </div>
   );
 }

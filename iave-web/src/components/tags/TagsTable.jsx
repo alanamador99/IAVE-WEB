@@ -71,6 +71,7 @@ const estatusMap = {
 
 const TagsTable = () => {
   const [showModal, setShowModal] = useState(false);
+  const [showComparisonModal, setShowComparisonModal] = useState(false);
   const [rowsPerPage, setRowsPerPage] = useState(250);
   const [vNoAclaracion, setvNoAclaracion] = useState('');
   const [vComentarios, setvComentarios] = useState('');
@@ -80,6 +81,9 @@ const TagsTable = () => {
   const [tagSeleccionado, setTagSeleccionado] = useState(null);
   const [fechaAclaracion, setFechaAclaracion] = useState(dayjs().format('YYYY-MM-DD'));
   const [loading, setLoading] = useState(true);
+  const [paseData, setPaseData] = useState(null);
+  const [discrepancias, setDiscrepancias] = useState([]);
+  const [loadingComparison, setLoadingComparison] = useState(false);
 
 
   useEffect(() => {
@@ -94,6 +98,165 @@ const TagsTable = () => {
       }
     })();
   }, []);
+
+  // Función para cargar archivo JSON de PASE
+  const handleLoadPaseJSON = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const jsonData = JSON.parse(e.target.result);
+        const content = jsonData.content || jsonData; // Maneja ambas estructuras
+        
+        if (!Array.isArray(content)) {
+          alert('El JSON debe contener un array de objetos en "content" o ser directamente un array.');
+          return;
+        }
+
+        setPaseData(content);
+        compararDatos(content);
+      } catch (error) {
+        console.error('Error al parsear JSON:', error);
+        alert('Error al cargar el archivo JSON. Verifica que sea válido.');
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  // Función para comparar datos entre PASE y TUSA
+  const compararDatos = (paseContent) => {
+    setLoadingComparison(true);
+    const discrepanciasList = [];
+
+    paseContent.forEach((paseTag) => {
+      // Limpiar los ".." del final del ID de PASE para coincidir con TUSA
+      const paseTagId = paseTag.id.replace(/\.\.$/g, '');
+      
+      // Buscar el tag correspondiente en TUSA
+      const tusaTag = tags.find(t => t.Dispositivo === paseTagId);
+
+      if (tusaTag) {
+        // Comparar estados activo/inactivo
+        const paseActivo = paseTag.activo === true || paseTag.activo === 'true';
+        const tusaActivo = tusaTag.Estatus_Secundario === 'activo';
+
+        if (paseActivo !== tusaActivo) {
+          discrepanciasList.push({
+            id: paseTagId,
+            prefijo: paseTag.prefijo,
+            numero: paseTag.numero,
+            statusPase: paseTag.activo ? 'ACTIVO' : 'INACTIVO',
+            statusTusa: tusaActivo ? 'Activo' : tusaTag.Estatus_Secundario,
+            clase: paseTag.nombreClase,
+            tipo: paseTag.tipoFisico,
+            observaciones: tusaTag.Observaciones || '-',
+            saldo: paseTag.saldo,
+            domiciliado: paseTag.domiciliado,
+            regionalizado: paseTag.regionalizado
+          });
+        }
+      } else {
+        // TAG encontrado en PASE pero no en TUSA
+        discrepanciasList.push({
+          id: paseTagId,
+          prefijo: paseTag.prefijo,
+          numero: paseTag.numero,
+          statusPase: paseTag.activo ? 'ACTIVO' : 'INACTIVO',
+          statusTusa: 'NO ENCONTRADO EN TUSA',
+          clase: paseTag.nombreClase,
+          tipo: paseTag.tipoFisico,
+          observaciones: 'Tag no existe en el sistema TUSA',
+          saldo: paseTag.saldo,
+          domiciliado: paseTag.domiciliado,
+          regionalizado: paseTag.regionalizado
+        });
+      }
+    });
+
+    setDiscrepancias(discrepanciasList);
+    setShowComparisonModal(true);
+    setLoadingComparison(false);
+    
+    // Log para debugging
+    console.log('=== RESULTADO DE COMPARACIÓN ===');
+    console.log(`Total TAGs de PASE procesados: ${paseContent.length}`);
+    console.log(`Total TAGs de TUSA en sistema: ${tags.length}`);
+    console.log(`Discrepancias encontradas: ${discrepanciasList.length}`);
+    console.log(`TAGs sincronizados: ${paseContent.length - discrepanciasList.length}`);
+    console.log('Discrepancias:', discrepanciasList);
+  };
+
+  // Función para generar CSV de discrepancias
+  const generarCSVDiscrepancias = () => {
+    if (!discrepancias || discrepancias.length === 0) return '';
+
+    const headers = [
+      'TAG (ID)',
+      'Número',
+      'Estado PASE',
+      'Estado TUSA',
+      'Clase',
+      'Tipo Físico',
+      'Saldo',
+      'Domiciliado',
+      'Observaciones'
+    ];
+
+    const rows = discrepancias.map((disc) => [
+      disc.id,
+      disc.numero,
+      disc.statusPase,
+      disc.statusTusa,
+      disc.clase,
+      disc.tipo,
+      disc.saldo.toFixed(2),
+      disc.domiciliado ? 'Sí' : 'No',
+      `"${disc.observaciones.replace(/"/g, '""')}"` // Escapar comillas
+    ]);
+
+    const csv = [
+      headers.join(','),
+      ...rows.map((row) => row.join(','))
+    ].join('\n');
+
+    return csv;
+  };
+
+  // Función para descargar CSV
+  const descargarCSV = (csv) => {
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `discrepancias_tags_${dayjs().format('YYYY-MM-DD_HH-mm-ss')}.csv`;
+    link.click();
+  };
+
+  // Función para generar responsiva
+  const generarResponsiva = async (tag) => {
+    const data = {
+      nombre: tag?.Nombres + " " + tag?.Ap_paterno + " " + tag?.Ap_materno,
+      matricula: (tag?.id_matricula),
+      numeroDispositivo: tag?.Dispositivo,
+      fechaAsignacion: tag?.Fecha_alta ? tag.Fecha_alta.split('T')[0] : ''
+    };
+
+    const response = await fetch(`${API_URL}/api/tags/exportar-responsiva`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Responsiva_${data.numeroDispositivo}.xlsx`;
+    a.click();
+  };
 
   const handleChange = ({ target: { name, value, checked, type } }) => {
     if (name === 'inAclaracionN') return setvNoAclaracion(value);
@@ -264,6 +427,20 @@ const TagsTable = () => {
                   })}>
                   <FunnelX size={40} className="me-1" />
                 </button>
+              </div>
+
+              {/* Botón para cargar JSON de PASE */}
+              <div className="ml-2 pr-1 pt-1">
+                <label htmlFor="paseJsonInput" className="btn btn-sm btn-outline-info rounded-3 m-0" style={{ cursor: 'pointer' }}>
+                  📄 Cargar JSON PASE
+                </label>
+                <input
+                  id="paseJsonInput"
+                  type="file"
+                  accept=".json"
+                  onChange={handleLoadPaseJSON}
+                  style={{ display: 'none' }}
+                />
               </div>
             </div>
 
@@ -475,6 +652,156 @@ const TagsTable = () => {
           </Button>
         </Modal.Footer>
       </Modal>
+
+      {/* Modal de Comparación de Datos PASE vs TUSA */}
+      <Modal show={showComparisonModal} onHide={() => setShowComparisonModal(false)} size="xl">
+        <Modal.Header closeButton>
+          <Modal.Title>
+            🔍 Comparación de TAGs: PASE vs TUSA
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+          {loadingComparison ? (
+            <div className="text-center">
+              <div className="spinner-border text-primary" role="status">
+                <span className="visually-hidden">Comparando datos...</span>
+              </div>
+              <p className="text-muted mt-2">Procesando archivo...</p>
+            </div>
+          ) : (
+            <>
+              {/* Resumen General */}
+              <div className="alert alert-info mb-3">
+                <h6 className="alert-heading">📊 Resumen de la Comparación</h6>
+                <div className="row">
+                  <div className="col-md-4">
+                    <strong>TAGs de PASE:</strong> <span className="text-primary">{paseData?.length || 0}</span>
+                  </div>
+                  <div className="col-md-4">
+                    <strong>Con Discrepancias:</strong> <span className="text-danger">{discrepancias.length}</span>
+                  </div>
+                  <div className="col-md-4">
+                    <strong>Sincronizados:</strong> <span className="text-success">{(paseData?.length || 0) - discrepancias.length}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Mensaje si NO hay discrepancias */}
+              {discrepancias.length === 0 ? (
+                <div className="alert alert-success" role="alert">
+                  <h5 className="alert-heading">✅ ¡Perfectamente Sincronizado!</h5>
+                  <p>
+                    Todos los <strong>{paseData?.length || 0} TAGs</strong> del archivo PASE coinciden 
+                    con tu sistema TUSA. No se encontraron discrepancias.
+                  </p>
+                  <hr />
+                  <p className="mb-0">
+                    <small className="text-muted">
+                      Última comparación: {dayjs().format('DD/MM/YYYY HH:mm:ss')}
+                    </small>
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {/* Mensaje si hay discrepancias */}
+                  <div className="alert alert-warning mb-3">
+                    <h6 className="alert-heading">⚠️ Se encontraron discrepancias</h6>
+                    <p className="mb-0">
+                      Se detectaron <strong>{discrepancias.length}</strong> TAGs con diferencias entre PASE y TUSA. 
+                      Revisa la tabla a continuación para más detalles.
+                    </p>
+                  </div>
+
+                  {/* Tabla de discrepancias */}
+                  <div className="table-responsive">
+                    <table className="table table-sm table-hover table-bordered">
+                      <thead className="table-danger">
+                        <tr>
+                          <th>TAG (ID)</th>
+                          <th>Estado PASE</th>
+                          <th>Estado TUSA</th>
+                          <th>Clase</th>
+                          <th>Tipo Físico</th>
+                          <th>Saldo</th>
+                          <th>Domiciliado</th>
+                          <th>Observaciones</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {discrepancias.map((disc, idx) => (
+                          <tr
+                            key={idx}
+                            className={
+                              disc.statusTusa === 'NO ENCONTRADO EN TUSA'
+                                ? 'table-warning'
+                                : 'table-info'
+                            }
+                          >
+                            <td>
+                              <strong>{disc.id}</strong>
+                              <br />
+                              <small className="text-muted">{disc.numero}</small>
+                            </td>
+                            <td>
+                              <span
+                                className={
+                                  disc.statusPase === 'ACTIVO'
+                                    ? 'badge bg-success'
+                                    : 'badge bg-secondary'
+                                }
+                              >
+                                {disc.statusPase}
+                              </span>
+                            </td>
+                            <td>
+                              <span
+                                className={
+                                  disc.statusTusa === 'Activo'
+                                    ? 'badge bg-success'
+                                    : disc.statusTusa === 'NO ENCONTRADO EN TUSA'
+                                    ? 'badge bg-danger'
+                                    : 'badge bg-warning'
+                                }
+                              >
+                                {disc.statusTusa}
+                              </span>
+                            </td>
+                            <td>{disc.clase}</td>
+                            <td>{disc.tipo}</td>
+                            <td className="text-end">${disc.saldo.toFixed(2)}</td>
+                            <td className="text-center">
+                              {disc.domiciliado ? '✓' : '-'}
+                            </td>
+                            <td style={{ fontSize: '0.85rem', maxWidth: '200px' }}>
+                              {disc.observaciones}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowComparisonModal(false)}>
+            Cerrar
+          </Button>
+          {discrepancias.length > 0 && (
+            <Button
+              variant="warning"
+              onClick={() => {
+                const csv = generarCSVDiscrepancias();
+                descargarCSV(csv);
+              }}
+            >
+              📥 Descargar CSV
+            </Button>
+          )}
+        </Modal.Footer>
+      </Modal>
     </div>
 
 
@@ -482,29 +809,3 @@ const TagsTable = () => {
 };
 
 export default TagsTable;
-
-
-
-const generarResponsiva = async (tag) => {
-  const data = {
-    nombre: tag?.Nombres + " " + tag?.Ap_paterno + " " + tag?.Ap_materno,
-    matricula: (tag?.id_matricula),
-    numeroDispositivo: tag?.Dispositivo,
-    fechaAsignacion: tag?.Fecha_alta ? tag.Fecha_alta.split('T')[0] : ''
-  };
-
-  const response = await fetch(`${API_URL}/api/tags/exportar-responsiva`, {
-    method: 'POST',
-    body: JSON.stringify(data),
-    headers: {
-      'Content-Type': 'application/json'
-    }
-  });
-
-  const blob = await response.blob();
-  const url = window.URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `Responsiva_${data.numeroDispositivo}.xlsx`;
-  a.click();
-};

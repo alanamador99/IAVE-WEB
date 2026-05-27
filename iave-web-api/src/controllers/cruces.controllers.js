@@ -453,6 +453,53 @@ export const updateCruce = async (req, res) => {
  *   }
  * ]
  */
+export const getCrucesByOT = async (req, res) => {
+  try {
+    const { IDOrden } = req.params;
+    const { fechaInicio, fechaFin } = req.query;
+    const pool = await getConnection();
+    const request = pool.request().input("IDOrden", sql.NVarChar, IDOrden);
+
+    let query = "SELECT * FROM cruces WHERE id_orden = @IDOrden";
+
+    if (fechaInicio) {
+      request.input("FechaInicio", sql.DateTime, new Date(fechaInicio));
+      query += " AND Fecha >= @FechaInicio";
+    }
+    if (fechaFin) {
+      request.input("FechaFin", sql.DateTime, new Date(fechaFin));
+      query += " AND Fecha <= @FechaFin";
+    }
+
+    const result = await request.query(query);
+    res.json(result.recordset);
+  } catch (error) {
+    res.status(500).send(error.message);
+  }
+};
+
+export const getCrucesByTag = async (req, res) => {
+  try {
+    const { tag } = req.params;
+    const { dias } = req.query; // opcional: cuántos días hacia atrás (default 90)
+    const diasAtras = parseInt(dias) || 90;
+    const pool = await getConnection();
+    const result = await pool.request()
+      .input("Tag", sql.VarChar, tag)
+      .input("DiasAtras", sql.Int, diasAtras)
+      .query(`
+        SELECT ID, Tag, Caseta, Fecha, Importe, No_Economico, id_orden, Estatus, Estatus_Secundario, Clase
+        FROM cruces
+        WHERE Tag = @Tag
+          AND Fecha >= DATEADD(day, -@DiasAtras, GETDATE())
+        ORDER BY Fecha DESC
+      `);
+    res.json(result.recordset);
+  } catch (error) {
+    res.status(500).send(error.message);
+  }
+};
+
 export const getCruces = async (req, res) => {
   try {
     const pool = await getConnection();
@@ -804,8 +851,8 @@ WHERE RTRIM(LTRIM(CTags.Dispositivo)) = RTRIM(LTRIM(@tag))
             FROM Orden_traslados OT INNER JOIN orden_status OS ON OT.ID_orden = OS.fk_orden
             WHERE OS.fk_matricula = @matricula
             AND OS.iniciada IS NOT NULL
-            AND OS.finalizada IS NOT NULL
-            AND @fechaCruce BETWEEN OS.iniciada AND OS.finalizada
+            AND OS.iniciada >= DATEADD(day, -20, @fechaCruce)
+            AND (@fechaCruce BETWEEN OS.iniciada AND OS.finalizada OR OS.finalizada IS NULL)
             `);
 
         if (match.recordset.length > 0) {
@@ -1291,6 +1338,115 @@ export const actualizarEstatusMasivoCruces = async (req, res) => {
 
 
 
+export const vincularCrucesManual = async (req, res) => {
+  const { ot, id_clave, vinculos } = req.body;
+  if (!Array.isArray(vinculos) || vinculos.length === 0) {
+    return res.status(400).json({ error: "Datos de vínculos vacíos o incorrectos" });
+  }
+
+  try {
+    const pool = await getConnection();
+    
+    // El id_clave nos dice qué tarifa usar
+    const claveToImporteField = {
+        'A': 'Automovil',
+        'B': 'Autobus2Ejes',
+        'C-2': 'Camion2Ejes',
+        'C-3': 'Camion3Ejes',
+        'C-4': 'Camion3Ejes',
+        'C-5': 'Camion5Ejes',
+        'C-9': 'Camion9Ejes'
+    };
+    
+    const columnaTarifa = claveToImporteField[id_clave?.trim()] || 'Camion9Ejes';
+
+    for (const v of vinculos) {
+        const { cruceId, nuevoIdCaseta } = v;
+        
+        if (!cruceId || !nuevoIdCaseta) continue;
+
+        // 1. Traer la tarifa esperada de la caseta objetivo
+        const resCaseta = await pool.request()
+            .input('idCaseta', sql.Int, nuevoIdCaseta)
+            .query(`SELECT ${columnaTarifa} AS ImporteOficial, Nombre_IAVE FROM Casetas_Plantillas WHERE ID_Caseta = @idCaseta`);
+        
+        let tarifaOficial = 1;
+        let nombreEsperado = "";
+        if(resCaseta.recordset.length > 0) {
+            tarifaOficial = resCaseta.recordset[0].ImporteOficial;
+            nombreEsperado = resCaseta.recordset[0].Nombre_IAVE;
+        }else {
+            console.warn(`No se encontró la caseta con ID ${nuevoIdCaseta} para el cruce ${cruceId}`);
+        }
+
+        // 2. Traer el cruce original para comparar importes
+        const resCruce = await pool.request()
+            .input('id', sql.VarChar, cruceId.toString())
+            .query(`SELECT Importe FROM Cruces WHERE ID = @id`);
+
+        let importeCruce = 0;
+        if(resCruce.recordset.length > 0) {
+            importeCruce = parseFloat(resCruce.recordset[0].Importe) || 0;
+        }
+
+        // 3. Evaluar el estatus (igual que en importCruces)
+        function limpiarImporte(importeStr) {
+          if (typeof importeStr === 'number') return importeStr;
+          if (!importeStr) return 0;
+          return parseFloat(importeStr.toString().replace(/[^0-9.-]+/g, ""));
+        }
+
+        const importeLimpio = limpiarImporte(importeCruce);
+        const tarifaFormateada = limpiarImporte(tarifaOficial);
+        
+        let Estatus = "Confirmado";
+        let EstatusSecundario = "confirmado";
+        
+        const diff = importeLimpio - tarifaFormateada;
+        
+        if (Math.abs(diff) <= 0.01) {
+            Estatus = "Confirmado";
+            EstatusSecundario = "confirmado";
+        } else if (diff < 0) {
+            Estatus = "Se cobró menos";
+            EstatusSecundario = "cobro_menor";
+        } else {
+            Estatus = "Aclaración";
+            EstatusSecundario = "pendiente_aclaracion";
+        }
+
+        if(tarifaOficial === 1) {
+           Estatus = "CasetaNoEncontradaEnRuta";
+           console.log("Caseta con nombre " + nombreEsperado + " y id " + nuevoIdCaseta + " no encontrada en ruta para OT " + ot);
+        }
+
+        // 4. Actualizar el cruce con el nuevo ID de caseta y sus estatus
+        await pool.request()
+            .input('idCaseta', sql.NVarChar, String(nuevoIdCaseta))
+            .input('estatus', sql.VarChar, Estatus)
+            .input('estatusSec', sql.VarChar, EstatusSecundario)
+            .input('tarifa', sql.Float, tarifaFormateada)
+            .input('cruceId', sql.VarChar, cruceId.toString())
+            .input('ot', sql.VarChar, ot || '')
+            // Opcional, asignar la ot nuevamente
+            .query(`UPDATE Cruces SET
+                      idCaseta = @idCaseta,
+                      Estatus = @estatus,
+                      Estatus_Secundario = @estatusSec,
+                      ImporteOficial = @tarifa,
+                      id_orden = @ot
+                    WHERE ID = @cruceId`);
+    }
+    console.log(`Vinculación manual completada para OT ${ot} con ${vinculos.length} cruces vinculados. IDCruce: ${vinculos.map(v => v.cruceId).join(", ")}`);
+
+    res.status(200).json({ message: "Vínculos guardados y conciliados correctamente" });
+
+  } catch (error) {
+     console.error("Error en vincularCrucesManual:", error);
+     res.status(500).json({ error: "Error al guardar la vinculación" });
+  }
+};
+
 export const conciliarCrucesMasivo = async (req, res) => {
   const { ids } = req.body;
   if (!Array.isArray(ids) || ids.length === 0) {
@@ -1425,8 +1581,8 @@ export const conciliarCrucesMasivo = async (req, res) => {
             FROM Orden_traslados OT INNER JOIN orden_status OS ON OT.ID_orden = OS.fk_orden
             WHERE OS.fk_matricula = @matricula
             AND OS.iniciada IS NOT NULL
-            AND OS.finalizada IS NOT NULL
-            AND @fechaCruce BETWEEN OS.iniciada AND OS.finalizada
+            AND OS.iniciada >= DATEADD(day, -20, @fechaCruce)
+            AND (@fechaCruce BETWEEN OS.iniciada AND OS.finalizada OR OS.finalizada IS NULL)
             `);
 
         if (match.recordset.length > 0) {

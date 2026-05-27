@@ -5,12 +5,12 @@ import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
-const RutasContent = ({ onRutaSeleccionada, onOrigenDestino }) => {
+const RutasContent = ({ initialRuta, onRutaSeleccionada, onOrigenDestino }) => {
     const checkboxes = useRef();
     const [loading, setLoading] = useState(true);
     const [TipoBusqueda, setTipoBusqueda] = useState(true);
     const [rutas, setRutas] = useState([{ '.': ' ', }]);
-    const [rutaSeleccionada, setRutaSeleccionada] = useState(0);
+    const [rutaSeleccionada, setRutaSeleccionada] = useState(initialRuta || 0);
     const [filtered, setFiltered] = useState([]);
     const [origen, setOrigen] = useState('');
     const [destino, setDestino] = useState('');
@@ -22,6 +22,14 @@ const RutasContent = ({ onRutaSeleccionada, onOrigenDestino }) => {
     // Estados para paginación
     const [paginaActual, setPaginaActual] = useState(1);
     const [registrosPorPagina, setRegistrosPorPagina] = useState(10);
+
+    useEffect(() => {
+        if (initialRuta && initialRuta !== 0) {
+            setRutaSeleccionada(initialRuta);
+            // Opcional: Podrías buscar la ruta en las rutas cargadas y aplicar un filtro
+            // para que se muestre en pantalla, o hacer algo con origen/destino.
+        }
+    }, [initialRuta]);
     
     useEffect(() => {
         try {

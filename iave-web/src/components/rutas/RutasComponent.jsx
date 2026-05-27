@@ -1,11 +1,21 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Accordion } from 'react-bootstrap';
+import { useSearchParams } from 'react-router-dom';
 import RutasContent from '../rutas/RutasContent';
 import MapaContent from '../rutas/MapaContent';
 
 function RutasComponent() {
-  const [rutaSeleccionada, setRutaSeleccionada] = useState(null);
+  const [searchParams] = useSearchParams();
+  const rutaParam = searchParams.get('ruta');
+  
+  const [rutaSeleccionada, setRutaSeleccionada] = useState(rutaParam ? parseInt(rutaParam, 10) : null);
   const [origenDestino, setOrigenDestino] = useState(null);
+
+  useEffect(() => {
+    if (rutaParam) {
+      setRutaSeleccionada(parseInt(rutaParam, 10));
+    }
+  }, [rutaParam]);
 
   // Determinar qué acordeón debe estar activo
   const activeKey = useMemo(() => {
@@ -40,6 +50,7 @@ function RutasComponent() {
           </Accordion.Header>
           <Accordion.Body>
             <RutasContent 
+              initialRuta={rutaParam ? parseInt(rutaParam, 10) : null}
               onRutaSeleccionada={handleRutaSeleccionada} 
               onOrigenDestino={handleOrigenDestino} 
             />

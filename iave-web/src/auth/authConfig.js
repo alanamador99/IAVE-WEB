@@ -21,8 +21,8 @@ const oidcConfig = {
   client_id: CLIENT_ID,
   
 
-  redirect_uri: "https://192.168.1.104:3000/callback", 
-  post_logout_redirect_uri: "https://192.168.1.104:3000/",
+  redirect_uri: "https://192.168.1.252:3000/callback", 
+  post_logout_redirect_uri: "https://192.168.1.252:3000/",
   
   response_type: "code",
   scope: "openid", 

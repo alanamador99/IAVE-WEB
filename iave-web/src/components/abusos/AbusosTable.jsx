@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Modal, Button } from 'react-bootstrap';
+import { useSearchParams } from 'react-router-dom';
 import {
   Grid2X2Check,
   Building2,
@@ -108,7 +109,8 @@ const estatusMap = {
   },
 };
 
-const AbusosTable = ({ NotifyUpdateToParent }) => {
+const AbusosTable = ({ onDataFiltered }) => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const checkboxes = useRef();
   const tableRef = useRef(null);
   const [showModal, setShowModal] = useState(false);
@@ -376,17 +378,17 @@ const AbusosTable = ({ NotifyUpdateToParent }) => {
         // Actualizar la lista de cruces después de cambiar el estatus en la base de datos, pero omitiendo los registros que ya no estaban en "pendiente_reporte"
         setCruces(prevCruces =>
           prevCruces.map(cruce =>
-            abusosAPEnviar.includes(cruce.ID) ? { ...cruce, Estatus_Secundario: "reporte_enviado_todo_pendiente" } : cruce
+            abusosAPEnviar.some(a => a.ID === cruce.ID) ? { ...cruce, Estatus_Secundario: "reporte_enviado_todo_pendiente" } : cruce
           )
         );
-        NotifyUpdateToParent(); // Notify parent component about the update
+        
         setSelectedCruces([]); // Limpiar selección después de la acción masiva
       } catch (error) {
         console.error("Error al enviar correo:", error);
       }
       finally {
         setSelectedCruces([]); // Limpiar selección después de la acción masiva
-        NotifyUpdateToParent(); // Notify parent component about the update
+        
       }
     }
 
@@ -440,7 +442,11 @@ const AbusosTable = ({ NotifyUpdateToParent }) => {
       return fechaOK && opOK && casOK && estOK;
     });
     setFiltered(filtrado);
-  }, [filtros, cruces]);
+
+    if (onDataFiltered) {
+      onDataFiltered(filtrado);
+    }
+  }, [filtros, cruces, onDataFiltered]);
 
   if (loading) {
     return (

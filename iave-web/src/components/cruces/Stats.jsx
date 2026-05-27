@@ -1,5 +1,6 @@
 import DashboardCard from "../shared/DashboardCard";
 import React, { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import axios from "axios";
 
 const API_URL = process.env.REACT_APP_API_URL;
@@ -25,7 +26,11 @@ const cards = [
   },
 ];
 
-function Stats() {
+function Stats({ datosFiltrados }) {
+  const [searchParams] = useSearchParams();
+  const currentMonth = searchParams.get("m");
+  const currentYear = searchParams.get("y");
+
   const [stats, setStats] = useState({
     Confirmado: '⟳',
     Abuso: '⟳',
@@ -37,34 +42,54 @@ function Stats() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const res = await axios.get(`${API_URL}/api/cruces/stats`);
-        const responseData = res.data;
+    if (datosFiltrados && Array.isArray(datosFiltrados)) {
+      const newStats = {
+        Confirmado: 0,
+        Abuso: 0,
+        Aclaración: 0,
+        Error: 0,
+        Pendiente: 0
+      };
 
-        const newStats = {
-          Confirmado: 0,
-          Abuso: 0,
-          Aclaración: 0,
-          Error: 0,
-          Pendiente: 0
-        };
+      datosFiltrados.forEach((cruce) => {
+        const estatus = cruce.Estatus;
+        if (newStats[estatus] !== undefined) {
+          newStats[estatus] += 1;
+        }
+      });
 
-        responseData.forEach((e) => {
-          const name = e.Estatus;
-          newStats[name] = e.total;
-        });
+      setStats(newStats);
+      setLoading(false);
+    } else {
+      const fetchStats = async () => {
+        try {
+          const res = await axios.get(`${API_URL}/api/cruces/stats`);
+          const responseData = res.data;
 
-        setStats(newStats);
-      } catch (error) {
-        console.error("Error al obtener estadísticas:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
+          const newStats = {
+            Confirmado: 0,
+            Abuso: 0,
+            Aclaración: 0,
+            Error: 0,
+            Pendiente: 0
+          };
 
-    fetchStats();
-  }, []);
+          responseData.forEach((e) => {
+            const name = e.Estatus;
+            newStats[name] = e.total;
+          });
+
+          setStats(newStats);
+        } catch (error) {
+          console.error("Error al obtener estadísticas:", error);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      fetchStats();
+    }
+  }, [datosFiltrados]);
 
   if (loading) {
     return (
@@ -79,16 +104,27 @@ function Stats() {
   return (
     <div className="container mt-4 pt-4">
       <div className="row justify-content-center">
-        {cards.map((card, idx) => (
-          <DashboardCard
-            titulo={card.titulo}
-            descripcion={card.descripcion}
-            valor={(card.titulo === 'Registro') ? stats.Error : (card.titulo === 'Abusos') ? stats.Abuso : stats.Aclaración}
-            bg={card.bg}
-            ruta={card.ruta}
-            key={idx}
-          />
-        ))}
+        {cards.map((card, idx) => {
+          let url = card.ruta;
+          if (currentYear && currentMonth !== null) {
+            url += `?y=${currentYear}&m=${currentMonth}`;
+          } else if (currentYear) {
+            url += `?y=${currentYear}`;
+          } else if (currentMonth !== null) {
+            url += `?m=${currentMonth}`;
+          }
+
+          return (
+            <DashboardCard
+              titulo={card.titulo}
+              descripcion={card.descripcion}
+              valor={(card.titulo === 'Registro') ? stats.Error : (card.titulo === 'Abusos') ? stats.Abuso : stats.Aclaración}
+              bg={card.bg}
+              ruta={url}
+              key={idx}
+            />
+          );
+        })}
       </div>
     </div>
   );

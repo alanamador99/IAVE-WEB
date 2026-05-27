@@ -73,6 +73,10 @@ function StatsSesgos() {
     );
   }
 
+  if (!stats || !stats[0]) {
+    return null;
+  }
+
   return (
     <div className="row mt-4 pt-4 justify-content-center">
       {configCards.map(({ key, titulo, descripcion, bg, icon }) => (

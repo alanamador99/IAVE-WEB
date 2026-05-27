@@ -1169,7 +1169,7 @@ const ModalConfirmacion = ({ isOpen, onClose, onSelect, mensaje, color, casetaAA
 
 
 
-const ModalUpdateCaseta = ({ isOpen, onClose, onConfirm, idCaseta }) => {
+const ModalUpdateCaseta = ({ isOpen, onClose, onConfirm, idCaseta, idPase }) => {
 
 
   const [loadingCasetas, setLoadingCasetas] = useState(false);
@@ -1182,6 +1182,10 @@ const ModalUpdateCaseta = ({ isOpen, onClose, onConfirm, idCaseta }) => {
   const [peajeNueveEjes, setPeajeNueveEjes] = useState('');
   const [coordenadasCaseta, setCoordenadasCaseta] = useState({ lat: '', lng: '' });
   const [nombreCasetaINEGI, setNombreCasetaINEGI] = useState('');
+  
+  // PASE States
+  const [paseData, setPaseData] = useState([]);
+  const [selectedPaseCuerpo, setSelectedPaseCuerpo] = useState('');
 
 
   const [IDOrigenINEGI, setIDOrigenINEGI] = useState('');
@@ -1329,13 +1333,16 @@ const ModalUpdateCaseta = ({ isOpen, onClose, onConfirm, idCaseta }) => {
         }
         else {
           console.log("No hay origen o destino inmediatos para INEGI en la caseta:", dataCaseta);
-          // Seteamos valores INEGI (según lógica original: inicializar con valor local)
-          setPeajeAutomovilINEGI(parseFloat(dataCaseta?.Automovil) || '');
-          setPeajeBusDosEjesINEGI(parseFloat(dataCaseta?.Autobus2Ejes) || '');
-          setPeajeDosEjesINEGI(parseFloat(dataCaseta?.Camion2Ejes) || '');
-          setPeajeTresEjesINEGI(parseFloat(dataCaseta?.Camion3Ejes) || '');
-          setPeajeCincoEjesINEGI(parseFloat(dataCaseta?.Camion5Ejes) || '');
-          setPeajeNueveEjesINEGI(parseFloat(dataCaseta?.Camion9Ejes) || '');
+          // Solo usar TUSA como fallback si NO hay ID PASE vinculado.
+          // Si hay idPase, el useEffect de PASE sobreescribirá con los valores correctos.
+          if (!idPase) {
+            setPeajeAutomovilINEGI(parseFloat(dataCaseta?.Automovil) || '');
+            setPeajeBusDosEjesINEGI(parseFloat(dataCaseta?.Autobus2Ejes) || '');
+            setPeajeDosEjesINEGI(parseFloat(dataCaseta?.Camion2Ejes) || '');
+            setPeajeTresEjesINEGI(parseFloat(dataCaseta?.Camion3Ejes) || '');
+            setPeajeCincoEjesINEGI(parseFloat(dataCaseta?.Camion5Ejes) || '');
+            setPeajeNueveEjesINEGI(parseFloat(dataCaseta?.Camion9Ejes) || '');
+          }
         }
 
 
@@ -1349,6 +1356,77 @@ const ModalUpdateCaseta = ({ isOpen, onClose, onConfirm, idCaseta }) => {
 
     fetchCasetaData();
   }, [idCaseta]);
+
+  // Fetch PASE Data
+  useEffect(() => {
+    const fetchPaseData = async () => {
+      if (!idPase) return;
+      try {
+        const res = await axios.get(`${API_URL}/api/casetas/pase/${idPase}/tarifas`);
+        const data = res.data;
+        setPaseData(data); // Array de cuerpos/carriles
+
+        // Seleccionar el primer cuerpo por defecto si hay resultados
+        if (Array.isArray(data) && data.length > 0) {
+          setSelectedPaseCuerpo(data[0].cuerpo);
+        }
+      } catch (error) {
+        console.error("Error fetching PASE data:", error);
+      }
+    };
+    fetchPaseData();
+  }, [idPase]);
+
+  // Update comparison values when PASE selection changes
+  useEffect(() => {
+    if (!idPase || !paseData || paseData.length === 0) return;
+
+    const cuerpoData = paseData.find(d => d.cuerpo === selectedPaseCuerpo);
+    if (!cuerpoData) return;
+
+    setNombreCasetaINEGI(`PASE: ${cuerpoData.cuerpo}`);
+
+    // Mapeo de clases PASE a variables de estado
+    // Clases comunes: AUTOMOVIL, EJE_AUTO, T2 (Auto 2 ejes o camion 2?), T3, T4, etc.
+    // Depende de la caseta, pero buscaremos las claves más usuales.
+    
+    const findCost = (clasePartial) => {
+        if (!cuerpoData.tarifas) {
+          console.log("No hay tarifas disponibles para el cuerpo:", cuerpoData);
+          return 0;
+        }
+        const tarifa = cuerpoData.tarifas.find(t => t.clase && t.clase.toUpperCase().includes(clasePartial));
+        return tarifa ? parseFloat(tarifa.costo) : 0;
+    };
+
+    // Ajuste de mapeo según lo que se observa en XMLs de PASE (ej. T2, T3, AUTOMOVIL)
+    // T2 suele ser Autobus 2 ejes o Camion 2 ejes dependiendo del contexto, 
+    // pero en IAVE suele ser T2 = Autobus/Camion 2 ejes? 
+    // Revisando XML tipico: AUTOMOVIL (Auto), T2 (Autobus 2, Camion 2), T3 (3 ejes), etc.
+    
+    // Auto
+    const costoAuto = findCost('AUTOMOVIL') || findCost('LIGERO');
+    setPeajeAutomovilINEGI(costoAuto);
+
+    // Autobus 2 Ejes (A veces T2, a veces AUTOBUS_2)
+    const costoBus2 = findCost('AUTOBUS_2') || findCost('T2') || 0;
+    setPeajeBusDosEjesINEGI(costoBus2);
+
+    // Camion 2 Ejes (A veces T2, CAMION_2)
+    // Si T2 ya se usó para bus, asumimos mismo costo o buscamos especifico
+    const costoCamion2 = findCost('CAMION_2') || findCost('T2') || 0;
+    setPeajeDosEjesINEGI(costoCamion2);
+
+    // Camion 3 Ejes (T3)
+    setPeajeTresEjesINEGI(findCost('T3') || findCost('CAMION_3') || 0);
+
+    // Camion 5 Ejes (T5)
+    setPeajeCincoEjesINEGI(findCost('T5') || findCost('CAMION_5') || 0);
+
+    // Camion 9 Ejes (T9 o T6-T9)
+    setPeajeNueveEjesINEGI(findCost('T9') || findCost('T6') || 0);
+
+  }, [selectedPaseCuerpo, paseData, idPase]);
 
 
 
@@ -1497,6 +1575,22 @@ const ModalUpdateCaseta = ({ isOpen, onClose, onConfirm, idCaseta }) => {
                 <label className="font-weight-bold text-gray-800">
                   Actualizando los costos de la caseta de "{nombreCaseta}" <span className="text-danger">*</span>
                 </label>
+                
+                {(idPase && paseData && paseData.length > 1) || true && (
+                  <div className="mb-2">
+                    <label className="small font-weight-bold text-success">Seleccionar Cuerpo/Carril PASE:</label>
+                    <select 
+                      className="form-select form-select-sm border-success"
+                      value={selectedPaseCuerpo}
+                      onChange={(e) => setSelectedPaseCuerpo(e.target.value)}
+                    >
+                      {paseData.map((d, idx) => (
+                        <option key={idx} value={d.cuerpo}>{d.cuerpo}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                
                 {/*Se contempla un input para cada uno de los campos de la caseta que se está actualizando en TUSA. Los cargos se precargan con los datos que se obtienen del INEGI.
                 */}
 
@@ -1545,7 +1639,7 @@ const ModalUpdateCaseta = ({ isOpen, onClose, onConfirm, idCaseta }) => {
                         allowNegative={false}
                         disabled={true}
                       />
-                      <label className="form-label" htmlFor='txtPeajeAutomovilINEGI'>INEGI</label>
+                      <label className="form-label" htmlFor='txtPeajeAutomovilINEGI'>{idPase ? 'PASE' : 'INEGI'}</label>
 
                     </div>
                     <div className="form-floating" style={{ maxWidth: '8rem', }}>
@@ -1588,7 +1682,7 @@ const ModalUpdateCaseta = ({ isOpen, onClose, onConfirm, idCaseta }) => {
                         allowNegative={false}
                         disabled={true}
                       />
-                      <label className="form-label" htmlFor='txtPeajeAutobusINEGI'>INEGI</label>
+                      <label className="form-label" htmlFor='txtPeajeAutobusINEGI'>{idPase ? 'PASE' : 'INEGI'}</label>
                     </div>
 
                   </div>
@@ -1634,7 +1728,7 @@ const ModalUpdateCaseta = ({ isOpen, onClose, onConfirm, idCaseta }) => {
                         allowNegative={false}
                         disabled={true}
                       />
-                      <label className="form-label" htmlFor='txtPeaje2EjesINEGI'>INEGI</label>
+                      <label className="form-label" htmlFor='txtPeaje2EjesINEGI'>{idPase ? 'PASE' : 'INEGI'}</label>
                     </div>
 
 
@@ -1678,7 +1772,7 @@ const ModalUpdateCaseta = ({ isOpen, onClose, onConfirm, idCaseta }) => {
                         allowNegative={false}
                         disabled={true}
                       />
-                      <label className="form-label" htmlFor='txtPeajeTresEjesINEGI'>INEGI</label>
+                      <label className="form-label" htmlFor='txtPeajeTresEjesINEGI'>{idPase ? 'PASE' : 'INEGI'}</label>
                     </div>
                   </div>
 
@@ -1724,7 +1818,7 @@ const ModalUpdateCaseta = ({ isOpen, onClose, onConfirm, idCaseta }) => {
                         allowNegative={false}
                         disabled={true}
                       />
-                      <label className="form-label" htmlFor='txtPeajeCincoEjesINEGI'>INEGI</label>
+                      <label className="form-label" htmlFor='txtPeajeCincoEjesINEGI'>{idPase ? 'PASE' : 'INEGI'}</label>
                     </div>
 
                     <div className="form-floating" style={{ maxWidth: '8rem', }}>
@@ -1766,7 +1860,7 @@ const ModalUpdateCaseta = ({ isOpen, onClose, onConfirm, idCaseta }) => {
                         allowNegative={false}
                         disabled={true}
                       />
-                      <label className="form-label" htmlFor='txtPeajeNueveEjesINEGI'>INEGI</label>
+                      <label className="form-label" htmlFor='txtPeajeNueveEjesINEGI'>{idPase ? 'PASE' : 'INEGI'}</label>
                     </div>
 
                   </div>
@@ -2493,7 +2587,30 @@ const ModalHandleEditarCruce = ({ isOpen, onClose, onConfirm, cruceSeleccionado 
  * @exports ModalSelector - Componente modal selector
  * @exports ModalSelectorOrigenDestino - Componente modal selector origen/destino
  * @exports modalConfirmacion - Componente modal de ventana de confirmación
+ * @exports parseJwt - Función para decodificar JWT
  */
+
+/**
+ * Decodifica un JWT para extraer el payload
+ * @function parseJwt
+ * @param {string} token - JWT Token
+ * @returns {Object|null} Payload decodificado o null si falla
+ */
+const parseJwt = (token) => {
+    if (!token) { return null; }
+    try {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function(c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+
+        return JSON.parse(jsonPayload);
+    } catch (e) {
+        console.error("Error parsing JWT", e);
+        return null; 
+    }
+};
 
 export default CopiarTag;
 export {
@@ -2514,7 +2631,8 @@ export {
   ModalConfirmacion,
   ModalFillCreation,
   ModalUpdateCaseta,
-  ModalHandleEditarCruce
+  ModalHandleEditarCruce,
+  parseJwt
 };
 
 

@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Table, Button, Form, InputGroup, Spinner, Modal, Badge } from 'react-bootstrap';
-import { Search, Save, CheckCircle, XCircle, Link2, ExternalLink, Filter } from 'lucide-react';
+import { Table, Button, Form, InputGroup, Spinner, Badge } from 'react-bootstrap';
+import { Search, Save, ExternalLink, Filter } from 'lucide-react';
+import { ModalUpdateCaseta } from '../shared/utils';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -12,6 +13,11 @@ const CasetasPaseLinker = () => {
     const [selectedPaseId, setSelectedPaseId] = useState({}); // { [id]: 'ID_SELECCIONADO' }
     const [savingStatus, setSavingStatus] = useState({}); // { [id]: 'saving' | 'success' | 'error' }
     const [showPendingOnly, setShowPendingOnly] = useState(false);
+    const [filterText, setFilterText] = useState('');
+
+    // Modal State
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [modalConfig, setModalConfig] = useState({ idCaseta: null, idPase: null });
 
     // Cargar datos iniciales
     useEffect(() => {
@@ -95,6 +101,13 @@ const CasetasPaseLinker = () => {
         } catch (error) {
             console.error("Error guardando:", error);
             setSavingStatus(prev => ({ ...prev, [casetaId]: 'error' }));
+            setTimeout(() => {
+                setSavingStatus(prev => {
+                    const newState = { ...prev };
+                    delete newState[casetaId];
+                    return newState;
+                });
+            }, 3000);
         }
     };
 
@@ -114,6 +127,35 @@ const CasetasPaseLinker = () => {
             await new Promise(r => setTimeout(r, 500));
         }
     };
+    
+    // Modal handlers
+    const handleOpenUpdateModal = (casetaId, paseId) => {
+        setModalConfig({ idCaseta: casetaId, idPase: paseId });
+        setIsModalOpen(true);
+    };
+
+    const handleConfirmUpdate = async (datosAGuardar) => {
+        setIsModalOpen(false);
+        try {
+            // Update in backend (using existing endpoint)
+            await axios.patch(`${API_URL}/api/casetas/updateCasetaByID`, {
+              ID_Caseta: modalConfig.idCaseta,
+              ...datosAGuardar
+            });
+            
+            // Update local state (Camion2Ejes shown in the table)
+            setCasetas(prev => prev.map(c => 
+                c.ID_EntidadCaseta === modalConfig.idCaseta 
+                ? { ...c, Camion2Ejes: parseFloat(datosAGuardar.API_peajeDosEjes) } 
+                : c
+            ));
+            
+            // alert("Caseta actualizada correctamente");
+        } catch (error) {
+            console.error("Error updating caseta:", error);
+            alert("Error al actualizar la caseta");
+        }
+    };
 
     if (loading) return <div className="text-center p-5"><Spinner animation="border" /></div>;
 
@@ -122,7 +164,16 @@ const CasetasPaseLinker = () => {
             <div className="card shadow mb-4">
                 <div className="card-header py-3 d-flex justify-content-between align-items-center">
                     <h6 className="m-0 font-weight-bold text-primary">Vinculación de Casetas con PASE</h6>
-                    <div>
+                    <div className="d-flex align-items-center">
+                        <Form.Control
+                            type="text"
+                            placeholder="Filtrar por nombre..."
+                            size="sm"
+                            value={filterText}
+                            onChange={(e) => setFilterText(e.target.value)}
+                            className="me-2"
+                            style={{ width: '250px' }}
+                        />
                         <Button variant="info" size="sm" onClick={autoSearchAll} className="me-2">
                             <Search size={16} className="me-2" />
                             Auto-Buscar Pendientes
@@ -154,7 +205,14 @@ const CasetasPaseLinker = () => {
                             </thead>
                             <tbody>
                                 {casetas
-                                    .filter(c => !showPendingOnly || !c.ID_PASE) // Filtro condicional
+                                    .filter(c => {
+                                        const matchesPending = !showPendingOnly || !c.ID_PASE;
+                                        if (!filterText) return matchesPending;
+                                        const search = filterText.toLowerCase();
+                                        const nombre = c.NombreCaseta ? c.NombreCaseta.toLowerCase() : '';
+                                        const plantilla = c.NombrePlantilla ? c.NombrePlantilla.toLowerCase() : '';
+                                        return matchesPending && (nombre.includes(search) || plantilla.includes(search));
+                                    })
                                     .map((caseta, idx) => {
 
                                     const searchState = searchResults[caseta.ID_EntidadCaseta] || {};
@@ -165,13 +223,13 @@ const CasetasPaseLinker = () => {
                                         <tr key={caseta.ID_EntidadCaseta + (caseta.ID_PASE || '') + (idx)} className={caseta.ID_PASE ? "table-success" : ""}>
                                             <td>{caseta.ID_EntidadCaseta}</td>
                                             <td>{caseta.NombreCaseta}</td>
-                                            <td className="text-muted small">{'$' + (caseta.Camion2Ejes?.toFixed(2)) || '-'}</td>
+                                            <td className="text-muted small">{caseta.Camion2Ejes != null ? '$' + caseta.Camion2Ejes.toFixed(2) : '-'}</td>
                                             <td className="text-muted small">{caseta.NombrePlantilla || '-'}</td>
                                             <td>
                                                 {caseta.ID_PASE ? (
                                                     <Badge bg="success">{caseta.ID_PASE}</Badge>
                                                 ) : (
-                                                    <Badge bg="secondary text-light">Sin vincular</Badge>
+                                                    <Badge bg="secondary" className="text-light">Sin vincular</Badge>
                                                 )}
                                             </td>
 
@@ -226,15 +284,16 @@ const CasetasPaseLinker = () => {
                                                 </Button>
 
                                                 {caseta.ID_PASE && (
-                                                    <a
-                                                        href={`https://apps.pase.com.mx/sp-web/api/cobertura/casetas/${caseta.ID_PASE}/tarifas`}
-                                                        target="_blank"
-                                                        rel="noreferrer"
-                                                        className="btn btn-sm btn-link btn btn-secondary text-light ml-2 ms-1"
-                                                        title="Ver tarifas (JSON)"
+                                                    <Button
+                                                        variant="secondary"
+                                                        size="sm"
+                                                        className="ml-2 ms-1 text-light"
+                                                        title="Actualizar Costos (Comparar con PASE)"
+                                                        id='btnOpenModalActualizarCostosEnTUSA'
+                                                        onClick={() => handleOpenUpdateModal(caseta.ID_EntidadCaseta, caseta.ID_PASE)}
                                                     >
                                                         <ExternalLink size={16} />
-                                                    </a>
+                                                    </Button>
                                                 )}
                                             </td>
                                         </tr>
@@ -245,6 +304,13 @@ const CasetasPaseLinker = () => {
                     </div>
                 </div>
             </div>
+            <ModalUpdateCaseta 
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                onConfirm={handleConfirmUpdate}
+                idCaseta={modalConfig.idCaseta}
+                idPase={modalConfig.idPase}
+            />
         </div>
     );
 };

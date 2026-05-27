@@ -5,6 +5,7 @@ import axios from 'axios';
 import dayjs from 'dayjs';
 import { useSearchParams } from "react-router-dom";
 import { ModalHandleEditarCruce } from '../shared/utils';
+import EditRutaPanel from '../shared/EditRutaPanel';
 import { FunnelX, Grid2X2Check } from 'lucide-react';
 
 
@@ -28,7 +29,7 @@ const API_URL = process.env.REACT_APP_API_URL;
 
 
 
-function CrucesTable() {
+function CrucesTable({ onDataFiltered }) {
   const checkboxes = useRef();
   const [searchParams, setSearchParams] = useSearchParams();
   const yearParam = searchParams.get("y");
@@ -63,11 +64,46 @@ function CrucesTable() {
   const [showModal, setShowModal] = useState(false);
   const [cruceSeleccionado, setCruceSeleccionado] = useState(null);
 
+  // Edit Ruta Panel (para CasetaNoEncontradaEnRuta)
+  const [editRutaPanelData, setEditRutaPanelData] = useState(null); // { id_tipo_ruta, ot }
+  const [editRutaPanelLoading, setEditRutaPanelLoading] = useState(false);
+
+  const handleOpenEditRutaForCruce = async (cruce) => {
+    if (!cruce.id_orden) { alert('Este cruce no tiene OT asignada'); return; }
+    setEditRutaPanelLoading(true);
+    try {
+      const res = await axios.get(`${API_URL}/api/tracking/ot/${cruce.id_orden}`);
+      const id_tipo_ruta = res.data?.info?.Id_tipo_ruta;
+      if (!id_tipo_ruta) { alert('No se encontró la ruta para esta OT'); return; }
+      const casetasRes = await axios.get(`${API_URL}/api/casetas/rutas/${id_tipo_ruta}/casetasPorRuta`);
+      const initialCasetas = casetasRes.data || [];
+      setEditRutaPanelData({ id_tipo_ruta, ot: cruce.id_orden, initialCasetas });
+    } catch {
+      alert('Error al obtener la información de la ruta');
+    } finally {
+      setEditRutaPanelLoading(false);
+    }
+  };
+
   const [paginaActual, setPaginaActual] = useState(1); //P2ágina actual, obviamente inicia en la primer página
   const [registrosPorPagina, setRegistrosPorPagina] = useState(250); //Filas por página.
 
+  // Sincronizar estado local con los parámetros de la URL
+  useEffect(() => {
+    const m = searchParams.get("m");
+    if (m !== null && m !== "") {
+      setMesSeleccionado(parseInt(m) - 1);
+    } else {
+      setMesSeleccionado(null);
+    }
 
-
+    const y = searchParams.get("y");
+    if (y !== null && y !== "") {
+      setSelectedYear({ AÑO: parseInt(y) });
+    } else {
+      setSelectedYear(null);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     try {
@@ -126,7 +162,11 @@ function CrucesTable() {
       return matchFecha && matchmat_OP && matchtagID && matchOT && matchCaseta && matchEstatus && matchMes && matchBase && matchYear;
     });
     setFiltered(filtrado);
-  }, [filtros, cruces, mesSeleccionado, baseSeleccionada, selectedYear]);
+
+    if (onDataFiltered) {
+      onDataFiltered(filtrado);
+    }
+  }, [filtros, cruces, mesSeleccionado, baseSeleccionada, selectedYear, onDataFiltered]);
 
   const connectToProgressStream = () => {
     const es = new EventSource(`${API_URL}/api/cruces/progress`);
@@ -172,14 +212,24 @@ function CrucesTable() {
 
             // Mostrar resultado final
             setTimeout(() => {
-              alert(
-                `✅ Importación completada:\n` +
-                `📊 Total procesados: ${data.total} registros\n` +
-                `✔️ Insertados: ${data.inserted}\n` +
-                `❌ Omitidos: ${data.skipped} (${data.omitidos?.incompletos || 0} incompletos, ` +
-                `${data.omitidos?.fechaInvalida || 0} con fecha inválida, ` +
-                `${data.omitidos?.duplicado || 0} duplicados)`
-              );
+              const esConciliacion = data.message?.toLowerCase().includes('conciliaci');
+              if (esConciliacion) {
+                alert(
+                  `✅ Conciliación completada:\n` +
+                  `📊 Total procesados: ${data.total} cruces\n` +
+                  `✔️ Actualizados: ${data.actualizados || 0}\n` +
+                  `❌ Omitidos: ${(data.omitidos?.incompletos || 0) + (data.omitidos?.fechaInvalida || 0)}`
+                );
+              } else {
+                alert(
+                  `✅ Importación completada:\n` +
+                  `📊 Total procesados: ${data.total} registros\n` +
+                  `✔️ Insertados: ${data.inserted}\n` +
+                  `❌ Omitidos: ${data.skipped} (${data.omitidos?.incompletos || 0} incompletos, ` +
+                  `${data.omitidos?.fechaInvalida || 0} con fecha inválida, ` +
+                  `${data.omitidos?.duplicado || 0} duplicados)`
+                );
+              }
 
               // Recargar datos
               axios.get(`${API_URL}/api/cruces`)
@@ -541,22 +591,24 @@ function CrucesTable() {
 
   const actualizarOTMasivo = async (e) => {
     e.preventDefault();
+    if (!window.confirm(
+      `¿Revalidar la OT y el estatus de ${selectedCruces.length} cruce(s) seleccionado(s)?\n\n` +
+      `Esto recalculará la OT asignada usando la lógica corregida (solo OTs iniciadas en los últimos 20 días respecto a la fecha del cruce) ` +
+      `y actualizará el estatus, importe oficial e ID de caseta de cada cruce.`
+    )) return;
+
+    connectToProgressStream();
     console.log("Cruces seleccionados para reasignar OT:", selectedCruces.length);
 
     try {
-      const response = await axios.patch(`${API_URL}/api/cruces/conciliacionMasiva`, {
+      await axios.patch(`${API_URL}/api/cruces/conciliacionMasiva`, {
         ids: selectedCruces
       });
-      
-      setProgreso(100);
-      const data = await response.data;
-      alert(data.message || 'Asignación completada');
-
-      // Limpia selección y recarga tabla si es necesario
       setSelectedCruces([]);
-      setFiltered(cruces);
     } catch (error) {
       console.error("Error al asignar OT", error);
+      alert("❌ Error al reasignar OT: " + (error.response?.data?.error || error.message));
+      setProgreso(null);
     }
   };
 
@@ -876,14 +928,28 @@ function CrucesTable() {
                   <button
                     key={i}
                     className={`btn btn-sm ${mesSeleccionado === i ? "btn-primary" : "btn-outline-primary"}`}
-                    onClick={() => setMesSeleccionado(i)}
+                    onClick={() => {
+                      setMesSeleccionado(i);
+                      setSearchParams(prev => {
+                        const newParams = new URLSearchParams(prev);
+                        newParams.set('m', i + 1);
+                        return newParams;
+                      });
+                    }}
                   >
                     {mes}
                   </button>
                 ))}
                 <button
                   className={`btn btn-sm ${mesSeleccionado === null ? "btn-secondary" : "btn-outline-secondary"}`}
-                  onClick={() => setMesSeleccionado(null)}
+                  onClick={() => {
+                    setMesSeleccionado(null);
+                    setSearchParams(prev => {
+                      const newParams = new URLSearchParams(prev);
+                      newParams.delete('m');
+                      return newParams;
+                    });
+                  }}
                 >
                   Todos
                 </button>
@@ -893,15 +959,31 @@ function CrucesTable() {
                 {years.map((year, i) => (
                   <button
                     key={i}
-                    className={`btn btn-sm ${selectedYear === year ? "btn-primary" : "btn-outline-primary"}`}
-                    onClick={() => setSelectedYear(selectedYear === year ? null : year)}
+                    className={`btn btn-sm ${selectedYear?.AÑO === year.AÑO ? "btn-primary" : "btn-outline-primary"}`}
+                    onClick={() => {
+                      const newYear = selectedYear?.AÑO === year.AÑO ? null : year;
+                      setSelectedYear(newYear);
+                      setSearchParams(prev => {
+                        const newParams = new URLSearchParams(prev);
+                        if (newYear) newParams.set('y', newYear['AÑO']);
+                        else newParams.delete('y');
+                        return newParams;
+                      });
+                    }}
                   >
                     {year['AÑO']}
                   </button>
                 ))}
                 <button
                   className={`btn btn-sm ${selectedYear === null ? "btn-secondary" : "btn-outline-secondary"}`}
-                  onClick={() => setSelectedYear(null)}
+                  onClick={() => {
+                    setSelectedYear(null);
+                    setSearchParams(prev => {
+                      const newParams = new URLSearchParams(prev);
+                      newParams.delete('y');
+                      return newParams;
+                    });
+                  }}
                 >
                   Todos
                 </button>
@@ -963,7 +1045,7 @@ function CrucesTable() {
               </thead>
               <tbody>
                 {paginaDatos.map((cruce, i) => (
-                  <tr key={i} className={'py-0 align-middle ' + ((cruce.Estatus === 'Confirmado') ? 'font-weight-bolder text-success' : (cruce.Estatus === 'Abuso') ? 'font-weight-bolder text-danger' : (cruce.Estatus === 'Aclaración') ? 'font-weight-bolder text-warning' : (cruce.Estatus === 'Error') ? 'font-weight-bolder text-info' : 'font-weight-bolder text-dark')}>
+                  <tr key={cruce.ID} className={'py-0 align-middle ' + ((cruce.Estatus === 'Confirmado') ? 'font-weight-bolder text-success' : (cruce.Estatus === 'Abuso') ? 'font-weight-bolder text-danger' : (cruce.Estatus === 'Aclaración') ? 'font-weight-bolder text-warning' : (cruce.Estatus === 'Error') ? 'font-weight-bolder text-info' : 'font-weight-bolder text-dark')}>
                     <td className='py-1 align-middle '> <input
                       type="checkbox" tabIndex={i + 2}
                       checked={selectedCruces.includes(cruce.ID)}
@@ -1022,6 +1104,16 @@ function CrucesTable() {
                       <button className="btn btn-sm btn-info me-1 align-middle ml-1" data-toggle="tooltip" data-placement="top" title="Diferencia por registros" onClick={() => cambiarEstatus(cruce.ID, 'Error')}>
                         ℹ️
                       </button>
+                      {cruce.Estatus === 'CasetaNoEncontradaEnRuta' && (
+                        <button
+                          className="btn btn-sm btn-outline-warning align-middle ml-1"
+                          title="Editar casetas de la ruta"
+                          onClick={() => handleOpenEditRutaForCruce(cruce)}
+                          disabled={editRutaPanelLoading}
+                        >
+                          {editRutaPanelLoading ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-edit"></i>}
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -1092,6 +1184,15 @@ function CrucesTable() {
 
         </div>
       </div>
+      {editRutaPanelData && (
+        <EditRutaPanel
+          id_tipo_ruta={editRutaPanelData.id_tipo_ruta}
+          ot={editRutaPanelData.ot}
+          initialCasetas={editRutaPanelData.initialCasetas}
+          onClose={() => setEditRutaPanelData(null)}
+          onSaved={() => setEditRutaPanelData(null)}
+        />
+      )}
       {showModal && cruceSeleccionado && <ModalHandleEditarCruce isOpen={showModal} onClose={() => setShowModal(false)} cruceSeleccionado={cruceSeleccionado} onConfirm={(DatosAGuardar)=>{
         axios.patch(`${API_URL}/api/cruces/${cruceSeleccionado.ID}/editar`, DatosAGuardar).then(response=>{
           if(response.status === 200){

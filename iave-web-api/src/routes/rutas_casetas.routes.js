@@ -16,17 +16,25 @@ import {
   getCasetaFromInegi,
   getCasetasTUSACoincidentes,
   getCasetaByID,
+  searchCasetas,
   // Linked PASE
   searchPaseCasetas,
   updatePaseID,
-  getCatEntidadCasetas
+  getCatEntidadCasetas,
+  getPaseTarifas,
+  getAnalisisCostosRutas,
+  getAnalisisHistoricoRutas,
+  getRutasCombustible2025,
+  getOxxoStations
 } from "../controllers/casetas.controllers.js";
 
 const router = Router();
 
 router.get("/", getCasetas);
+router.get("/search", searchCasetas);
 router.get("/pase/cat-entidad", getCatEntidadCasetas);
 router.get("/pase/search", searchPaseCasetas);
+router.get("/pase/:id/tarifas", getPaseTarifas);
 router.patch("/pase/:id/update-id", updatePaseID);
 
 router.get("/:IDcaseta/getCasetaByID", getCasetaByID);
@@ -44,5 +52,9 @@ router.post("/rutas/guardar-cambios", GuardarCambiosEnRuta);
 router.post("/casetaINEGI", getCasetaFromInegi);
 router.post("/rutas/crear-nueva-ruta", crearNuevaRutaTUSA);
 router.post("/rutas/casetas-tusa-coincidentes", getCasetasTUSACoincidentes);
+router.get("/analisis/costos-rutas", getAnalisisCostosRutas);
+router.get("/analisis/historico-rutas", getAnalisisHistoricoRutas);
+router.get("/analisis/combustible-2025", getRutasCombustible2025);
+router.get("/analisis/oxxo-stations", getOxxoStations);
 
 export default router;

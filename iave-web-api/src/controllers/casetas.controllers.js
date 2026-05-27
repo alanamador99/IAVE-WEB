@@ -285,6 +285,27 @@ export const getCasetas = async (req, res) => {
 };
 
 
+export const searchCasetas = async (req, res) => {
+  try {
+    const { q } = req.query;
+    if (!q || q.trim().length < 2) {
+      return res.json([]);
+    }
+    const pool = await getConnection();
+    const result = await pool.request()
+      .input('q', sql.NVarChar, `%${q.trim()}%`)
+      .query(`
+        SELECT TOP 15 ID_Caseta, Nombre_IAVE, Nombre, Camion2Ejes, Automovil, Estado
+        FROM casetas_Plantillas
+        WHERE Nombre_IAVE LIKE @q OR Nombre LIKE @q OR CAST(ID_Caseta AS NVARCHAR) LIKE @q
+        ORDER BY Nombre_IAVE ASC
+      `);
+    res.json(result.recordset);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 export const getCasetaByID = async (req, res) => {
   try {
     const IDcaseta = req.params.IDcaseta;
@@ -2059,3 +2080,382 @@ export const updatePaseID = async (req, res) => {
     res.status(500).json({ msg: "Error al actualizar BD" });
   }
 };
+
+export const getPaseTarifas = async (req, res) => {
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ msg: "Falta ID de caseta PASE" });
+
+    const url = `https://apps.pase.com.mx/sp-web/api/cobertura/casetas/${id}/tarifas`;
+
+    // Configuración de Headers para simular navegador real (Bypass WAF/Radware)
+    const config = {
+        headers: {
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+            'Accept-Language': 'es-MX,es;q=0.9,en-US;q=0.8,en;q=0.7',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+            'Sec-Ch-Ua': '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
+            'Sec-Ch-Ua-Mobile': '?0',
+            'Sec-Ch-Ua-Platform': '"Windows"',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1',
+            'Upgrade-Insecure-Requests': '1',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+        },
+        responseType: 'text', // Force text to handle XML manually
+        timeout: 10000 // 10s timeout
+    };
+
+    try {
+        const response = await axios.get(url, config);
+        const data = response.data;
+
+        // WAF Check
+        if (typeof data === 'string' && (data.includes('<!DOCTYPE html>') || data.includes('<html'))) {
+            console.log("PASE API retornó HTML (posible bloqueo WAF).");
+            return res.json([]);
+        }
+
+        const isXML = typeof data === 'string' && data.trim().startsWith('<');
+
+        if (isXML) {
+            // FIX: La API de PASE devuelve XML inválido y xml2js/sax puede fallar
+            let cleanData = data.replace(/&(?!(?:apos|quot|[gl]t|amp);|#)/g, '&amp;');
+            cleanData = cleanData.replace(/<(?![a-zA-Z\/\!\?])/g, '&lt;');
+
+            const parser = new xml2js.Parser({ explicitArray: false });
+            const result = await parser.parseStringPromise(cleanData);
+
+            // Estructura esperada: List -> item -> tarifas -> tarifas (array)
+            let items = [];
+            if (result.List && result.List.item) {
+                 items = Array.isArray(result.List.item) ? result.List.item : [result.List.item];
+            }
+
+            // Normalización
+            const tarifasLimpio = items.map(item => {
+                let tarifasArr = [];
+                // item.tarifas puede tener distintas estructuras según el XML de PASE:
+                // - Array directo (múltiples <tarifas> al mismo nivel que <cuerpo>)
+                // - Objeto con propiedad 'tarifas' (nodo <tarifas> conteniendo <tarifas>)
+                // - Objeto con propiedad 'tarifa' (nodo <tarifas> conteniendo <tarifa>)
+                if (item.tarifas) {
+                    if (Array.isArray(item.tarifas)) {
+                        tarifasArr = item.tarifas;
+                    } else if (item.tarifas.tarifas) {
+                        tarifasArr = Array.isArray(item.tarifas.tarifas) ? item.tarifas.tarifas : [item.tarifas.tarifas];
+                    } else if (item.tarifas.tarifa) {
+                        tarifasArr = Array.isArray(item.tarifas.tarifa) ? item.tarifas.tarifa : [item.tarifas.tarifa];
+                    } else if (item.tarifas.clase) {
+                        // Nodo <tarifas> es directamente una tarifa (único elemento, sin wrapper)
+                        tarifasArr = [item.tarifas];
+                    }
+                }
+                
+                return {
+                    cuerpo: item.cuerpo,
+                    tarifas: tarifasArr
+                };
+            });
+
+            console.log(`[getPaseTarifas] ID=${id} → ${tarifasLimpio.length} cuerpo(s). Ejemplo tarifas[0]:`, JSON.stringify(tarifasLimpio[0]?.tarifas?.slice(0, 3)));
+            return res.json(tarifasLimpio);
+        }
+
+        // Si es JSON
+        res.json(data);
+
+    } catch (error) {
+        console.error("Error consultando tarifas PASE:", error.message);
+        // Retornamos vacío en error para no romper
+        return res.json([]); 
+    }
+};
+
+// Exporting new analyzer function
+export const getAnalisisCostosRutas = async (req, res) => {
+    try {
+        const pool = await getConnection();
+        const result = await pool.request().query(`
+            SELECT 
+                TRN.id_Tipo_ruta AS id_Tipo_ruta,
+                PO.Poblacion AS Origen, 
+                PD.Poblacion AS Destino,
+                CP.Nombre AS Caseta,
+                PCR.id_Caseta AS ID_Caseta,
+                ISNULL(CR.Clase, 'Camion2Ejes') AS Clase,
+                YEAR(CR.Fecha) AS Anio,
+                MONTH(CR.Fecha) AS Mes,
+                COUNT(CR.id_orden) AS TotalCruces,
+                MIN(CR.Importe) AS CostoMinimo,
+                MAX(CR.Importe) AS CostoMaximo,
+                AVG(CR.Importe) AS CostoPromedio
+            FROM PCasetasporruta PCR
+                INNER JOIN Tipo_de_ruta_N TRN ON PCR.id_Tipo_ruta = TRN.id_Tipo_ruta
+                INNER JOIN Poblaciones PO ON TRN.id_origen = PO.ID_poblacion
+                INNER JOIN Poblaciones PD ON TRN.id_destino = PD.ID_poblacion
+                INNER JOIN casetas_Plantillas CP ON PCR.id_Caseta = CP.ID_Caseta
+                LEFT JOIN Orden_traslados OT ON TRN.id_Tipo_ruta = OT.Id_tipo_ruta
+                LEFT JOIN cruces CR ON OT.ID_orden = CR.id_orden 
+                    AND CR.idCaseta = PCR.id_Caseta 
+                    AND YEAR(CR.Fecha) IN (2025, 2026)
+            WHERE PCR.consecutivo IS NOT NULL
+            GROUP BY 
+                TRN.id_Tipo_ruta, 
+                PO.Poblacion, 
+                PD.Poblacion, 
+                CP.Nombre, 
+                PCR.id_Caseta,
+                CR.Clase, 
+                YEAR(CR.Fecha), 
+                MONTH(CR.Fecha)
+            ORDER BY 
+                TRN.id_Tipo_ruta, 
+                Caseta, 
+                Anio DESC, 
+                Mes DESC;
+        `);
+        res.json(result.recordset);
+    } catch (error) {
+        console.error('Error en getAnalisisCostosRutas:', error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+
+export const getAnalisisHistoricoRutas = async (req, res) => {
+    try {
+        const pool = await getConnection();
+        const result = await pool.request().query(`
+            WITH CostoActualizados AS (
+                SELECT 
+                    ID_Caseta,
+                    ISNULL(Camion2Ejes, 0) AS CostoActual,
+                    2026 as AnioActual,
+                    ROW_NUMBER() OVER (PARTITION BY ID_Caseta ORDER BY fecha_act DESC) as rn_current
+                FROM historico_casetas
+                WHERE YEAR(fecha_act) <= 2026
+            ),
+            CostoAnteriores AS (
+                SELECT 
+                    ID_Caseta,
+                    ISNULL(Camion2Ejes, 0) AS CostoAnterior,
+                    2025 as AnioAnterior,
+                    ROW_NUMBER() OVER (PARTITION BY ID_Caseta ORDER BY fecha_act DESC) as rn_prev
+                FROM historico_casetas
+                WHERE YEAR(fecha_act) <= 2025
+            ),
+            CasetaCostos AS (
+                SELECT 
+                    ca.ID_Caseta,
+                    COALESCE(ca.CostoActual, 0) as CostoActual,
+                    COALESCE(cp.CostoAnterior, ca.CostoActual, 0) as CostoAnterior,
+                    ca.AnioActual,
+                    COALESCE(cp.AnioAnterior, 2025) as AnioAnterior
+                FROM CostoActualizados ca
+                LEFT JOIN CostoAnteriores cp ON ca.ID_Caseta = cp.ID_Caseta AND cp.rn_prev = 1
+                WHERE ca.rn_current = 1
+            ),
+            CasetasBase AS (
+                SELECT DISTINCT id_Tipo_ruta, id_Caseta, consecutivo
+                FROM PCasetasporruta
+                WHERE consecutivo IS NOT NULL
+            )
+            SELECT
+                TRN.id_Tipo_ruta,
+                PO.Poblacion AS Origen, 
+                PD.Poblacion AS Destino,
+                COUNT(PCR.id_Caseta) as CantidadCasetas,
+                SUM(CC.CostoAnterior) as CostoAnterior,
+                SUM(CC.CostoActual) as CostoActual,
+                MAX(CC.AnioActual) as AnioActual,
+                MAX(CC.AnioAnterior) as AnioAnterior
+            FROM Tipo_de_ruta_N TRN
+            INNER JOIN Poblaciones PO ON TRN.id_origen = PO.ID_poblacion
+            INNER JOIN Poblaciones PD ON TRN.id_destino = PD.ID_poblacion
+            INNER JOIN CasetasBase PCR ON TRN.id_Tipo_ruta = PCR.id_Tipo_ruta
+            LEFT JOIN CasetaCostos CC ON PCR.id_Caseta = CC.ID_Caseta
+            GROUP BY TRN.id_Tipo_ruta, PO.Poblacion, PD.Poblacion
+            ORDER BY TRN.id_Tipo_ruta
+        `);
+        
+        // We also need the casetas detail for each route
+        const groupedResult = await pool.request().query(`
+            WITH CostoActualizados AS (
+                SELECT ID_Caseta, ISNULL(Camion2Ejes, 0) AS CostoActual, ROW_NUMBER() OVER (PARTITION BY ID_Caseta ORDER BY fecha_act DESC) as rn_current FROM historico_casetas WHERE YEAR(fecha_act) <= 2026
+            ),
+            CostoAnteriores AS (
+                SELECT ID_Caseta, ISNULL(Camion2Ejes, 0) AS CostoAnterior, ROW_NUMBER() OVER (PARTITION BY ID_Caseta ORDER BY fecha_act DESC) as rn_prev FROM historico_casetas WHERE YEAR(fecha_act) <= 2025
+            ),
+            CasetaCostos AS (
+                SELECT ca.ID_Caseta, COALESCE(ca.CostoActual, 0) as CostoActual, COALESCE(cp.CostoAnterior, ca.CostoActual, 0) as CostoAnterior FROM CostoActualizados ca LEFT JOIN CostoAnteriores cp ON ca.ID_Caseta = cp.ID_Caseta AND cp.rn_prev = 1 WHERE ca.rn_current = 1
+            ),
+            CasetasBase AS (
+                SELECT DISTINCT id_Tipo_ruta, id_Caseta, consecutivo
+                FROM PCasetasporruta
+                WHERE consecutivo IS NOT NULL
+            )
+            SELECT 
+                PCR.id_Tipo_ruta,
+                CP.Nombre AS Caseta,
+                CC.CostoAnterior,
+                CC.CostoActual
+            FROM CasetasBase PCR
+            INNER JOIN casetas_Plantillas CP ON PCR.id_Caseta = CP.ID_Caseta
+            LEFT JOIN CasetaCostos CC ON PCR.id_Caseta = CC.ID_Caseta
+            ORDER BY PCR.consecutivo ASC
+        `);
+        
+        // Group the casetas by id_Tipo_ruta
+        const casetasMap = {};
+        for(let caseta of groupedResult.recordset) {
+            if (!casetasMap[caseta.id_Tipo_ruta]) {
+                casetasMap[caseta.id_Tipo_ruta] = [];
+            }
+            casetasMap[caseta.id_Tipo_ruta].push(caseta);
+        }
+        
+        // Attach casetas to main result
+        for(let route of result.recordset) {
+            route.casetas = casetasMap[route.id_Tipo_ruta] || [];
+        }
+        
+        res.json(result.recordset);
+    } catch (error) {
+        console.error('Error en getAnalisisHistoricoRutas:', error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+/**
+ * Obtiene rutas con estadísticas de viajes en 2025 y coordenadas de origen/destino
+ * para el mapa de consumo de combustible.
+ */
+export const getRutasCombustible2025 = async (req, res) => {
+    try {
+        const pool = await getConnection();
+        const result = await pool.request().query(`
+            -- TRY_CAST convierte varchar→float de forma segura:
+            -- si el valor no es numérico devuelve NULL (nunca lanza error).
+            WITH CoordsSeguras AS (
+                SELECT
+                    TRN.id_Tipo_ruta,
+                    PO.Poblacion                                        AS Origen,
+                    PD.Poblacion                                        AS Destino,
+                    ISNULL(TRN.Km_reales, 0)                           AS Km_reales,
+                    ISNULL(TRN.Km_oficiales, 0)                        AS Km_oficiales,
+                    DIR_O.Nombre                                        AS NombreOrigen,
+                    DIR_D.Nombre                                        AS NombreDestino,
+                    TRY_CAST(DIR_O.latitud  AS FLOAT)                  AS LatOrigen,
+                    TRY_CAST(DIR_O.longitud AS FLOAT)                  AS LonOrigen,
+                    TRY_CAST(DIR_D.latitud  AS FLOAT)                  AS LatDestino,
+                    TRY_CAST(DIR_D.longitud AS FLOAT)                  AS LonDestino,
+                    CAST(ISNULL(TRN.Alterna, 0) AS BIT)                AS Alterna,
+                    COUNT(DISTINCT OT.ID_orden)                        AS TotalViajes2025
+                FROM Tipo_de_ruta_N TRN
+                INNER JOIN Poblaciones PO     ON TRN.id_origen       = PO.ID_poblacion
+                INNER JOIN Poblaciones PD     ON TRN.id_destino       = PD.ID_poblacion
+                INNER JOIN Directorio DIR_O   ON TRN.PoblacionOrigen  = DIR_O.ID_entidad
+                INNER JOIN Directorio DIR_D   ON TRN.PoblacionDestino = DIR_D.ID_entidad
+                INNER JOIN Orden_traslados OT ON TRN.id_Tipo_ruta     = OT.Id_tipo_ruta
+                WHERE YEAR(OT.Fecha_solicitud_cte) = 2025
+                GROUP BY
+                    TRN.id_Tipo_ruta,
+                    PO.Poblacion,
+                    PD.Poblacion,
+                    TRN.Km_reales,
+                    TRN.Km_oficiales,
+                    DIR_O.Nombre,
+                    DIR_D.Nombre,
+                    DIR_O.latitud,
+                    DIR_O.longitud,
+                    DIR_D.latitud,
+                    DIR_D.longitud,
+                    TRN.Alterna
+                HAVING COUNT(DISTINCT OT.ID_orden) > 0
+            )
+            SELECT *
+            FROM CoordsSeguras
+            WHERE
+                -- Solo coordenadas dentro de la República Mexicana
+                LatOrigen  BETWEEN 14.5 AND 32.7
+                AND LonOrigen  BETWEEN -118.5 AND -86.7
+                AND LatDestino BETWEEN 14.5 AND 32.7
+                AND LonDestino BETWEEN -118.5 AND -86.7
+            ORDER BY TotalViajes2025 DESC;
+        `);
+        res.json(result.recordset);
+    } catch (error) {
+        console.error('Error en getRutasCombustible2025:', error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// ── OXXO Gas stations (Google My Maps KML proxy) ─────────────────────────────
+let _stationsCache = null;
+let _stationsCacheTime = 0;
+const STATIONS_CACHE_TTL = 60 * 60 * 1000; // 1 hora
+
+export const getOxxoStations = async (req, res) => {
+    try {
+        const now = Date.now();
+        if (_stationsCache && (now - _stationsCacheTime) < STATIONS_CACHE_TTL) {
+            return res.json(_stationsCache);
+        }
+
+        const KML_URL = 'https://www.google.com/maps/d/u/0/kml?mid=19SUU-opod-yB-boXDkCj9Zfg-Jc5FNs&resourcekey&forcekml=1';
+        const response = await axios.get(KML_URL, {
+            responseType: 'text',
+            headers: { 'User-Agent': 'Mozilla/5.0 (compatible; IAVE-WEB/1.0)' },
+            timeout: 15000,
+        });
+
+        const result = await xml2js.parseStringPromise(response.data, { explicitArray: false });
+        const stations = [];
+
+        const processPlacemarks = (placemarks) => {
+            if (!placemarks) return;
+            const list = Array.isArray(placemarks) ? placemarks : [placemarks];
+            list.forEach(pm => {
+                if (pm.Point && pm.Point.coordinates) {
+                    const parts = String(pm.Point.coordinates).trim().split(',');
+                    const lon = parseFloat(parts[0]);
+                    const lat = parseFloat(parts[1]);
+                    if (!isNaN(lat) && !isNaN(lon)) {
+                        stations.push({ name: pm.name || 'OXXO Gas', lat, lon });
+                    }
+                }
+            });
+        };
+
+        const processFolder = (folder) => {
+            if (!folder) return;
+            processPlacemarks(folder.Placemark);
+            if (folder.Folder) {
+                const subs = Array.isArray(folder.Folder) ? folder.Folder : [folder.Folder];
+                subs.forEach(processFolder);
+            }
+        };
+
+        const doc = result?.kml?.Document;
+        if (!doc) return res.status(502).json({ error: 'Estructura KML inesperada' });
+
+        if (doc.Folder) {
+            const folders = Array.isArray(doc.Folder) ? doc.Folder : [doc.Folder];
+            folders.forEach(processFolder);
+        }
+        processPlacemarks(doc.Placemark);
+
+        _stationsCache = stations;
+        _stationsCacheTime = Date.now();
+        console.log(`OXXO Stations fetched: ${stations.length} (cached for 1 hour)`);
+        res.json(stations);
+        
+    } catch (error) {
+        console.error('Error en getOxxoStations:', error);
+        res.status(500).json({ error: error.message });
+    }
+};
+

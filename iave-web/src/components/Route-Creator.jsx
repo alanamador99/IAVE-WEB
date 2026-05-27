@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 // Importaciones necesarias (agregar al inicio del archivo)
 import { DndContext, closestCenter, DragOverlay } from '@dnd-kit/core';
 import { arrayMove, SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { useSearchParams } from 'react-router-dom';
 
 import Ordenamiento from './route-creator/Sortable';
 import { ModalConfirmacion, ModalFillCreation, ModalSelector, ModalSelectorOrigenDestino, CustomToast, parsearMinutos, formatearDinero, RouteOption, formatearEnteros } from '../components/shared/utils';
@@ -59,7 +60,7 @@ const markerIcons = {
         iconSize: [24, 24],
         shadowSize: [64, 40],
     }),
-        casetaHover: L.icon({
+    casetaHover: L.icon({
         iconUrl: markerCasetaHover,
         shadowUrl: markerShadow,
         iconSize: [32, 32],
@@ -204,6 +205,7 @@ const useDestinationSearch = (searchTerm, tipo) => {
 // ===== COMPONENTE PRINCIPAL =====
 const RutasModule = () => {
 
+    const [searchParams] = useSearchParams();
     const focusRef = useRef(null);
 
     useEffect(() => {
@@ -256,11 +258,41 @@ const RutasModule = () => {
     const [loadingRutaSeleccionada, setLoadingRutaSeleccionada] = useState(false);
     const [boolExiste, setBoolExiste] = useState('Consultando ruta');
     const [casetaHover, setCasetaHover] = useState(null);
+    const [manualIdTipoRuta, setManualIdTipoRuta] = useState('');
 
     // Custom hooks para búsqueda
     const { results: origenes, loading: loadingOrigen } = useDestinationSearch(txtOrigen, 'Origen');
     const { results: destinos, loading: loadingDestino } = useDestinationSearch(txtDestino, 'Destino');
     const { results: puntosIntermedios, loading: loadingPuntoIntermedio } = useDestinationSearch(txtPuntoIntermedio, 'Intermedio');
+
+    // --- Precarga desde URL params (ej: /route-creator?origen=León&destino=Guadalajara) ---
+    const urlParamsProcessed = useRef(false);
+    const autoCalcPending = useRef(false);
+
+    useEffect(() => {
+        if (urlParamsProcessed.current) return;
+        const paramOrigen = searchParams.get('origen');
+        const paramDestino = searchParams.get('destino');
+        if (paramOrigen) setTxtOrigen(paramOrigen);
+        if (paramDestino) setTxtDestino(paramDestino);
+        if (paramOrigen && paramDestino) autoCalcPending.current = true;
+        urlParamsProcessed.current = true;
+    }, [searchParams]);
+
+    // Selección automática del primer resultado cuando vienen de URL params
+    useEffect(() => {
+        if (!autoCalcPending.current) return;
+        if (origenes.length > 0 && !origen) {
+            setOrigen(origenes[0]);
+        }
+    }, [origenes, origen]);
+
+    useEffect(() => {
+        if (!autoCalcPending.current) return;
+        if (destinos.length > 0 && !destino) {
+            setDestino(destinos[0]);
+        }
+    }, [destinos, destino]);
 
     // ===== HANDLERS MEMOIZADOS =====
     const detectarCambiosConsecutivos = useCallback(() => {
@@ -543,6 +575,47 @@ const RutasModule = () => {
         }
     }, [casetasOriginales]);
 
+    const handleCargarRutaManual = async () => {
+        if (!manualIdTipoRuta) {
+            alert('Por favor ingresa un ID de tipo de ruta');
+            return;
+        }
+
+        const confirmar = window.confirm(
+            'Si cargas una ruta manual, se perderán los datos actuales en pantalla. ¿Deseas continuar?'
+        );
+
+        if (!confirmar) return;
+
+        setLoadingRutas(true);
+        try {
+            const response = await axios.get(
+                `${API_URL}/api/casetas/rutas/${manualIdTipoRuta}/casetasPorRuta`
+            );
+
+            if (response.data && response.data.length > 0) {
+                // Actualizar estado de ruta TUSA para que guardar funcione
+                setRutaTusa([{ id_Tipo_ruta: manualIdTipoRuta }]);
+                cargarCasetasRuta(response.data);
+                // Limpiar otros estados para evitar conflictos visuales
+                setRutas_OyL(null);
+                setRutaSeleccionada([]);
+                setOrigen(null);
+                setDestino(null);
+                setPuntoIntermedio(null);
+
+                alert('✅ Ruta cargada exitosamente');
+            } else {
+                alert('⚠️ No se encontraron casetas para este ID de ruta o el ID no existe');
+            }
+        } catch (error) {
+            console.error('Error al cargar ruta manual:', error);
+            alert('Error al cargar la ruta: ' + error.message);
+        } finally {
+            setLoadingRutas(false);
+        }
+    };
+
     // NUEVA FUNCIÓN: Actualizar consecutivo manual
     const handleConsecutivoChange = (idCaseta, nuevoValor) => {
         setCasetasEnRutaTusa((prev) =>
@@ -625,15 +698,15 @@ const RutasModule = () => {
             `${API_URL}/api/casetas/rutas/casetas-tusa-coincidentes`,
             { casetasLimpias: casetasLimpias }
         );
-        
+
         const casetasConCoincidencias = response.data.data?.casetas || [];
         let casetasAgregadasCount = 0;
 
         for (const casetaOrigen of casetasConCoincidencias) {
             // Cada caseta tiene un array 'resultado' con sus coincidencias
             const coincidencias = casetaOrigen.resultado || [];
-            
-            for (const casetaAAgregarModal of coincidencias) {   
+
+            for (const casetaAAgregarModal of coincidencias) {
                 const casetaNormalizada = {
                     ...casetaAAgregarModal,
                     latitud: casetaAAgregarModal.latitud || casetaAAgregarModal.lat,
@@ -944,6 +1017,15 @@ const RutasModule = () => {
             setLoadingRutas(false);
         }
     }, [origen, destino, puntoIntermedio, tipoVehiculo]);
+
+    // Auto-ejecución cuando origen y destino vienen de URL params
+    useEffect(() => {
+        if (autoCalcPending.current && origen?.id_dest && destino?.id_dest) {
+            autoCalcPending.current = false;
+            calcularRutaHandler('SinIntermedio');
+        }
+    }, [origen, destino, calcularRutaHandler]);
+
     useEffect(() => {
         document.addEventListener('keydown', handleKeyDown);
 
@@ -980,8 +1062,29 @@ const RutasModule = () => {
         <div className="container-fluid py-0">
             <div className="container-fluid py-0 rounded-top">
                 <div className="header-RC py-2 rounded-top">
-                    <h1>🚛 Creador de Rutas - Propuesta IAVE-WEB</h1>
-                    {rutas_OyL &&
+                    <div className='d-flex justify-content-between align-items-center'>
+                        <h1>🚛 Creador de Rutas - Propuesta IAVE-WEB</h1>
+                        <div className="d-flex flex-row align-items-center gap-2">
+                            <input
+                                type="text"
+                                className="form-control form-control-sm"
+                                style={{ maxWidth: '120px' }}
+                                placeholder="ID Tipo Ruta"
+                                value={manualIdTipoRuta}
+                                onChange={(e) => setManualIdTipoRuta(e.target.value)}
+                            />
+                            <button
+                                className="btn btn-primary btn-sm"
+                                onClick={handleCargarRutaManual}
+                                disabled={loadingRutas || !manualIdTipoRuta}
+                                title="Cargar ruta existente por ID"
+                            >
+                                <CopyPlus size={16} /> Cargar
+                            </button>
+                        </div>
+                    </div>
+                    {/* Condicional para mostrar la header-actions-RC si hay ruta calculada o casetas cargadas manualmente */}
+                    {(rutas_OyL || casetasEnRutaTusa.length > 0) &&
                         <div className="header-actions-RC">
                             {casetasEnRutaTusa.length === 0 && <button
                                 className="btn btn-info"
@@ -1652,38 +1755,64 @@ const RutasModule = () => {
                                     <thead className="table-hover">
                                         <tr className='text-center'>
                                             <th>IDx</th>
-                                            <th>Caseta</th>
+                                            <th>Latitud</th>
+                                            <th>Longitud</th>
                                             <th>Importes</th>
-                                            <th>¿TAG?</th>
+                                            <th>Caseta</th>
+                                            <th>➕</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {rutaSeleccionada[1]?.map((item, index) => (
-                                            <tr key={item?.id || item?.cve_caseta || index} className='text-center align-middle' onMouseOver={()=>{setCasetaHover(item)}} onMouseOut={()=>{setCasetaHover(null)}}>
-                                                <td className='align-middle'>
-                                                    <div className="d-flex" style={{ textAlign: 'left' }}>
-                                                        {index + 1}
-                                                    </div>
-                                                </td>
-                                                <td className='align-middle'>
-                                                    <div className="d-flex" style={{ textAlign: 'left' }}>
-                                                        {item?.direccion.replace('Cruce la caseta ', '')}
-                                                    </div>
-                                                </td>
-                                                <td className='pr-0 pl-0 align-middle'>
-                                                    <div className="text-center">
-                                                        ${item?.costo_caseta}
-                                                    </div>
-                                                </td>
-                                                <td className='align-middle'>
-                                                    <div className="text-center">
-                                                        <button className="btn btn-sm btn-outline-success" onClick={() => handleAddCaseta(item)} title='Agregar caseta INEGI a la ruta TUSA.'>
-                                                            <MapPinPlus size={20} className='mr-1 py-0 px-0'></MapPinPlus>
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
+                                        {rutaSeleccionada[1]?.map((item, index) => {
+                                            let lat = '';
+                                            let lng = '';
+                                            try {
+                                                if (item?.geojson) {
+                                                    const coords = JSON.parse(item.geojson).coordinates;
+                                                    lng = coords[0];
+                                                    lat = coords[1];
+                                                }
+                                            } catch (e) { }
+
+                                            return (
+                                                <tr key={item?.id || item?.cve_caseta || index} className='text-center align-middle' onMouseOver={() => { setCasetaHover(item) }} onMouseOut={() => { setCasetaHover(null) }}>
+                                                    <td className='align-middle'>
+                                                        <div className="d-flex" style={{ textAlign: 'left' }}>
+                                                            {index + 1}
+                                                        </div>
+                                                    </td>
+                                                    <td className='align-middle'>
+                                                        <div className="text-center" style={{ fontSize: '0.85rem' }}>
+                                                            {lat}
+                                                        </div>
+                                                    </td>
+                                                    <td className='align-middle'>
+                                                        <div className="text-center" style={{ fontSize: '0.85rem' }}>
+                                                            {lng}
+                                                        </div>
+                                                    </td>
+
+                                                    <td className='pr-0 pl-0 align-middle'>
+                                                        <div className="text-center">
+                                                            ${item?.costo_caseta}
+                                                        </div>
+                                                    </td>
+                                                    <td className='align-middle'>
+                                                        <div className="d-flex" style={{ textAlign: 'left' }}>
+                                                            {item?.direccion.replace('Cruce la caseta ', '')}
+                                                        </div>
+                                                    </td>
+
+                                                    <td className='align-middle'>
+                                                        <div className="text-center">
+                                                            <button className="btn btn-sm btn-outline-success" onClick={() => handleAddCaseta(item)} title='Agregar caseta INEGI a la ruta TUSA.'>
+                                                                <MapPinPlus size={20} className='mr-1 py-0 px-0'></MapPinPlus>
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             </div>

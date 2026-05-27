@@ -17,6 +17,7 @@ const Callback = () => {
       .signinCallback()
       .then((user) => {
         console.log("Login exitoso:", user);
+        
         // Redirigir al usuario a la página principal o la que intentaba acceder
         // (Podrías guardar la ruta original en state antes de redirigir)
         navigate("/", { replace: true });

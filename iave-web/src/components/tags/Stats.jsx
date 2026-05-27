@@ -71,6 +71,15 @@ function StatsTags() {
     );
   }
 
+  // Add a safety check in case the API falls over or stats[0] is undefined
+  if (!stats || !stats[0]) {
+    return (
+      <div className="alert alert-warning text-center mt-3" role="alert">
+        No se pudieron cargar las estadísticas. Verifica la conexión.
+      </div>
+    );
+  }
+
   return (
     <div className="row mt-4 pt-4 justify-content-center">
       {configCards.map(({ key, titulo, descripcion, bg, icon }) => (

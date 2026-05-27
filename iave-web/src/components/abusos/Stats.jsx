@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import axios from "axios";
 import DashboardCard from "../shared/DashboardCard";
 import { Target, AlertTriangle, DollarSign, Gavel, HandCoins, CircleCheckBig } from 'lucide-react';
@@ -58,27 +59,55 @@ const configCards = [
 ];
 
 
-function StatsAbusos({onUpdateFromAbusosTable}) {
+function StatsAbusos({ datosFiltrados }) {
+  const [searchParams] = useSearchParams();
+  const currentMonth = searchParams.get("m");
+  const currentYear = searchParams.get("y");
+
   const [stats, setStats] = useState({});
 
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const res = await axios.get(`${API_URL}/api/abusos/stats`);
-        setStats(res.data || {});
+    if (datosFiltrados && Array.isArray(datosFiltrados)) {
+      const newStats = {
+        pendiente_reporte_count: 0, pendiente_reporte_monto: 0,
+        reporte_enviado_todo_pendiente_count: 0, reporte_enviado_todo_pendiente_monto: 0,
+        descuento_aplicado_pendiente_acta_count: 0, descuento_aplicado_pendiente_acta_monto: 0,
+        acta_aplicada_pendiente_descuento_count: 0, acta_aplicada_pendiente_descuento_monto: 0,
+        completado_count: 0, completado_monto: 0,
+        total_count: 0, total_monto: 0
+      };
 
+      datosFiltrados.forEach((abuso) => {
+        const estatus = abuso.Estatus_Secundario || 'pendiente_reporte';
+        const monto = parseFloat(abuso.Importe) || 0;
 
-      } catch (error) {
-        console.error("Error al obtener estadísticcas:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
+        if (newStats[`${estatus}_count`] !== undefined) {
+          newStats[`${estatus}_count`] += 1;
+          newStats[`${estatus}_monto`] += monto;
+        }
+        newStats.total_count += 1;
+        newStats.total_monto += monto;
+      });
 
-    fetchStats();
-  }, [onUpdateFromAbusosTable]);
+      setStats([newStats]);
+      setLoading(false);
+    } else {
+      const fetchStats = async () => {
+        try {
+          const res = await axios.get(`${API_URL}/api/abusos/stats`);
+          setStats(res.data || {});
+        } catch (error) {
+          console.error("Error al obtener estadísticcas:", error);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      fetchStats();
+    }
+  }, [datosFiltrados]);
 
   if (loading) {
     return (
@@ -92,22 +121,30 @@ function StatsAbusos({onUpdateFromAbusosTable}) {
 
   return (
     <div className="row mt-4 pt-4 justify-content-center">
-      {configCards.map(({ key, titulo, descripcion, bg, icon }) => (
+      {configCards.map(({ key, titulo, descripcion, bg, icon }) => {
+        let url = null;
+        if (currentYear && currentMonth !== null) {
+          url = `?y=${currentYear}&m=${currentMonth}`;
+        } else if (currentYear) {
+          url = `?y=${currentYear}`;
+        } else if (currentMonth !== null) {
+          url = `?m=${currentMonth}`;
+        }
 
-        <DashboardCard
-          key={key}
-          titulo={(stats[0][key + '_count'] > 1) ? titulo.split(' ').map(word => word.charAt(0) + word.slice(1)).join('s ') + 's' : titulo.charAt(0).toUpperCase() + titulo.slice(1)}
-          descripcion={descripcion}
-          valor={icon || 0}
-          valordefault={(stats[0][key + '_monto'] === 0) ? <b> ——</b> : <b>  # {stats[0][key + '_count']} | $ {new Intl.NumberFormat("es-MX").format(stats[0][key + '_monto']) + '.00'} </b>}
-          bg={bg}
-          ruta={null}
-          grande={false}
-          bateriaSuperior={<><span className="font-weight-bolder text-info">💰 </span>{(100 * stats[0][key + '_monto'] / stats[0]['total_monto']).toFixed(1) + '%'} </>}
-          bateriaSuperiorIzquierda={<><span className="font-weight-bolder text-dark fs-5">#️⃣</span>{(100 * stats[0][key + '_count'] / stats[0]['total_count']).toFixed(1) + '%'}</>}
-
-        />
-      ))}
+        return (
+          <DashboardCard
+            key={key}
+            titulo={(stats[0][key + '_count'] > 1) ? titulo.split(' ').map(word => word.charAt(0) + word.slice(1)).join('s ') + 's' : titulo.charAt(0).toUpperCase() + titulo.slice(1)}
+            descripcion={descripcion}
+            valor={icon || 0}
+            valordefault={(stats[0][key + '_monto'] === 0) ? <b> ——</b> : <b>  # {stats[0][key + '_count']} | $ {new Intl.NumberFormat("es-MX").format(stats[0][key + '_monto']) + '.00'} </b>}
+            bg={bg}
+            grande={false}
+            bateriaSuperior={<><span className="font-weight-bolder text-info">💰 </span>{stats[0]['total_monto'] > 0 ? (100 * stats[0][key + '_monto'] / stats[0]['total_monto']).toFixed(1) + '%' : '0.0%'} </>}
+            bateriaSuperiorIzquierda={<><span className="font-weight-bolder text-dark fs-5">#️⃣</span>{stats[0]['total_count'] > 0 ? (100 * stats[0][key + '_count'] / stats[0]['total_count']).toFixed(1) + '%' : '0.0%'}</>}
+          />
+        );
+      })}
     </div>
   );
 }

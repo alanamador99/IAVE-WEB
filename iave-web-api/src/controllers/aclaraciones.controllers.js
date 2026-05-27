@@ -20,7 +20,8 @@
  * Estados secundarios:
  * - pendiente_aclaracion: Aclaración identificada, pendiente levantar aclaración en el portal PASE
  * - aclaracion_levantada: Aclaración registrada en el portal PASE, pendiente de dictaminación por parte del proveedor para saber si procedió o no.
- * - dictaminado: Dictamen emitido sobre la aclaración (Pueden no ser procedente).
+ * - Aprobado: Dictamen emitido sobre la aclaración y resultó procedente o a favor.
+ * - Rechazado: Dictamen emitido sobre la aclaración y resultó improcedente.
  * - completado: Proceso finalizado
  * 
  * @requires ../database/connection.js - Es necesario iniciar una conexión a la base de datos SQL-Server, mediante el motor MSSQL.
@@ -102,13 +103,15 @@ export const getAclaraciones = async (req, res) => {
  * @description
  * Retorna conteos y montos por estado secundario:
  * - pendiente_aclaracion: Aclaraciones sin resolver
- * - aclaracion_levantada: Aclaraciones resueltas a favor
- * - dictaminado: Dictamen emitido
+ * - aclaracion_levantada: Aclaraciones registradas en espera de resolución
+ * - Aprobado: Dictamen emitido a favor
+ * - Rechazado: Dictamen emitido en contra
  * 
  * Los montos reflejan la diferencia cobrada:
  * - pendiente_aclaracion: Importe - ImporteOficial
  * - aclaracion_levantada: montoDictaminado o (Importe - ImporteOficial)
- * - dictaminado: montoDictaminado
+ * - Aprobado: montoDictaminado
+ * - Rechazado: montoDictaminado
  * @example
  * // GET /api/aclaraciones/stats
  * // Response
@@ -118,9 +121,11 @@ export const getAclaraciones = async (req, res) => {
  *     "pendiente_monto": 5250.00,
  *     "aclaracion_levantada_count": 18,
  *     "aclaracion_levantada_monto": 2700.00,
- *     "dictaminado_count": 7,
- *     "dictaminado_monto": 1050.00,
- *     "total_count": 60,
+ *     "Aprobado_count": 7,
+ *     "Aprobado_monto": 1050.00,
+ *     "Rechazado_count": 3,
+ *     "Rechazado_monto": 0.00,
+ *     "total_count": 63,
  *     "total_monto": 9000.00
  *   }
  * ]
@@ -333,7 +338,7 @@ ORDER BY
  * @param {string} req.params.id - ID de la aclaración/cruce
  * @param {string} req.body.noAclaracion - Número de aclaración
  * @param {string} req.body.FechaDictamen - Fecha del dictamen
- * @param {string} req.body.estatusSecundario - Nuevo estado (pendiente_aclaracion, aclaracion_levantada, dictaminado)
+ * @param {string} req.body.estatusSecundario - Nuevo estado (pendiente_aclaracion, aclaracion_levantada, Aprobado, Rechazado)
  * @param {string} req.body.observaciones - Observaciones/notas
  * @param {boolean} req.body.dictaminado - ¿Ha sido dictaminado?
  * @param {number} req.body.montoDictaminado - Monto del dictamen
@@ -584,6 +589,8 @@ export const conciliarJSONfromPASE = async (req, res) => {
     let omitidos = {
       incompletos: 0,
       duplicados: 0,
+      noEncontrados: 0,
+      detalles: []
     };
 
     const totalCruces = cruces.length;
@@ -596,7 +603,7 @@ export const conciliarJSONfromPASE = async (req, res) => {
       inserted: 0,
       skipped: 0,
       percentage: 0,
-      message: 'Iniciando conciliación...'
+      message: 'Iniciando conciliación - Calculando ID: YYMMDD_HHMMSS_NumTarjeta'
     });
 
     let i = 0;
@@ -616,6 +623,15 @@ export const conciliarJSONfromPASE = async (req, res) => {
         status
       } = cruce;
 
+      // IDCruce=concatenadoDe(yymmdd)+"_"+concatenadoDe(hhmmss)+"_"+numero
+      // Aseguramos que son strings
+      let fechaCruceStr = String(fechaCruce || "");
+      let horaCruceStr = String(horaCruce || "");
+      
+      let fechaCruceFormatted = fechaCruceStr.replace(/-/g, "").slice(2); // yymmdd
+      let horaCruceFormatted = horaCruceStr.replace(/:/g, ""); // hhmmss
+      const IDCruce = `${fechaCruceFormatted}_${horaCruceFormatted}_${numero}`;
+
       // Enviar progreso cada 10 registros o al inicio/final
       if (i % 10 === 0 || i === 1 || i === totalCruces) {
         const percentage = Math.round((i / totalCruces) * 100);
@@ -624,7 +640,7 @@ export const conciliarJSONfromPASE = async (req, res) => {
           total: totalCruces,
           processed: i,
           inserted: insertados,
-          skipped: omitidos.incompletos + omitidos.duplicados,
+          skipped: omitidos.incompletos + omitidos.duplicados + omitidos.noEncontrados,
           percentage: percentage,
           message: `Procesando registro ${i} de ${totalCruces}`
         });
@@ -632,30 +648,44 @@ export const conciliarJSONfromPASE = async (req, res) => {
 
       if (!id || !fechaCruce || !horaCruce) {
         omitidos.incompletos++;
+        omitidos.detalles.push({ folio: folio || '-', idBuscado: IDCruce || '-', motivo: 'Datos incompletos (fecha/hora/id)', comentario: comentario + importeDevuelto || '-' });
         continue;
       }
-      
-      // IDCruce=concatenadoDe(yymmdd)+"_"+concatenadoDe(hhmmss)+"_"+numero
-      // Aseguramos que son strings
-      let fechaCruceStr = String(fechaCruce);
-      let horaCruceStr = String(horaCruce);
-      
-      let fechaCruceFormatted = fechaCruceStr.replace(/-/g, "").slice(2); // yymmdd
-      let horaCruceFormatted = horaCruceStr.replace(/:/g, ""); // hhmmss
-      const IDCruce = `${fechaCruceFormatted}_${horaCruceFormatted}_${numero}`;
 
-      const estatusSecundario = (status === "DICTAMINADO") ? "dictaminado" : "aclaracion_levantada";
+      let estatusSecundario = "aclaracion_levantada";
+      let estatus = null;
       
-      await pool.request()
+      if (status && status.trim().toUpperCase() === "DICTAMINADO") {
+        const dictToCompare = String(dictamen || "").trim().toUpperCase();
+        if (dictToCompare === "PROCEDENTE" || dictToCompare === "APROBADO" || parseFloat(importeDevuelto) > 0) {
+          estatusSecundario = "Aprobado";
+          estatus="Aclaración";
+        } else {
+          estatusSecundario = "Rechazado";
+        }
+      }
+      
+      let query = (estatus != 'Aclaración') ? "UPDATE Cruces SET FechaDictamen = @FechaDictamen, montoDictaminado = @montoDictaminado, Estatus_Secundario = @estatusSecundario, observaciones = @observaciones, NoAclaracion = @folio WHERE ID = @ID"
+      : "UPDATE Cruces SET FechaDictamen = @FechaDictamen, montoDictaminado = @montoDictaminado, Estatus_Secundario = @estatusSecundario, observaciones = @observaciones, NoAclaracion = @folio, Estatus = 'Aclaración' WHERE ID = @ID";
+
+      const result = await pool.request()
         .input("ID", sql.NVarChar, IDCruce)
         .input("FechaDictamen", sql.Date, fechaDictamen)
         .input("montoDictaminado", sql.Decimal(18, 2), parseFloat(importeDevuelto) || 0)
         .input("estatusSecundario", sql.VarChar, estatusSecundario)
         .input("observaciones", sql.VarChar, comentario)
         .input("folio", sql.VarChar, folio)
-        .query("UPDATE Cruces SET FechaDictamen = @FechaDictamen, montoDictaminado = @montoDictaminado, Estatus_Secundario = @estatusSecundario, observaciones = @observaciones, NoAclaracion = @folio WHERE ID = @ID");
-      
-      insertados++;
+        .input("aplicado", sql.Bit, ((status && status.trim().toUpperCase() === "DICTAMINADO") || (status && status.trim().toUpperCase() === "AUTORIZADO")) ? 1 : 0)
+        .query(query);
+        
+      if (result.rowsAffected[0] > 0) {
+        insertados++;
+        console.log("Actualizado cruce", IDCruce, fechaDictamen, importeDevuelto, estatusSecundario, comentario, folio);
+      } else {
+        omitidos.noEncontrados++;
+        omitidos.detalles.push({ folio: folio || '-', idBuscado: IDCruce || '-', motivo: 'No encontrado en la BD', comentario: comentario + " - " + importeDevuelto || '-' });
+        console.log("Cruce NO encontrado en la base de datos:", IDCruce);
+      }
     }
 
     // Enviar progreso final
@@ -664,9 +694,9 @@ export const conciliarJSONfromPASE = async (req, res) => {
       total: totalCruces,
       processed: totalCruces,
       inserted: insertados,
-      skipped: omitidos.incompletos + omitidos.duplicados,
+      skipped: omitidos.incompletos + omitidos.duplicados + omitidos.noEncontrados,
       percentage: 100,
-      message: 'Conciliación completada',
+      message: `Conciliación completada. ${insertados} actualizados. ${omitidos.noEncontrados} no encontrados.`,
       omitidos: omitidos
     });
 
