@@ -7,10 +7,10 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
-import markerATM from 'leaflet/dist/images/ATM__.png';
-import markerTarget from 'leaflet/dist/images/target__.png';
-import markerStartingPoint from 'leaflet/dist/images/starting-point__.png';
-import markerIconTollB from 'leaflet/dist/images/LittleTollBoth.png';
+import markerATM from '../../assets/img/markers/ATM__.png';
+import markerTarget from '../../assets/img/markers/target__.png';
+import markerStartingPoint from '../../assets/img/markers/starting-point__.png';
+import markerIconTollB from '../../assets/img/markers/LittleTollBoth.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 
 const API_URL = process.env.REACT_APP_API_URL;

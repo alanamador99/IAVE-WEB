@@ -29,7 +29,7 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
-import markerIconTollB from 'leaflet/dist/images/LittleTollBoth.png';
+import markerIconTollB from '../../assets/img/markers/LittleTollBoth.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 
 // Fix leaflet's default icon issue with webpack

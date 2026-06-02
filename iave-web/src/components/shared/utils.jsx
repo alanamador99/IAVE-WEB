@@ -19,7 +19,7 @@ import React, { useState, useRef, useEffect, useCallback, use } from 'react';
 import { Toast } from 'react-bootstrap';
 import { NumericFormat } from 'react-number-format';
 import axios from 'axios';
-import markerCaseta from 'leaflet/dist/images/MapPinGreen.png';
+import markerCaseta from '../../assets/img/markers/MapPinGreen.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 
 
